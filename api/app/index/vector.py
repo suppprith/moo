@@ -50,14 +50,31 @@ def _dims(conn: sqlite3.Connection) -> int:
 
 
 def build(conn: sqlite3.Connection, *, rebuild: bool = False) -> int:
-    """Create chunk_vec and sync embeddings into it. Returns rows inserted."""
+    """Create chunk_vec and sync embeddings into it. Returns rows inserted.
+
+    Sync must self-heal, not just append: a rechunk deletes every chunk row and
+    SQLite reuses the freed rowids, so chunk_vec can hold *old* vectors under
+    ids that now belong to different chunks. We prune orphans, drop rows whose
+    stored vector no longer matches chunk.embedding, then insert what's missing.
+    """
     dims = _dims(conn)
+    if rebuild:
+        conn.execute("DROP TABLE IF EXISTS chunk_vec")  # DROP also handles a dims change
     conn.execute(
         f"CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vec USING vec0("
         f"chunk_id INTEGER PRIMARY KEY, embedding float[{dims}])"
     )
-    if rebuild:
-        conn.execute("DELETE FROM chunk_vec")
+    # orphans: chunk deleted (or whole corpus rechunked and shrunk)
+    conn.execute("DELETE FROM chunk_vec WHERE chunk_id NOT IN (SELECT id FROM chunk)")
+    # stale: rowid reused by a different chunk, or chunk re-embedded
+    stale = [
+        r[0]
+        for r in conn.execute(
+            "SELECT cv.chunk_id FROM chunk_vec cv JOIN chunk c ON c.id = cv.chunk_id "
+            "WHERE c.embedding IS NULL OR cv.embedding != c.embedding"
+        )
+    ]
+    conn.executemany("DELETE FROM chunk_vec WHERE chunk_id = ?", [(i,) for i in stale])
     rows = conn.execute(
         "SELECT id, embedding FROM chunk "
         "WHERE embedding IS NOT NULL AND id NOT IN (SELECT chunk_id FROM chunk_vec)"
@@ -67,6 +84,8 @@ def build(conn: sqlite3.Connection, *, rebuild: bool = False) -> int:
         [(r["id"], r["embedding"]) for r in rows],
     )
     conn.commit()
+    if stale:
+        log.info("repaired %d stale vector rows", len(stale))
     return len(rows)
 
 
