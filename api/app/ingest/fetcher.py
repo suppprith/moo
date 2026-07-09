@@ -36,11 +36,20 @@ class FetchResult:
     url: str
     status: int
     text: str
-    headers: dict[str, str]
+    headers: dict[str, str]        # keys normalized to lowercase
     from_cache: bool = False       # served from disk (304 or offline hit)
     not_modified: bool = False     # server said 304
     ok: bool = True
     error: str | None = None
+
+    def __post_init__(self) -> None:
+        # httpx lowercases keys when cast to dict, but hand-built dicts (cache
+        # fallbacks, tests) may not — normalize so lookups are predictable.
+        self.headers = {k.lower(): v for k, v in self.headers.items()}
+
+    def header(self, name: str, default: str = "") -> str:
+        """Case-insensitive header lookup."""
+        return self.headers.get(name.lower(), default)
 
     @property
     def json(self) -> object:

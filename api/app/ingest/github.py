@@ -93,7 +93,7 @@ class GitHubConnector(Connector):
                 seen += 1
                 if seen >= cap:
                     return
-            m = _NEXT_RE.search(res.headers.get("Link", ""))
+            m = _NEXT_RE.search(res.header("link"))
             url = m.group(1) if m else ""
 
     # -- per-repo ------------------------------------------------------------
