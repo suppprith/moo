@@ -1,0 +1,36 @@
+# ---- Python / api ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# ---- Node / web ----
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Data / models / caches ----
+*.sqlite
+*.sqlite3
+*.db
+data/
+!data/.gitkeep
+.cache/
+models/
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
