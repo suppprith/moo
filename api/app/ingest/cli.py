@@ -12,9 +12,11 @@ import logging
 
 from ..db import get_connection, migrate
 from .github import GitHubConnector
+from .web import DocsConnector
 
 CONNECTORS = {
     "github": GitHubConnector,
+    "docs": DocsConnector,
 }
 
 
@@ -23,6 +25,8 @@ def _build(name: str, conn, args) -> object:
     if name == "github":
         repos = [args.repo] if args.repo else None
         return GitHubConnector(conn, fetcher, repos=repos, max_issues=args.max_per_repo)
+    if name == "docs":
+        return DocsConnector(conn, fetcher, max_pages=args.max_pages)
     return CONNECTORS[name](conn, fetcher)
 
 
@@ -32,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", help="github: single owner/repo instead of all seeds")
     parser.add_argument("--limit", type=int, default=None, help="max documents to store")
     parser.add_argument("--max-per-repo", type=int, default=30, help="github: items per repo")
+    parser.add_argument("--max-pages", type=int, default=20, help="docs: pages per site")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 
