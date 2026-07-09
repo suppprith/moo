@@ -19,13 +19,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+next-env.d.ts
+*.tsbuildinfo
 
 # ---- Data / models / caches ----
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 *.db
-data/
-!data/.gitkeep
 .cache/
 models/
 
