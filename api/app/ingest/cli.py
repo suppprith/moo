@@ -11,12 +11,14 @@ import argparse
 import logging
 
 from ..db import get_connection, migrate
+from .community import CommunityConnector
 from .github import GitHubConnector
 from .web import DocsConnector
 
 CONNECTORS = {
     "github": GitHubConnector,
     "docs": DocsConnector,
+    "community": CommunityConnector,
 }
 
 
@@ -27,6 +29,9 @@ def _build(name: str, conn, args) -> object:
         return GitHubConnector(conn, fetcher, repos=repos, max_issues=args.max_per_repo)
     if name == "docs":
         return DocsConnector(conn, fetcher, max_pages=args.max_pages)
+    if name == "community":
+        sources = tuple(args.source) if args.source else ("so", "hn", "reddit")
+        return CommunityConnector(conn, fetcher, sources=sources, max_items=args.max_pages)
     return CONNECTORS[name](conn, fetcher)
 
 
@@ -36,7 +41,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", help="github: single owner/repo instead of all seeds")
     parser.add_argument("--limit", type=int, default=None, help="max documents to store")
     parser.add_argument("--max-per-repo", type=int, default=30, help="github: items per repo")
-    parser.add_argument("--max-pages", type=int, default=20, help="docs: pages per site")
+    parser.add_argument("--max-pages", type=int, default=20, help="docs/community: items/source")
+    parser.add_argument(
+        "--source", action="append", choices=["so", "hn", "reddit"],
+        help="community: restrict to these sources (repeatable)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 

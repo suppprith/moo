@@ -55,6 +55,25 @@ DOCS_SITES: list[DocsSite] = [
     ),
 ]
 
-# Stack Overflow tags / subreddits used by the community connector (SUP-75).
+# Stack Overflow tags / subreddits / HN queries for the community connector (SUP-75).
 STACKOVERFLOW_TAGS = ["postgresql", "mysql", "sqlite", "redis", "database-indexing"]
 SUBREDDITS = ["PostgreSQL", "Database", "redis"]
+HN_QUERIES = [
+    "postgresql performance",
+    "mysql vs postgres",
+    "redis persistence",
+    "sqlite production",
+]
+
+# Used to keep off-topic HN/Reddit hits out of the corpus.
+DOMAIN_KEYWORDS = [
+    "postgres", "postgresql", "mysql", "mariadb", "sqlite", "redis",
+    "database", "index", "query", "sql", "transaction", "deadlock",
+    "vacuum", "replication", "b-tree", "jsonb", "wal",
+]
+
+
+def is_domain_relevant(*texts: str | None) -> bool:
+    """True if any db keyword appears in the given texts (case-insensitive)."""
+    blob = " ".join(t for t in texts if t).lower()
+    return any(kw in blob for kw in DOMAIN_KEYWORDS)
