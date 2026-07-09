@@ -201,6 +201,13 @@ def rechunk(conn: sqlite3.Connection, *, only_new: bool = False) -> dict[str, in
         # full rebuild: clear in one shot (per-doc deletes would trip the
         # canonical_chunk_id self-FK when a dup in another doc points at the row)
         conn.execute("DELETE FROM chunk")
+    else:
+        # incremental: preload existing canonical hashes so new chunks that
+        # duplicate already-stored ones still collapse onto them
+        for row in conn.execute(
+            "SELECT content_hash, id FROM chunk WHERE canonical_chunk_id IS NULL"
+        ):
+            seen.setdefault(row["content_hash"], row["id"])
     for doc in rows:
         if only_new and conn.execute(
             "SELECT 1 FROM chunk WHERE document_id = ? LIMIT 1", (doc["id"],)

@@ -148,6 +148,8 @@ def brute_search(
     rows = conn.execute(
         "SELECT id, embedding FROM chunk WHERE embedding IS NOT NULL"
     ).fetchall()
+    if not rows:
+        return []
     ids = np.array([r["id"] for r in rows])
     mat = np.vstack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
     q = np.frombuffer(query_vec, dtype=np.float32)
