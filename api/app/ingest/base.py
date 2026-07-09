@@ -45,6 +45,16 @@ def store(conn: sqlite3.Connection, doc: RawDoc) -> str:
     new_hash = doc.content_hash()
     row = conn.execute("SELECT id, content_hash FROM document WHERE url = ?", (doc.url,)).fetchone()
     if row is not None and row["content_hash"] == new_hash:
+        # content_hash deliberately excludes volatile signals (votes, reactions)
+        # so they don't churn the corpus — but they feed trust scoring, so
+        # refresh them even when the content itself is unchanged.
+        conn.execute(
+            "UPDATE document SET popularity = coalesce(?, popularity), "
+            "updated_at = coalesce(?, updated_at), fetched_at = datetime('now') "
+            "WHERE id = ?",
+            (doc.popularity, doc.updated_at, row["id"]),
+        )
+        conn.commit()
         return "unchanged"
 
     params = (

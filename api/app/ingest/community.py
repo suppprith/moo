@@ -10,6 +10,7 @@ hits are filtered to the domain to keep noise out of the corpus.
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -51,17 +52,34 @@ class CommunityConnector(Connector):
         return Fetcher(min_interval=1.5, obey_robots=False)
 
     # -- Stack Overflow ------------------------------------------------------
+    def _se_get(self, url: str) -> dict | None:
+        """GET a Stack Exchange API URL, honoring the `backoff` field.
+
+        SE returns {"backoff": N} with HTTP 200 when the client should pause N
+        seconds before the next request to that method; ignoring it escalates
+        to throttling and eventually an IP ban.
+        """
+        res = self.fetcher.get(url, obey_robots=False)
+        if not res.ok or not isinstance(res.json, dict):
+            log.warning("SE request failed %s: %s", url, res.error)
+            return None
+        payload = res.json
+        backoff = payload.get("backoff")
+        if backoff and not res.from_cache:
+            log.info("SE backoff requested: sleeping %ss", backoff)
+            time.sleep(float(backoff))
+        return payload
+
     def _stackoverflow(self) -> Iterator[RawDoc]:
         for tag in STACKOVERFLOW_TAGS:
             url = (
                 f"{SE_API}/questions?order=desc&sort=votes&tagged={tag}"
                 f"&site=stackoverflow&filter=withbody&pagesize={self.max_items}"
             )
-            res = self.fetcher.get(url, obey_robots=False)
-            if not res.ok or not isinstance(res.json, dict):
-                log.warning("SO questions failed for %s: %s", tag, res.error)
+            payload = self._se_get(url)
+            if payload is None:
                 continue
-            for q in res.json.get("items", []):
+            for q in payload.get("items", []):
                 qurl = q.get("link")
                 yield RawDoc(
                     source_type="so_question",
@@ -82,10 +100,10 @@ class CommunityConnector(Connector):
             f"{SE_API}/questions/{qid}/answers?order=desc&sort=votes"
             f"&site=stackoverflow&filter=withbody&pagesize={self.max_items}"
         )
-        res = self.fetcher.get(url, obey_robots=False)
-        if not res.ok or not isinstance(res.json, dict):
+        payload = self._se_get(url)
+        if payload is None:
             return
-        for a in res.json.get("items", []):
+        for a in payload.get("items", []):
             yield RawDoc(
                 source_type="so_answer",
                 url=a.get("link") or f"{question.get('link')}#{a.get('answer_id')}",
