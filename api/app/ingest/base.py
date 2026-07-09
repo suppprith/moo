@@ -90,6 +90,11 @@ class Connector(ABC):
         self.conn = conn
         self.fetcher = fetcher
 
+    @classmethod
+    def default_fetcher(cls) -> Fetcher:
+        """Fetcher configured for this source; override for auth/robots/rate."""
+        return Fetcher()
+
     @abstractmethod
     def fetch(self) -> Iterator[RawDoc]:
         """Yield raw documents. Implementations should be resumable/idempotent."""
