@@ -3,10 +3,14 @@
 Run locally with:  uv run fastapi dev app/main.py
 """
 
+from typing import Any, Literal
+
 from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from .db import get_connection
 from .graph import query as graph_query
+from .search import CONTRACT_VERSION, search
 
 app = FastAPI(
     title="moo search API",
@@ -15,10 +19,76 @@ app = FastAPI(
 )
 
 
+# ---------------------------------------------------------------------------
+# /search response contract (versioned, documented via OpenAPI)
+# ---------------------------------------------------------------------------
+
+class Source(BaseModel):
+    chunk_id: int
+    document_url: str
+    title: str | None = None
+    source_type: str
+    trust_score: float | None = None
+    heading: str | None = None
+    url_anchor: str
+    score: float
+
+
+class Evidence(BaseModel):
+    relation: Literal["supports", "contradicts", "explains"]
+    chunk_id: int
+    strength: float | None = None
+    document_url: str | None = None
+
+
+class Claim(BaseModel):
+    id: int
+    text: str
+    confidence: float | None = None
+    disputed: bool = False
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class SearchResponse(BaseModel):
+    query: str
+    mode: Literal["raw", "claims", "full"]
+    intent: str
+    answer: str | None = None
+    claims: list[Claim] = Field(default_factory=list)
+    graph: dict[str, Any] = Field(default_factory=dict)
+    sources: list[Source] = Field(default_factory=list)
+    citations: list[dict[str, Any]] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Liveness probe."""
-    return {"status": "ok"}
+    return {"status": "ok", "contract_version": CONTRACT_VERSION}
+
+
+@app.get("/search", response_model=SearchResponse)
+def search_endpoint(
+    q: str = Query(..., description="the search query"),
+    mode: Literal["raw", "claims", "full"] = Query(
+        "raw", description="raw=pure retrieval (no LLM); claims=+evidence; full=+synthesis"
+    ),
+    k: int = Query(10, ge=1, le=50),
+) -> dict:
+    """Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds
+    the evidence layer + query subgraph; `full` adds a cited synthesized answer."""
+    conn = get_connection_for_search()
+    try:
+        return search(conn, q, mode=mode, k=k)
+    finally:
+        conn.close()
+
+
+def get_connection_for_search():
+    """Search needs the sqlite-vec extension loaded for vector retrieval."""
+    from .index.vector import connect
+
+    return connect()
 
 
 @app.get("/graph")
