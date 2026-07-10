@@ -3,9 +3,35 @@
 import { useCallback, useRef, useState } from "react";
 import { ApiError, search } from "@/lib/api";
 import type { Mode, SearchResponse } from "@/lib/types";
+import { Answer } from "@/components/Answer";
+import { ClaimList } from "@/components/ClaimList";
 import { ModeBar } from "@/components/ModeBar";
 import { SearchBox } from "@/components/SearchBox";
 import { SourceList } from "@/components/SourceList";
+
+const EXAMPLES = [
+  "Postgres vs MySQL for a new web app",
+  "Why is my Postgres query not using the index?",
+  "Is SQLite good enough for production?",
+  "Redis vs Postgres for a job queue",
+];
+
+function ResultSkeleton() {
+  return (
+    <div className="skeleton" aria-hidden>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div className="skel-row" key={i}>
+          <div className="skel sq" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="skel line" style={{ width: "55%" }} />
+            <div className="skel line" style={{ width: "30%", height: 9 }} />
+            <div className="skel line" style={{ width: "85%", height: 9 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -13,6 +39,7 @@ export default function Home() {
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async (q: string, m: Mode) => {
@@ -35,6 +62,7 @@ export default function Home() {
 
   const onSearch = (q: string) => {
     setQuery(q);
+    setSearched(true);
     run(q, mode);
   };
 
@@ -43,50 +71,92 @@ export default function Home() {
     if (query) run(query, m);
   };
 
+  const goHome = () => {
+    setSearched(false);
+    setData(null);
+    setError(null);
+    setQuery("");
+    setMode("raw");
+  };
+
+  // ---- home (pre-search) hero ----
+  if (!searched) {
+    return (
+      <div className="shell">
+        <div className="home">
+          <h1 className="wordmark">
+            moo<span className="accent"> search</span>
+          </h1>
+          <p className="tagline">
+            An evidence-graph search engine for developers. Claims backed by typed
+            evidence — supports, contradicts, explains — not ten blue links.
+          </p>
+          <SearchBox loading={loading} size="lg" onSearch={onSearch} />
+          <div className="examples">
+            {EXAMPLES.map((ex) => (
+              <button className="example" key={ex} onClick={() => onSearch(ex)}>
+                {ex}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- results ----
   return (
-    <main className="page">
-      <h1 className="brand">
-        moo<span> search</span>
-      </h1>
+    <div className="shell">
+      <header className="topbar">
+        <div className="inner">
+          <div className="home-wordmark" onClick={goHome}>
+            moo<span style={{ color: "var(--accent)" }}> search</span>
+          </div>
+          <SearchBox initial={query} loading={loading} onSearch={onSearch} />
+        </div>
+      </header>
 
-      <SearchBox loading={loading} onSearch={onSearch} />
+      <main className="content">
+        {data && (
+          <ModeBar
+            mode={mode}
+            intent={data.intent}
+            elapsedMs={data.meta.elapsed_ms}
+            counts={{ claims: data.claims.length }}
+            onMode={onMode}
+          />
+        )}
 
-      {data && (
-        <ModeBar
-          mode={mode}
-          intent={data.intent}
-          elapsedMs={data.meta.elapsed_ms}
-          onMode={onMode}
-        />
-      )}
+        {error && <div className="error">{error}</div>}
 
-      {error && <div className="error">{error}</div>}
+        {loading && !data && <ResultSkeleton />}
 
-      {data && !error && (
-        <>
-          {mode === "full" && data.answer && (
-            <p style={{ marginTop: "1rem" }}>{data.answer}</p>
-          )}
+        {data && !error && (
+          <>
+            {mode === "full" && data.answer && (
+              <Answer
+                text={data.answer}
+                citations={data.citations}
+                generator={data.meta.generator}
+              />
+            )}
 
-          {mode !== "raw" && (
+            {mode !== "raw" && (
+              <>
+                <div className="section-label">
+                  Claims <span className="count">{data.claims.length}</span>
+                </div>
+                <ClaimList claims={data.claims} sources={data.sources} />
+              </>
+            )}
+
             <div className="section-label">
-              {data.claims.length} claim{data.claims.length === 1 ? "" : "s"}
-              {data.graph.nodes.length > 0 &&
-                ` · ${data.graph.nodes.length} graph nodes`}
+              Sources <span className="count">{data.sources.length}</span>
             </div>
-          )}
-
-          <div className="section-label">Sources</div>
-          <SourceList sources={data.sources} />
-        </>
-      )}
-
-      {!data && !error && (
-        <p className="hint" style={{ marginTop: "1.5rem" }}>
-          Ask about PostgreSQL, MySQL, SQLite, or Redis. The default view is pure
-          retrieval — no AI until you ask for it.
-        </p>
-      )}
-    </main>
+            <SourceList sources={data.sources} />
+          </>
+        )}
+      </main>
+    </div>
   );
 }
