@@ -211,10 +211,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-k", type=int, default=8)
     parser.add_argument("--compare", action="store_true", help="also show single-index results")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--no-expand", action="store_true",
+        help="kill-switch: skip query expansion fan-out (for latency comparisons)",
+    )
     args = parser.parse_args(argv)
 
     conn = vector.connect()
-    hits = retrieve(conn, args.query, k=args.k)
+    queries: list[str] | None = None
+    if not args.no_expand:
+        from .expand import expand
+
+        queries = expand(conn, args.query)
+        if queries:
+            print(f"[fan-out: {queries}]")
+    hits = retrieve(conn, args.query, k=args.k, queries=queries)
     if args.json:
         print(json.dumps([h.__dict__ for h in hits], indent=2, default=str))
     else:
