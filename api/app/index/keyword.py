@@ -41,10 +41,16 @@ def build(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT count(*) FROM chunk_fts").fetchone()[0]
 
 
-def _match_query(text: str) -> str:
-    """Turn free text into a safe FTS5 MATCH: each term a quoted phrase (AND)."""
+def _match_query(text: str, *, operator: str = "AND") -> str:
+    """Turn free text into a safe FTS5 MATCH: each term a quoted phrase.
+
+    AND (implicit) is right for identifier-ish queries; OR is the fallback for
+    long natural-language queries where no chunk contains every word (BM25
+    still ranks fuller matches first).
+    """
     terms = re.findall(r"\w+", text)
-    return " ".join(f'"{t}"' for t in terms)
+    joiner = " " if operator == "AND" else " OR "
+    return joiner.join(f'"{t}"' for t in terms)
 
 
 def search(
@@ -55,8 +61,32 @@ def search(
     source_types: list[str] | None = None,
     since: str | None = None,
 ) -> list[tuple[int, float]]:
-    """Return [(chunk_id, bm25_relevance)] best-first (higher = better)."""
-    match = _match_query(query)
+    """Return [(chunk_id, bm25_relevance)] best-first (higher = better).
+
+    Runs strict AND first (exact-identifier precision); if that returns fewer
+    than k hits, tops up with OR-mode matches so long natural-language queries
+    still contribute a BM25 ranking to the hybrid fusion.
+    """
+    hits = _search_match(conn, _match_query(query), k, source_types, since)
+    if len(hits) < k:
+        seen = {cid for cid, _ in hits}
+        hits += [
+            (cid, score)
+            for cid, score in _search_match(
+                conn, _match_query(query, operator="OR"), k, source_types, since
+            )
+            if cid not in seen
+        ]
+    return hits[:k]
+
+
+def _search_match(
+    conn: sqlite3.Connection,
+    match: str,
+    k: int,
+    source_types: list[str] | None,
+    since: str | None,
+) -> list[tuple[int, float]]:
     if not match:
         return []
     sql = (
