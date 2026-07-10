@@ -5,8 +5,8 @@ description = "moo search API — evidence-graph search engine"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=0.116.0",
     "fastapi[standard]>=0.115",
+    "google-genai>=2.11.0",
     "httpx>=0.28.1",
     "sentence-transformers",
     "sqlite-vec>=0.1.9",

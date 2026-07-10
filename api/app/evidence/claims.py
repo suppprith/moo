@@ -6,7 +6,7 @@ source chunks (`claim_chunk`). Near-identical claims are merged via embedding
 similarity over claim text, and a hallucination guard drops any claim whose text
 isn't grounded in its source chunk.
 
-Primary path is a structured Claude call (`app.llm`); a deterministic
+Primary path is a structured Gemini call (`app.llm`); a deterministic
 sentence-extraction fallback keeps the pipeline runnable without credentials —
 lower quality, but grounded by construction (claims are literal chunk sentences).
 

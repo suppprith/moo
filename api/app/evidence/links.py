@@ -5,7 +5,7 @@ relationship as a typed ``evidence`` edge with a strength. Contradiction
 detection is the differentiator — contradicting evidence is stored, never
 dropped, so the UI can surface disagreement instead of averaging it away.
 
-Primary path is a batched Claude call per claim; a heuristic fallback uses
+Primary path is a batched Gemini call per claim; a heuristic fallback uses
 embedding similarity plus contrast/causal lexical cues so the edge graph
 exists without credentials (coarser, but contradictions still surface).
 

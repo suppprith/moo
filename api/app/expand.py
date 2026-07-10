@@ -3,7 +3,7 @@
 ``expand(conn, query)`` returns 3-5 reformulations — synonyms, the "why"
 behind a "what", the error-message phrasing of a symptom — cached in
 ``llm_cache`` by normalized query so repeats are free. Primary path is a
-cheap Claude call through ``app.llm``; a deterministic intent-aware heuristic
+cheap Gemini call through ``app.llm``; a deterministic intent-aware heuristic
 covers the no-credentials case so retrieval always works.
 
 Fan-out itself is ``retrieve(..., queries=expansions)`` — every (index,
