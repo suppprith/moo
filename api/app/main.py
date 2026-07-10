@@ -5,7 +5,10 @@ Run locally with:  uv run fastapi dev app/main.py
 
 from typing import Any, Literal
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .db import get_connection
@@ -16,6 +19,18 @@ app = FastAPI(
     title="moo search API",
     version="0.1.0",
     summary="Evidence-graph search engine",
+)
+
+# Let the web/ dev server (and a self-hosted UI) call the API from the browser.
+# Override the allowed origins with MOO_CORS_ORIGINS (comma-separated) in prod.
+_origins = os.environ.get(
+    "MOO_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+).split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _origins if o.strip()],
+    allow_methods=["GET"],
+    allow_headers=["*"],
 )
 
 
