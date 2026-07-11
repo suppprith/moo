@@ -33,6 +33,15 @@ app = FastAPI(
     title="moo",
     version="0.1.0",
     summary="CS/coding evidence search for AI agents",
+    description=(
+        "CS/coding-specialized search backend for AI agents. Endpoints: `/search` "
+        "(ranked evidence), `/v1/web_search` (drop-in web_search shape), `/research` "
+        "(deep research), fetch/drill-down (`/source|/chunk|/claim/{id}`), `/graph`. "
+        "Opaque handles: `chk_`/`doc_`/`clm_`/`ent_`. Errors use a structured "
+        "envelope with a stable `code`. See `/contract` for the machine-readable "
+        "descriptor and the MCP tool schemas."
+    ),
+    license_info={"name": "MIT", "url": "https://github.com/suppprith/moo/blob/main/LICENSE"},
 )
 
 # Let the web/ dev server (and a self-hosted UI) call the API from the browser.
@@ -53,7 +62,7 @@ app.add_middleware(
 # Request IDs + structured error envelope (SUP-107)
 # ---------------------------------------------------------------------------
 
-_AUTH_EXEMPT = {"/", "/health", "/v1/tools", "/openapi.json", "/docs", "/redoc"}
+_AUTH_EXEMPT = {"/", "/health", "/contract", "/v1/tools", "/openapi.json", "/docs", "/redoc"}
 
 
 @app.middleware("http")
@@ -187,6 +196,30 @@ def health() -> dict:
 def usage() -> dict:
     """Per-key request counts (masked). Requires a valid key when auth is on."""
     return {"enabled": auth.enabled(), "usage": auth.usage()}
+
+
+@app.get("/contract")
+async def contract() -> dict:
+    """Machine-readable descriptor: contract version, the OpenAPI URL, the handle
+    formats, and the MCP tool schemas — one place for an agent to introspect moo."""
+    from .mcp_server import mcp as mcp_server
+
+    tools = await mcp_server.list_tools()
+    return {
+        "name": "moo",
+        "contract_version": CONTRACT_VERSION,
+        "openapi": "/openapi.json",
+        "handle_formats": {
+            "chunk": "chk_<id>", "document": "doc_<id>",
+            "claim": "clm_<id>", "entity": "ent_<id>",
+        },
+        "error_envelope": {"error": {"code": "string", "message": "string",
+                                     "retryable": "bool", "request_id": "string"}},
+        "mcp_tools": [
+            {"name": t.name, "description": t.description, "input_schema": t.inputSchema}
+            for t in tools
+        ],
+    }
 
 
 @app.get("/search")

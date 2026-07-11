@@ -11,7 +11,11 @@ uv run ruff check .           # lint
 uv run ruff format .          # format
 ```
 
-- `GET /health` → `{"status": "ok"}` liveness probe.
+- `GET /health` → liveness probe.
+- `GET /contract` → machine-readable descriptor (contract version, OpenAPI URL,
+  handle formats, MCP tool schemas). OpenAPI at `/openapi.json`, committed to
+  [`openapi.json`](openapi.json) — regenerate with `uv run python -m app.export_openapi`
+  (a test fails on drift).
 
 ## MCP server (`moo-mcp`)
 
