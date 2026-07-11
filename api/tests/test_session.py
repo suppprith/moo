@@ -108,6 +108,7 @@ def test_run_research_persists_and_finalizes(conn, monkeypatch):
     monkeypatch.setattr(sess, "run_loop", fake_loop)
     out = sess.run_research(conn, "q", use_llm=False)
     assert out["status"] == "partial"          # exhausted -> partial
+    assert "cost" in out and out["cost"]["llm_calls"] == 0   # faked/keyless: no LLM calls
     persisted = sess.get_run(conn, out["run_id"])
     assert persisted["status"] == "partial"
     assert len(persisted["steps"]) == 1

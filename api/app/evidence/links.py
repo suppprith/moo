@@ -106,10 +106,14 @@ def _candidates(conn: sqlite3.Connection, claim_text: str, claim_id: int) -> lis
     return pairs
 
 
-def _llm_edges(claim_text: str, candidates: list[tuple[int, str]]) -> list[dict] | None:
+def _llm_edges(
+    conn: sqlite3.Connection, claim_text: str, candidates: list[tuple[int, str]]
+) -> list[dict] | None:
     joined = "\n\n".join(f"[chunk {cid}] {text[:600]}" for cid, text in candidates)
-    payload = llm.generate_json(
-        _PROMPT.format(claim=claim_text, chunks=joined), schema=_EDGE_SCHEMA, max_tokens=1200
+    key_input = claim_text.strip().lower() + ":" + ",".join(str(cid) for cid, _ in sorted(candidates))
+    payload = llm.cached_json(
+        conn, "links", key_input,
+        _PROMPT.format(claim=claim_text, chunks=joined), schema=_EDGE_SCHEMA, max_tokens=1200,
     )
     if not payload or not isinstance(payload.get("edges"), list):
         return None
@@ -121,7 +125,7 @@ def link_claim(conn: sqlite3.Connection, claim_id: int, claim_text: str, *, use_
     candidates = _candidates(conn, claim_text, claim_id)
     if not candidates:
         return {}
-    edges = _llm_edges(claim_text, candidates) if use_llm else None
+    edges = _llm_edges(conn, claim_text, candidates) if use_llm else None
     if edges is None:
         # heuristic: cosine between claim and each candidate + lexical cues
         cvec = embed_texts([claim_text])[0]

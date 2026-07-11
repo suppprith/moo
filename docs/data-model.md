@@ -115,6 +115,17 @@ Runs persist to `research_run` / `research_step` / `research_claim` (migration
 0005); they associate with the shared claim/evidence graph rather than owning it,
 so a run is purgeable without harming the graph.
 
+**Cost & caching (SUP-122).** Every LLM stage (expand, plan, claims, links,
+rerank, synthesize) is cached in `llm_cache` by content hash via
+`llm.cached_json`, so a repeated identical run makes ~zero API calls (plan/expand
+cache their heuristic results too, so repeats hit the cache even keyless).
+`run_research` resets `llm` cost counters and reports a `cost` block:
+`{plan_ms, loop_ms, llm_calls, cache_hits, cache_misses}`. The loop is bounded by
+`max_steps` + a wall-clock deadline, never re-runs the same query, and suppresses
+near-duplicate spawned follow-ups (token-Jaccard) so it does not re-retrieve
+covered ground. Measured warm on the dev box: a 3-step run ≈ 0.8s loop + ~1ms
+plan; retrieval-only path is well under 1s (post the near-dup simhash fix).
+
 ## Conventions
 
 - Timestamps are ISO-8601 text (`datetime('now')`).

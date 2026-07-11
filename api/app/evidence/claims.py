@@ -113,9 +113,13 @@ def _heuristic_extract(chunks: list[tuple[int, str]], max_claims: int) -> list[d
     return [c for _, c in scored[: max_claims * 2]]  # trimmed after clustering
 
 
-def _llm_extract(query: str, chunks: list[tuple[int, str]], max_claims: int) -> list[dict] | None:
+def _llm_extract(
+    conn: sqlite3.Connection, query: str, chunks: list[tuple[int, str]], max_claims: int
+) -> list[dict] | None:
     joined = "\n\n".join(f"[chunk {cid}] {text[:700]}" for cid, text in chunks)
-    payload = llm.generate_json(
+    key_input = _normalize(query) + ":" + ",".join(str(cid) for cid, _ in sorted(chunks))
+    payload = llm.cached_json(
+        conn, "claims", key_input,
         _PROMPT.format(max=max_claims, query=query, chunks=joined),
         schema=_CLAIM_SCHEMA,
         max_tokens=1500,
@@ -194,7 +198,7 @@ def extract_claims(
 ) -> list[dict]:
     hits = retrieve(conn, query, k=k)
     chunks = [(h.chunk_id, h.text) for h in hits]
-    raw = _llm_extract(query, chunks, MAX_CLAIMS) if use_llm else None
+    raw = _llm_extract(conn, query, chunks, MAX_CLAIMS) if use_llm else None
     model = llm.CHEAP_MODEL if raw else "heuristic"
     if not raw:
         raw = _heuristic_extract(chunks, MAX_CLAIMS)

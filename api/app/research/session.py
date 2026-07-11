@@ -20,8 +20,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 import uuid
 
+from .. import llm
 from .loop import MAX_SECONDS, MAX_STEPS, run_loop
 from .plan import plan as make_plan
 
@@ -168,7 +170,10 @@ def run_research(
 ) -> dict:
     """Plan -> run the loop (persisting each step) -> finalize. Returns the run
     state including its ``run_id`` and terminal ``status`` (done|partial|failed)."""
+    llm.reset_stats()  # measure LLM cost for this run (SUP-122)
+    t0 = time.perf_counter()
     plan = make_plan(conn, question, use_llm=use_llm)
+    plan_ms = round((time.perf_counter() - t0) * 1000, 1)
     run_id = create_run(conn, question, plan)
 
     def on_step(step, assocs):
@@ -183,5 +188,13 @@ def run_research(
         set_status(conn, run_id, "failed", error=str(exc))
         raise
     status = "partial" if result["budget"]["exhausted"] else "done"
+    stats = llm.get_stats()
+    result["cost"] = {
+        "plan_ms": plan_ms,
+        "loop_ms": result["budget"].get("elapsed_ms"),
+        "llm_calls": stats["calls"],
+        "cache_hits": stats["cache_hits"],
+        "cache_misses": stats["cache_misses"],
+    }
     finalize_run(conn, run_id, result, status)
     return {"run_id": run_id, "status": status, "plan": plan, **result}

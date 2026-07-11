@@ -160,7 +160,9 @@ def _validate(answer: str, valid_ids: set[int]) -> str:
     return " ".join(kept)
 
 
-def _llm_answer(query: str, prepared: list[dict], source_ids: list[int]) -> str | None:
+def _llm_answer(
+    conn: sqlite3.Connection, query: str, prepared: list[dict], source_ids: list[int]
+) -> str | None:
     lines = []
     for i, c in enumerate(prepared, 1):
         tag = "DISPUTED" if c["disputed"] and c["contradicts"] else f"confidence {c['confidence']}"
@@ -168,7 +170,9 @@ def _llm_answer(query: str, prepared: list[dict], source_ids: list[int]) -> str 
         if c["contradicts"]:
             cite += " ; contradicting " + ",".join(f"S{s}" for s in c["contradicts"])
         lines.append(f'[C{i}] ({tag}) "{c["text"]}" — {cite}')
-    payload = llm.generate_json(
+    key_input = query.strip().lower() + ":" + "|".join(f"{c['text']}>{c['supports']}/{c['contradicts']}" for c in prepared)
+    payload = llm.cached_json(
+        conn, "synthesize", key_input,
         _PROMPT.format(
             query=query, claims="\n".join(lines),
             source_ids=", ".join(f"S{i}" for i in source_ids),
@@ -209,7 +213,7 @@ def synthesize(
     generator = "template"
     answer = ""
     if use_llm:
-        raw = _llm_answer(query, prepared, sorted(valid_ids))
+        raw = _llm_answer(conn, query, prepared, sorted(valid_ids))
         if raw:
             answer = _validate(raw, valid_ids)
             if answer:

@@ -115,7 +115,7 @@ def assemble_report(conn, run: dict, *, use_llm: bool = True, max_findings: int 
     generator = "template"
     answer = ""
     if use_llm and top:
-        raw = _llm_answer(question, top, sorted(valid_ids))
+        raw = _llm_answer(conn, question, top, sorted(valid_ids))
         if raw:
             answer = _validate(raw, valid_ids)
             if answer:

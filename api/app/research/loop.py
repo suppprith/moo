@@ -46,6 +46,19 @@ def _max_conf(claims: list[dict]) -> float:
     return max((c["confidence"] or 0.0 for c in claims), default=0.0)
 
 
+def _too_similar(nq: str, seen: set[str], threshold: float = 0.85) -> bool:
+    """Token-Jaccard near-duplicate check, to suppress a redundant *follow-up*
+    that would re-retrieve what an earlier step already covered."""
+    toks = set(nq.split())
+    if not toks:
+        return False
+    for s in seen:
+        st = set(s.split())
+        if st and len(toks & st) / len(toks | st) >= threshold:
+            return True
+    return False
+
+
 def _gap_query(conn, query: str, use_llm: bool, already: set[str]) -> str | None:
     """A reformulation of `query` not yet run this session, to chase a gap."""
     for variant in expand(conn, query, use_llm=use_llm):
@@ -91,7 +104,10 @@ def run_loop(
     while queue and budget_left():
         sub_id, query, reason = queue.popleft()
         nq = normalize_query(query)
-        if nq in run_queries:
+        # exact dedup for any query; near-dup suppression only for spawned
+        # follow-ups (plan sub-questions are intentionally similar — the axes of a
+        # comparison share most tokens — and must always run).
+        if nq in run_queries or (reason != "plan" and _too_similar(nq, run_queries)):
             continue
         run_queries.add(nq)
 

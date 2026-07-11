@@ -99,6 +99,12 @@ def test_same_query_not_run_twice(conn, monkeypatch):
     assert out["budget"]["steps_used"] == 1
 
 
+def test_too_similar_suppresses_near_dup_only():
+    seen = {"how do you fix connection pool exhaustion"}
+    assert loop_mod._too_similar("how do you fix connection pool exhaustion", seen)  # ~identical
+    assert not loop_mod._too_similar("redis persistence tradeoffs", seen)
+
+
 def test_claim_linked_and_scored_once_across_sub_questions(conn, monkeypatch):
     monkeypatch.setattr(loop_mod, "extract_claims", lambda *a, **k: [{"id": 9, "text": "shared", "chunk_ids": [1]}])
     scored = []

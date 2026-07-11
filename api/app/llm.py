@@ -69,6 +69,20 @@ def get_client():
     return _client
 
 
+# Per-process cost counters (SUP-122). Reset around a run to measure it; note
+# they are process-global, so a single run at a time gets clean numbers.
+_STATS = {"calls": 0, "cache_hits": 0, "cache_misses": 0}
+
+
+def reset_stats() -> None:
+    for k in _STATS:
+        _STATS[k] = 0
+
+
+def get_stats() -> dict:
+    return dict(_STATS)
+
+
 def cache_key(stage: str, normalized_input: str) -> str:
     digest = hashlib.sha256(normalized_input.encode("utf-8")).hexdigest()
     return f"{stage}:{digest}"
@@ -76,7 +90,11 @@ def cache_key(stage: str, normalized_input: str) -> str:
 
 def cache_get(conn: sqlite3.Connection, key: str):
     row = conn.execute("SELECT value FROM llm_cache WHERE key = ?", (key,)).fetchone()
-    return json.loads(row[0]) if row else None
+    if row:
+        _STATS["cache_hits"] += 1
+        return json.loads(row[0])
+    _STATS["cache_misses"] += 1
+    return None
 
 
 def cache_put(conn: sqlite3.Connection, key: str, value, model: str) -> None:
@@ -85,6 +103,20 @@ def cache_put(conn: sqlite3.Connection, key: str, value, model: str) -> None:
         (key, json.dumps(value, ensure_ascii=False), model),
     )
     conn.commit()
+
+
+def cached_json(conn: sqlite3.Connection, stage: str, key_input: str, prompt: str, *, schema: dict, **kw):
+    """cache_get -> generate_json -> cache_put in one call, keyed by content, so
+    every LLM stage is cached (SUP-122). A repeated identical run is a cache hit
+    and makes zero API calls. Non-results (heuristic fallback) are not cached."""
+    key = cache_key(stage, key_input)
+    hit = cache_get(conn, key)
+    if hit is not None:
+        return hit
+    result = generate_json(prompt, schema=schema, **kw)
+    if result is not None:
+        cache_put(conn, key, result, kw.get("model", CHEAP_MODEL))
+    return result
 
 
 def _gemini_schema(schema: dict) -> dict:
@@ -118,6 +150,7 @@ def generate_json(
     client = get_client()
     if client is None:
         return None
+    _STATS["calls"] += 1
     try:
         from google.genai import types
     except Exception as exc:  # noqa: BLE001
