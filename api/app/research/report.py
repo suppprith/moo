@@ -35,6 +35,7 @@ from ..synthesize import (
     _template_answer,
     _validate,
 )
+from .groundedness import attach_groundedness
 
 log = logging.getLogger("moo.research.report")
 
@@ -135,7 +136,7 @@ def assemble_report(conn, run: dict, *, use_llm: bool = True, max_findings: int 
         for s in registry.sources
     ]
 
-    return {
+    report = {
         "question": question,
         "executive_answer": answer,
         "findings": findings,
@@ -144,6 +145,7 @@ def assemble_report(conn, run: dict, *, use_llm: bool = True, max_findings: int 
         "sources": sources,
         "generator": generator,
     }
+    return attach_groundedness(conn, report)
 
 
 def main(argv: list[str] | None = None) -> int:
