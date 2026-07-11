@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.115",
     "google-genai>=2.11.0",
     "httpx>=0.28.1",
+    "mcp>=1.28.1",
     "sentence-transformers",
     "sqlite-vec>=0.1.9",
     "trafilatura>=2.1.0",
