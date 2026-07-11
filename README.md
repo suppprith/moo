@@ -55,6 +55,46 @@ cd api && uv sync && uv run fastapi dev app/main.py   # http://127.0.0.1:8000/he
 cd web && npm install && npm run dev                  # http://localhost:3000
 ```
 
+## Connect an agent (MCP) in 2 minutes
+
+moo doubles as a **CS/coding search backend for AI agents** — the tool a coding
+agent routes its `web_search` to for software-engineering questions. It ships an
+MCP server exposing `search`, `fetch_source`, `get_claim`, `list_contradictions`,
+and `expand_graph`, all returning compact, grounded results with opaque handles
+you can drill into.
+
+```bash
+cd api && uv sync                       # once
+uv run python -m app.mcp_server         # stdio server (no install needed)
+# or, if installed as a tool (uv tool install . / pipx install .):
+moo-mcp                                 # stdio   ·   moo-mcp --http   (streamable HTTP on :8000/mcp)
+```
+
+Point a client at it (replace the path with your absolute checkout path):
+
+**Claude Code** — `claude mcp add moo -- uv run --directory "/abs/path/to/moo search/api" python -m app.mcp_server`
+
+**Claude Desktop** — add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "moo": {
+      "command": "uv",
+      "args": ["run", "--directory", "/abs/path/to/moo search/api", "python", "-m", "app.mcp_server"]
+    }
+  }
+}
+```
+
+**Any MCP client (installed)** — `{ "mcpServers": { "moo": { "command": "moo-mcp" } } }`,
+or run `moo-mcp --http` and connect to `http://127.0.0.1:8000/mcp`.
+
+Runs **keyless** locally (no API key, no query logging; per-key auth arrives with
+serving). The first `search` warms the embedding model (~a few seconds), then a
+typical agent flow is: `search` → read `sources` → `fetch_source(chk_…)` for the
+full evidence, or `list_contradictions` to see where sources disagree.
+
 ## Data model
 
 Single SQLite file; stdlib `sqlite3`, no ORM. Full detail in

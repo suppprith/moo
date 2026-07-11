@@ -20,6 +20,15 @@ def _no_real_db(monkeypatch):
 
 # ---- registration + schemas -------------------------------------------------
 
+def test_server_smoke_lists_tools():
+    """CI smoke check (SUP-118): the server object builds and exposes its tools,
+    and the `moo-mcp` entry point is importable."""
+    assert m.mcp.name == "moo-search"
+    assert callable(m.main)
+    tools = asyncio.run(m.mcp.list_tools())
+    assert len(tools) == 5
+
+
 def test_all_tools_registered_with_schemas():
     tools = asyncio.run(m.mcp.list_tools())
     by_name = {t.name: t for t in tools}

@@ -166,12 +166,19 @@ def expand_graph(node: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="app.mcp_server", description="moo MCP server")
+    parser = argparse.ArgumentParser(prog="moo-mcp", description="moo MCP server")
     parser.add_argument(
         "--http", action="store_true", help="serve over streamable HTTP instead of stdio"
     )
+    parser.add_argument("--host", default="127.0.0.1", help="HTTP bind host (with --http)")
+    parser.add_argument("--port", type=int, default=8000, help="HTTP bind port (with --http)")
     args = parser.parse_args(argv)
-    mcp.run(transport="streamable-http" if args.http else "stdio")
+    if args.http:
+        mcp.settings.host = args.host
+        mcp.settings.port = args.port
+        mcp.run(transport="streamable-http")
+    else:
+        mcp.run(transport="stdio")
     return 0
 
 
