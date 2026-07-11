@@ -118,12 +118,24 @@ attaches moo's evidence layer (claims + confidence + citations) as an optional
 `evidence` field the caller can use or ignore.
 
 **Interface parity.** The MCP server is the full surface (search, fetch_source,
-get_claim, list_contradictions, expand_graph, and — once the engine lands —
-deep_research). The `/v1/web_search` adapter covers the search entry point in
-web-search shape; drill-down and graph tools remain MCP-only. Latency note: the
-default `raw` path is CPU-embedding-bound on a dev box (~1–2s warm per query);
-query-embedding caching (perf pass) brings repeat queries toward the sub-second
-target.
+get_claim, list_contradictions, expand_graph, deep_research, research_status). The
+`/v1/web_search` adapter covers the search entry point in web-search shape;
+drill-down, graph, and deep-research tools are MCP-only.
+
+### Deep research
+
+Hand off a whole question and get a grounded, cited report:
+
+- **MCP**: `deep_research(question)` → `{executive_answer, findings[] (confidence +
+  citations), disputed_points[], open_questions[], sources[], groundedness}`;
+  `research_status(run_id)` to poll/resume. Progress streams as MCP events.
+- **HTTP**: `POST /research` (or `POST /research/stream` for SSE), `GET /research/{id}`.
+
+moo decomposes the question, iterates retrieval to fill gaps and chase
+contradictions (budgeted), and every finding traces to a source (uncited claims
+never ship). Full tool reference, workflow, and benchmark numbers:
+**[docs/agents.md](docs/agents.md)**. Reproducible demo: `uv run python -m app.eval.demo`
+([recorded transcript](docs/agent-demo.md)).
 
 ## Data model
 
