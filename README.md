@@ -95,6 +95,36 @@ serving). The first `search` warms the embedding model (~a few seconds), then a
 typical agent flow is: `search` → read `sources` → `fetch_source(chk_…)` for the
 full evidence, or `list_contradictions` to see where sources disagree.
 
+### Or: route an existing `web_search` tool to moo
+
+For agents that don't speak MCP, moo also serves the **universal web-search shape**
+(`{title, url, snippet}`) so it drops in wherever a general web search was:
+
+```bash
+uv run fastapi dev app/main.py            # API on :8000
+curl -s localhost:8000/v1/tools           # the OpenAI web_search function-tool definition
+curl -s -X POST localhost:8000/v1/web_search \
+     -H 'content-type: application/json' \
+     -d '{"query":"why is my Postgres query slow","max_results":5}'
+```
+
+- **OpenAI-style** — register the definition from `/v1/tools` as a function tool
+  (it's named `web_search`), and execute each call against `POST /v1/web_search`.
+- **Anthropic-style** — pass `"shape":"anthropic"` to get `web_search_result`
+  content blocks.
+
+`depth=raw` (default) returns just ranked results with zero LLM calls; `depth=claims`
+attaches moo's evidence layer (claims + confidence + citations) as an optional
+`evidence` field the caller can use or ignore.
+
+**Interface parity.** The MCP server is the full surface (search, fetch_source,
+get_claim, list_contradictions, expand_graph, and — once the engine lands —
+deep_research). The `/v1/web_search` adapter covers the search entry point in
+web-search shape; drill-down and graph tools remain MCP-only. Latency note: the
+default `raw` path is CPU-embedding-bound on a dev box (~1–2s warm per query);
+query-embedding caching (perf pass) brings repeat queries toward the sub-second
+target.
+
 ## Data model
 
 Single SQLite file; stdlib `sqlite3`, no ORM. Full detail in

@@ -20,6 +20,7 @@ from .fetch import fetch_chunk, fetch_claim, fetch_document
 from .graph import query as graph_query
 from .search import CONTRACT_VERSION, decode_cursor, search
 from .streaming import sse_event, sse_response
+from .websearch import OPENAI_TOOL, to_anthropic_results, web_search
 
 app = FastAPI(
     title="moo search API",
@@ -35,7 +36,7 @@ _origins = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _origins if o.strip()],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
     expose_headers=["X-Request-ID"],
 )
@@ -238,6 +239,55 @@ def get_connection_for_search():
     from .index.vector import connect
 
     return connect()
+
+
+# ---------------------------------------------------------------------------
+# Drop-in web_search adapter for coding agents (SUP-119)
+# ---------------------------------------------------------------------------
+
+class WebSearchRequest(BaseModel):
+    query: str
+    max_results: int = Field(8, ge=1, le=50)
+    depth: Literal["raw", "claims", "full"] = "raw"
+    shape: Literal["web", "anthropic"] = "web"
+
+
+def _run_web_search(query: str, max_results: int, depth: str, shape: str) -> dict:
+    conn = get_connection_for_search()
+    try:
+        out = web_search(conn, query, k=max_results, depth=depth)
+    finally:
+        conn.close()
+    if shape == "anthropic":
+        out["results"] = to_anthropic_results(out["results"])
+    return out
+
+
+@app.post("/v1/web_search")
+def web_search_post(req: WebSearchRequest) -> dict:
+    """Drop-in web search for coding agents: point your agent's `web_search` tool
+    here and get CS-specialist `{title, url, snippet}` results (plus moo's
+    evidence layer as optional fields). `depth=raw` (default) makes zero LLM
+    calls. Register `GET /v1/tools` as the tool definition."""
+    return _run_web_search(req.query, req.max_results, req.depth, req.shape)
+
+
+@app.get("/v1/web_search")
+def web_search_get(
+    q: str = Query(..., description="the search query"),
+    max_results: int = Query(8, ge=1, le=50),
+    depth: Literal["raw", "claims", "full"] = Query("raw"),
+    shape: Literal["web", "anthropic"] = Query("web"),
+) -> dict:
+    """GET convenience form of the drop-in web search (see POST /v1/web_search)."""
+    return _run_web_search(q, max_results, depth, shape)
+
+
+@app.get("/v1/tools")
+def web_search_tools() -> dict:
+    """The OpenAI-style function-tool definition to register so an agent routes
+    its `web_search` to moo; execute the calls against POST /v1/web_search."""
+    return {"tools": [OPENAI_TOOL]}
 
 
 # ---------------------------------------------------------------------------
