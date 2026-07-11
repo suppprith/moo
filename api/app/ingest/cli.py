@@ -11,6 +11,7 @@ import argparse
 import logging
 
 from ..db import get_connection, migrate
+from . import seeds
 from .community import CommunityConnector
 from .github import GitHubConnector
 from .web import DocsConnector
@@ -24,20 +25,31 @@ CONNECTORS = {
 
 def _build(name: str, conn, args) -> object:
     fetcher = CONNECTORS[name].default_fetcher()
+    vert = seeds.get_vertical(args.vertical) if args.vertical else None
     if name == "github":
-        repos = [args.repo] if args.repo else None
+        repos = [args.repo] if args.repo else (vert.github_repos if vert else None)
         return GitHubConnector(conn, fetcher, repos=repos, max_issues=args.max_per_repo)
     if name == "docs":
-        return DocsConnector(conn, fetcher, max_pages=args.max_pages)
+        sites = vert.docs_sites if vert else None
+        return DocsConnector(conn, fetcher, sites=sites, max_pages=args.max_pages)
     if name == "community":
         sources = tuple(args.source) if args.source else ("so", "hn", "reddit")
-        return CommunityConnector(conn, fetcher, sources=sources, max_items=args.max_pages)
+        return CommunityConnector(
+            conn, fetcher, sources=sources, max_items=args.max_pages,
+            tags=vert.stackoverflow_tags if vert else None,
+            subreddits=vert.subreddits if vert else None,
+            hn_queries=vert.hn_queries if vert else None,
+        )
     return CONNECTORS[name](conn, fetcher)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.ingest", description="Run a moo source connector")
     parser.add_argument("connector", choices=sorted(CONNECTORS))
+    parser.add_argument(
+        "--vertical", choices=seeds.list_verticals(),
+        help="ingest only this CS/coding vertical's seeds (default: all)",
+    )
     parser.add_argument("--repo", help="github: single owner/repo instead of all seeds")
     parser.add_argument("--limit", type=int, default=None, help="max documents to store")
     parser.add_argument("--max-per-repo", type=int, default=30, help="github: items per repo")

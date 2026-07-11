@@ -100,3 +100,31 @@ several are deliberately **disputed** to exercise the contradiction path.
   contradiction, not collapse to one side.
 - Relevance judgments (which chunks are relevant per query) are authored in Phase 8 against the
   ingested corpus and versioned in-repo.
+
+## Multi-domain expansion (SUP-125)
+
+v1 stays the deep, end-to-end proof (**databases**). Further CS/coding verticals
+start shallower and deepen over time — the gate to moo being a coding agent's
+*default* web_search. The seed registry lives in
+[`api/app/ingest/seeds.py`](../api/app/ingest/seeds.py) as a `Vertical` per
+domain (github repos, docs sites, SO tags, subreddits, HN queries, keywords).
+
+| Vertical | Seeds (examples) | Sample gold queries |
+| --- | --- | --- |
+| databases (deep) | postgres/redis/sqlite repos, SQLite/PG docs, SO db tags | the 15 above |
+| languages | cpython, node; Python docs; `python`/`node.js` SO | "how does the Python GIL affect threads?"; "Node event loop vs worker threads" |
+| web-frameworks | fastapi, django; FastAPI docs | "when should a FastAPI route be async vs sync?"; "Django ORM N+1 query" |
+| build-tooling | uv, pip; uv docs | "uv vs pip for dependency resolution"; "why is my wheel build failing?" |
+| cloud-infra | kubernetes, terraform; k8s docs | "why is my pod stuck in CrashLoopBackOff?"; "terraform state drift" |
+| systems | (docs/community only) | "what causes the OOM killer to fire?"; "how do syscalls work?" |
+
+**Routing.** `is_domain_relevant` checks the union of every vertical's keywords,
+so ingestion + retrieval span domains while off-topic (non-CS) community noise is
+still filtered out. Ingest one vertical at a time:
+`uv run python -m app.ingest <connector> --vertical <name>`.
+
+**Scale / vector store.** sqlite-vec does an exact linear scan; the point where a
+dedicated ANN store (Qdrant/FAISS) earns its ops cost is ~500k–1M vectors (see
+[data-model.md](data-model.md)). The corpus is ~200 chunks per shallow vertical
+today; a full-depth multi-domain corpus would approach that threshold and trigger
+the migration. Until then sqlite-vec's exactness + zero-ops win.

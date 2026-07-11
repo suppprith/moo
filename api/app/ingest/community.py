@@ -41,10 +41,17 @@ class CommunityConnector(Connector):
         sources: tuple[str, ...] = ("so", "hn", "reddit"),
         *,
         max_items: int = 15,
+        tags: list[str] | None = None,
+        subreddits: list[str] | None = None,
+        hn_queries: list[str] | None = None,
     ) -> None:
         super().__init__(conn, fetcher)
         self.sources = sources
         self.max_items = max_items  # per tag/query/subreddit
+        # default to the all-verticals unions; a vertical passes its own subset
+        self.tags = tags if tags is not None else STACKOVERFLOW_TAGS
+        self.subreddits = subreddits if subreddits is not None else SUBREDDITS
+        self.hn_queries = hn_queries if hn_queries is not None else HN_QUERIES
 
     @classmethod
     def default_fetcher(cls) -> Fetcher:
@@ -71,7 +78,7 @@ class CommunityConnector(Connector):
         return payload
 
     def _stackoverflow(self) -> Iterator[RawDoc]:
-        for tag in STACKOVERFLOW_TAGS:
+        for tag in self.tags:
             url = (
                 f"{SE_API}/questions?order=desc&sort=votes&tagged={tag}"
                 f"&site=stackoverflow&filter=withbody&pagesize={self.max_items}"
@@ -123,7 +130,7 @@ class CommunityConnector(Connector):
 
     # -- Hacker News (Algolia) ----------------------------------------------
     def _hackernews(self) -> Iterator[RawDoc]:
-        for query in HN_QUERIES:
+        for query in self.hn_queries:
             q = query.replace(" ", "+")
             url = f"{HN_API}/search?query={q}&tags=story&hitsPerPage={self.max_items}"
             res = self.fetcher.get(url, obey_robots=False)
@@ -154,7 +161,7 @@ class CommunityConnector(Connector):
 
     # -- Reddit --------------------------------------------------------------
     def _reddit(self) -> Iterator[RawDoc]:
-        for sub in SUBREDDITS:
+        for sub in self.subreddits:
             url = f"https://www.reddit.com/r/{sub}/top.json?t=year&limit={self.max_items}"
             res = self.fetcher.get(url, obey_robots=False)
             if not res.ok or not isinstance(res.json, dict):
