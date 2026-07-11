@@ -11,7 +11,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from . import ids
 from .db import get_connection
+from .fetch import fetch_chunk, fetch_claim, fetch_document
 from .graph import query as graph_query
 from .search import CONTRACT_VERSION, decode_cursor, search
 
@@ -129,6 +131,71 @@ def get_connection_for_search():
     from .index.vector import connect
 
     return connect()
+
+
+# ---------------------------------------------------------------------------
+# Fetch / drill-down: resolve a citation handle to the underlying row (SUP-106)
+# ---------------------------------------------------------------------------
+
+def _rowid(id: str, expected_kind: str) -> int:
+    """Accept either an opaque handle (``chk_75``) — validated against the
+    endpoint's kind — or a bare rowid (``75``)."""
+    try:
+        kind, rowid = ids.decode(id)
+    except ValueError:
+        if id.isdigit():
+            return int(id)
+        raise HTTPException(status_code=422, detail=f"malformed id: {id!r}")
+    if kind != expected_kind:
+        raise HTTPException(
+            status_code=422, detail=f"expected a {expected_kind!r} handle, got {id!r}"
+        )
+    return rowid
+
+
+@app.get("/source/{id}")
+def source_endpoint(id: str) -> dict:
+    """Full document behind a source: cleaned text + metadata + chunk handles.
+    Accepts a `doc_<id>` handle or bare rowid."""
+    rowid = _rowid(id, ids.DOCUMENT)
+    conn = get_connection()
+    try:
+        result = fetch_document(conn, rowid)
+    finally:
+        conn.close()
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no document {id!r}")
+    return result
+
+
+@app.get("/chunk/{id}")
+def chunk_endpoint(id: str) -> dict:
+    """A chunk with full text, its document handle, and surrounding-chunk context.
+    Accepts a `chk_<id>` handle (as emitted in agent-format sources) or bare rowid."""
+    rowid = _rowid(id, ids.CHUNK)
+    conn = get_connection()
+    try:
+        result = fetch_chunk(conn, rowid)
+    finally:
+        conn.close()
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no chunk {id!r}")
+    return result
+
+
+@app.get("/claim/{id}")
+def claim_endpoint(id: str) -> dict:
+    """A claim with confidence + its full evidence set (contradictions first) and
+    extraction provenance. Accepts a `clm_<id>` handle or bare rowid."""
+    rowid = _rowid(id, ids.CLAIM)
+    conn = get_connection()
+    try:
+        result = fetch_claim(conn, rowid)
+    finally:
+        conn.close()
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"no claim {id!r}")
+    return result
 
 
 @app.get("/graph")
