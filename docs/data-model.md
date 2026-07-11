@@ -69,6 +69,33 @@ agent surface: `chk_<id>` (chunk / a search "source"), `clm_<id>` (claim),
 routable — the fetch/drill-down endpoints (SUP-106) decode the prefix. Callers
 treat them as opaque.
 
+## Serving contract — errors & streaming (SUP-107)
+
+**Structured errors.** Every API error renders as one shape so an agent can
+branch on `code` and retry only when `retryable` is true:
+
+```json
+{"error": {"code": "not_found", "message": "...", "retryable": false, "request_id": "…"}}
+```
+
+Codes ([`app/errors.py`](../api/app/errors.py)): `invalid_request` (422),
+`not_found` (404), `unauthorized` (401), `rate_limited` (429, retryable),
+`budget_exceeded` (429), `timeout` (504, retryable), `upstream_error` (502,
+retryable), `internal` (500, retryable). Every request (success or error) carries
+an `X-Request-ID` header, echoed in the envelope's `request_id`.
+
+**Fetch / drill-down.** `GET /source/{id}` (document), `GET /chunk/{id}`,
+`GET /claim/{id}` resolve a handle (or bare rowid) from an agent-format response
+to the full row ([`app/fetch.py`](../api/app/fetch.py)); a chunk carries its
+document handle + prev/next context, a claim its full evidence set
+(contradictions first) + provenance.
+
+**Streaming.** `GET /search/stream` returns `text/event-stream`
+([`app/streaming.py`](../api/app/streaming.py)): a `progress` event, then one
+`source`/`claim` event per row, then a terminal `done` — or a terminal `error`
+event if it fails mid-stream (the 200 status is already committed). The
+deep-research endpoint (SUP-114) reuses this event schema.
+
 ## Conventions
 
 - Timestamps are ISO-8601 text (`datetime('now')`).

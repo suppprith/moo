@@ -7,15 +7,19 @@ from typing import Any, Literal
 
 import os
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import ids
 from .db import get_connection
+from .errors import ApiError, code_for_status, envelope, new_request_id
 from .fetch import fetch_chunk, fetch_claim, fetch_document
 from .graph import query as graph_query
 from .search import CONTRACT_VERSION, decode_cursor, search
+from .streaming import sse_event, sse_response
 
 app = FastAPI(
     title="moo search API",
@@ -33,7 +37,69 @@ app.add_middleware(
     allow_origins=[o.strip() for o in _origins if o.strip()],
     allow_methods=["GET"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Request IDs + structured error envelope (SUP-107)
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Tag every request with an id echoed in the response header and in any
+    error envelope, so a failing call is traceable end to end."""
+    request.state.request_id = new_request_id()
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request.state.request_id
+    return response
+
+
+def _request_id(request: Request) -> str:
+    return getattr(request.state, "request_id", None) or new_request_id()
+
+
+@app.exception_handler(ApiError)
+async def _handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
+    rid = _request_id(request)
+    return JSONResponse(
+        status_code=exc.status,
+        content=envelope(exc.code, exc.message, exc.retryable, rid),
+        headers={"X-Request-ID": rid},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def _handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+    rid = _request_id(request)
+    code = code_for_status(exc.status_code)
+    retryable = code in ("timeout", "upstream_error", "internal", "rate_limited")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=envelope(code, str(exc.detail), retryable, rid),
+        headers={"X-Request-ID": rid},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    rid = _request_id(request)
+    msg = "; ".join(f"{'.'.join(str(p) for p in e['loc'][1:])}: {e['msg']}" for e in exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content=envelope("invalid_request", msg or "invalid request", False, rid),
+        headers={"X-Request-ID": rid},
+    )
+
+
+@app.exception_handler(Exception)
+async def _handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+    rid = _request_id(request)
+    return JSONResponse(
+        status_code=500,
+        content=envelope("internal", "internal server error", True, rid),
+        headers={"X-Request-ID": rid},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +190,47 @@ def search_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
     finally:
         conn.close()
+
+
+@app.get("/search/stream")
+def search_stream_endpoint(
+    q: str = Query(..., description="the search query"),
+    mode: Literal["raw", "claims", "full"] = Query("raw"),
+    k: int = Query(10, ge=1, le=50),
+    fields: str | None = Query(None, description="comma-separated sections to include"),
+) -> Any:
+    """Streaming (SSE) variant of /search: emits a `progress` event, then one
+    `source` (and `claim`) event per row, then a terminal `done`. A failure
+    mid-stream arrives as a terminal `error` event (see app.streaming)."""
+
+    def frames():
+        conn = None
+        try:
+            conn = get_connection_for_search()
+            yield sse_event("progress", {"stage": "searching", "query": q, "mode": mode})
+            result = search(conn, q, mode=mode, k=k, format="agent", fields=fields)
+            for s in result.get("sources", []):
+                yield sse_event("source", s)
+            for c in result.get("claims", []):
+                yield sse_event("claim", c)
+            done: dict[str, Any] = {"mode": result["mode"], "intent": result["intent"], "meta": result["meta"]}
+            if result.get("answer"):
+                done["answer"] = result["answer"]
+            yield sse_event("done", done)
+        except Exception as exc:  # noqa: BLE001 - headers already sent; report in-band
+            rid = new_request_id()
+            if isinstance(exc, ApiError):
+                env = envelope(exc.code, exc.message, exc.retryable, rid)
+            elif isinstance(exc, ValueError):
+                env = envelope("invalid_request", str(exc), False, rid)
+            else:
+                env = envelope("internal", "search failed", True, rid)
+            yield sse_event("error", env)
+        finally:
+            if conn is not None:
+                conn.close()
+
+    return sse_response(frames())
 
 
 def get_connection_for_search():
