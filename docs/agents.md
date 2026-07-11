@@ -7,6 +7,23 @@ grounded, structured evidence — claims with confidence, supports/contradicts
 edges, source trust, and stable handles to drill into — not ten blue links or one
 unverifiable paragraph.
 
+## Why moo (vs. general search)
+
+| Capability | Exa / Tavily | Perplexity / built-in web_search | moo |
+| --- | --- | --- | --- |
+| Returns ranked snippets/content | ✅ | ✅ | ✅ |
+| Synthesized answer + citations | partial | ✅ | ✅ (`full` mode) |
+| Claims with per-claim confidence | ❌ | ❌ | ✅ |
+| Surfaces contradictions instead of averaging them | ❌ | ❌ | ✅ (`list_contradictions`, disputed flags) |
+| Typed evidence edges (supports/contradicts/explains) | ❌ | ❌ | ✅ |
+| Per-source trust rubric (maintainer > forum, recency decay) | ❌ | ❌ | ✅ |
+| Stable drill-down handles (citation → span → doc) | contents API | ❌ | ✅ (`fetch_source`) |
+| CS "dark knowledge" (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ specialist |
+| Self-hosted, private, keyless, zero per-query cost | ❌ paid API | ❌ paid API | ✅ |
+
+moo trades coverage/freshness for a specialist, verifiable evidence layer: for a
+coding question it returns claims you can check, not links or one paragraph.
+
 ## Two ways in
 
 1. **Primitive tools** — the agent drives its own loop: `search`, `fetch_source`,
