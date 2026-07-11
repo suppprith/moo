@@ -66,6 +66,74 @@ export interface Citation {
   trust_score: number | null;
 }
 
+// ---- deep research (POST /research/stream) ----
+
+export interface SubQuestion {
+  id: number;
+  question: string;
+  depends_on: number[];
+}
+
+export interface ResearchStep {
+  step: number;
+  sub_question_id: number | null;
+  query: string;
+  reason: "plan" | "gap" | "contradiction";
+  claims: number;
+  new_claims: number;
+  disputed: number;
+}
+
+export interface Finding {
+  claim: string; // clm_<id> handle
+  text: string;
+  confidence: number | null;
+  disputed: boolean;
+  sub_question_id: number | null;
+  citations: number[]; // source indices (S#)
+}
+
+export interface DisputedPoint {
+  claim: string;
+  text: string;
+  supports: number[];
+  contradicts: number[];
+}
+
+export interface ResearchSource {
+  index: number;
+  document_id: number;
+  url: string | null;
+  title: string | null;
+  source_type: string;
+  trust_score: number | null;
+  handle: string; // doc_<id>
+  trust_tier: string;
+}
+
+export interface Groundedness {
+  findings_total: number;
+  findings_grounded: number;
+  pct_grounded: number;
+  well_supported: number;
+  answer_citations_valid: boolean;
+  ungrounded: string[];
+}
+
+export interface ResearchReport {
+  question: string;
+  run_id?: string;
+  status?: "running" | "partial" | "done" | "failed";
+  executive_answer: string;
+  findings: Finding[];
+  disputed_points: DisputedPoint[];
+  open_questions: string[];
+  sources: ResearchSource[];
+  groundedness: Groundedness;
+  generator: string;
+  steps?: ResearchStep[];
+}
+
 export interface SearchResponse {
   query: string;
   mode: Mode;

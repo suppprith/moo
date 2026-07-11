@@ -6,6 +6,7 @@ import type { Mode, SearchResponse } from "@/lib/types";
 import { Answer } from "@/components/Answer";
 import { ClaimList } from "@/components/ClaimList";
 import { ModeBar } from "@/components/ModeBar";
+import { ResearchView } from "@/components/ResearchView";
 import { SearchBox } from "@/components/SearchBox";
 import { SourceList } from "@/components/SourceList";
 
@@ -40,6 +41,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const [research, setResearch] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async (q: string, m: Mode) => {
@@ -63,6 +65,7 @@ export default function Home() {
   const onSearch = (q: string) => {
     setQuery(q);
     setSearched(true);
+    setResearch(null);
     run(q, mode);
   };
 
@@ -77,6 +80,7 @@ export default function Home() {
     setError(null);
     setQuery("");
     setMode("raw");
+    setResearch(null);
   };
 
   // ---- home (pre-search) hero ----
@@ -84,12 +88,10 @@ export default function Home() {
     return (
       <div className="shell">
         <div className="home">
-          <h1 className="wordmark">
-            moo<span className="accent"> search</span>
-          </h1>
+          <h1 className="wordmark">moo</h1>
           <p className="tagline">
-            An evidence-graph search engine for developers. Claims backed by typed
-            evidence — supports, contradicts, explains — not ten blue links.
+            CS/coding evidence search. Claims backed by typed evidence — supports,
+            contradicts, explains — with confidence and source trust, not ten blue links.
           </p>
           <SearchBox loading={loading} size="lg" onSearch={onSearch} />
           <div className="examples">
@@ -110,22 +112,33 @@ export default function Home() {
       <header className="topbar">
         <div className="inner">
           <div className="home-wordmark" onClick={goHome}>
-            moo<span style={{ color: "var(--accent)" }}> search</span>
+            moo
           </div>
           <SearchBox initial={query} loading={loading} onSearch={onSearch} />
         </div>
       </header>
 
       <main className="content">
-        {data && (
-          <ModeBar
-            mode={mode}
-            intent={data.intent}
-            elapsedMs={data.meta.elapsed_ms}
-            counts={{ claims: data.claims.length }}
-            onMode={onMode}
-          />
-        )}
+        {research !== null ? (
+          <ResearchView question={research} onExit={() => setResearch(null)} />
+        ) : (
+          <>
+        <div className="toolbar">
+          {data && (
+            <ModeBar
+              mode={mode}
+              intent={data.intent}
+              elapsedMs={data.meta.elapsed_ms}
+              counts={{ claims: data.claims.length }}
+              onMode={onMode}
+            />
+          )}
+          {query && (
+            <button className="deep-btn" onClick={() => setResearch(query)}>
+              Deep research →
+            </button>
+          )}
+        </div>
 
         {error && <div className="error">{error}</div>}
 
@@ -154,6 +167,8 @@ export default function Home() {
               Sources <span className="count">{data.sources.length}</span>
             </div>
             <SourceList sources={data.sources} />
+          </>
+        )}
           </>
         )}
       </main>

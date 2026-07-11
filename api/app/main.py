@@ -47,7 +47,8 @@ app = FastAPI(
 # Let the web/ dev server (and a self-hosted UI) call the API from the browser.
 # Override the allowed origins with MOO_CORS_ORIGINS (comma-separated) in prod.
 _origins = os.environ.get(
-    "MOO_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    "MOO_CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100",
 ).split(",")
 app.add_middleware(
     CORSMiddleware,
