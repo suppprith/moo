@@ -1,0 +1,124 @@
+{
+  "n_tasks": 5,
+  "k": 5,
+  "max_steps": 3,
+  "rows": [
+    {
+      "id": "pg-vs-mysql-joins",
+      "deep_research": {
+        "coverage": 0.6,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.333,
+        "contradiction_recall": 0.0,
+        "tokens": 1453,
+        "steps": 3,
+        "elapsed_ms": 26075.1,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.6,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 548
+      }
+    },
+    {
+      "id": "redis-rdb-vs-aof",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 2011,
+        "steps": 3,
+        "elapsed_ms": 3761.5,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.4,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 803
+      }
+    },
+    {
+      "id": "pg-connections-exhausted",
+      "deep_research": {
+        "coverage": 0.25,
+        "citation_accuracy": 1.0,
+        "source_recall": 1.0,
+        "contradiction_recall": null,
+        "tokens": 1966,
+        "steps": 3,
+        "elapsed_ms": 2376.3,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.25,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": null,
+        "tokens": 907
+      }
+    },
+    {
+      "id": "sqlite-production",
+      "deep_research": {
+        "coverage": 0.75,
+        "citation_accuracy": 1.0,
+        "source_recall": 1.0,
+        "contradiction_recall": 0.0,
+        "tokens": 2029,
+        "steps": 3,
+        "elapsed_ms": 3754.8,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.25,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 783
+      }
+    },
+    {
+      "id": "mysql-vs-pg-json",
+      "deep_research": {
+        "coverage": 0.5,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 920,
+        "steps": 3,
+        "elapsed_ms": 539.1,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.5,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 630
+      }
+    }
+  ],
+  "summary": {
+    "deep_research": {
+      "coverage": 0.42,
+      "citation_accuracy": 1.0,
+      "source_recall": 0.467,
+      "contradiction_recall": 0.0,
+      "tokens": 1675.8
+    },
+    "search": {
+      "coverage": 0.4,
+      "citation_accuracy": null,
+      "source_recall": 0.0,
+      "contradiction_recall": 0.0,
+      "tokens": 734.2
+    }
+  },
+  "task_set_version": "1.0"
+}

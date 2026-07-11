@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "domain": "databases",
+  "tasks": [
+    {
+      "id": "pg-vs-mysql-joins",
+      "question": "Postgres vs MySQL for complex analytical joins",
+      "rubric_points": ["postgres", "mysql", "join", "query", "index"],
+      "key_source_hints": ["postgresql.org", "dev.mysql.com", "stackoverflow.com"],
+      "disputed_hints": ["faster", "performance"]
+    },
+    {
+      "id": "redis-rdb-vs-aof",
+      "question": "When should I use Redis RDB versus AOF persistence",
+      "rubric_points": ["rdb", "aof", "snapshot", "durability", "fsync"],
+      "key_source_hints": ["redis.io"],
+      "disputed_hints": ["durability", "performance"]
+    },
+    {
+      "id": "pg-connections-exhausted",
+      "question": "Why do my Postgres connections get exhausted under load",
+      "rubric_points": ["connection", "pool", "max_connections", "pgbouncer"],
+      "key_source_hints": ["postgresql.org", "stackoverflow.com"],
+      "disputed_hints": []
+    },
+    {
+      "id": "sqlite-production",
+      "question": "Is SQLite suitable for production web applications",
+      "rubric_points": ["sqlite", "concurrency", "write", "wal"],
+      "key_source_hints": ["sqlite.org"],
+      "disputed_hints": ["production", "concurrency"]
+    },
+    {
+      "id": "mysql-vs-pg-json",
+      "question": "MySQL vs Postgres for storing and querying JSON data",
+      "rubric_points": ["json", "jsonb", "postgres", "mysql"],
+      "key_source_hints": ["postgresql.org", "dev.mysql.com"],
+      "disputed_hints": ["json"]
+    }
+  ]
+}
