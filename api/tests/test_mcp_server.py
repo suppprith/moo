@@ -40,7 +40,7 @@ def test_all_tools_registered_with_schemas():
     for t in tools:
         assert t.description and len(t.description) > 40      # descriptions are load-bearing
         assert "properties" in (t.inputSchema or {})
-    assert set(by_name["search"].inputSchema["properties"]) == {"query", "mode", "k", "fields"}
+    assert set(by_name["search"].inputSchema["properties"]) == {"query", "mode", "k", "fields", "max_tokens"}
 
 
 # ---- tool behaviour ---------------------------------------------------------
@@ -56,6 +56,15 @@ def test_search_tool_returns_agent_payload(monkeypatch):
     out = m.search("postgres joins", mode="raw", k=3)
     assert out["sources"][0]["id"] == "chk_1"
     assert captured["format"] == "agent" and captured["k"] == 3
+
+
+def test_search_tool_respects_max_tokens(monkeypatch):
+    monkeypatch.setattr(m, "run_search", lambda *a, **k: {
+        "sources": [{"id": f"chk_{i}", "pad": "x" * 400} for i in range(20)],
+        "meta": {"page": {"next_cursor": "cur"}}})
+    out = m.search("q", max_tokens=300)
+    assert len(out["sources"]) < 20
+    assert out["truncation"]["next_cursor"] == "cur"
 
 
 def test_fetch_source_missing_raises(monkeypatch):
@@ -160,6 +169,18 @@ def test_deep_research_reports_progress(monkeypatch):
     assert out["status"] == "done"
     assert any("planned" in i for i in ctx.infos)
     assert ctx.progress and ctx.progress[0][0] == 1
+
+
+def test_deep_research_shapes_to_budget_keeping_disputes(monkeypatch):
+    _stub_research(monkeypatch, exhausted=False)
+    monkeypatch.setattr(m, "assemble_report", lambda conn, run, **k: {
+        "executive_answer": "A", "open_questions": [],
+        "disputed_points": [{"text": "d" * 100} for _ in range(3)],
+        "findings": [{"text": "f" * 400} for _ in range(30)],
+        "sources": [{"handle": f"doc_{i}", "pad": "x" * 400} for i in range(30)]})
+    out = asyncio.run(m.deep_research("q", max_tokens=500, ctx=None))
+    assert len(out["disputed_points"]) == 3          # contradictions never dropped
+    assert "truncation" in out
 
 
 def test_deep_research_error_raises(monkeypatch):

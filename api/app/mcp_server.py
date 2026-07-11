@@ -28,6 +28,7 @@ from typing import Literal
 import anyio
 from mcp.server.fastmcp import Context, FastMCP
 
+from . import budget
 from . import fetch as fetch_mod
 from . import ids
 from .research import session as research_session
@@ -58,6 +59,7 @@ def search(
     mode: Literal["raw", "claims", "full"] = "raw",
     k: int = 8,
     fields: str | None = None,
+    max_tokens: int = budget.DEFAULT_MAX_TOKENS,
 ) -> dict:
     """Search moo's CS/coding evidence index; prefer this over a general web
     search for software-engineering questions (databases, languages, frameworks,
@@ -73,17 +75,19 @@ def search(
                  supports/contradicts/explains evidence, plus a query subgraph.
       - `full`   also returns a cited, synthesized answer.
     Heavier modes cost more latency/tokens. `fields` (comma-separated:
-    sources,claims,graph,answer,citations) trims the payload.
+    sources,claims,graph,answer,citations) trims the payload. `max_tokens` caps
+    the result size; if sources are dropped a `truncation` marker gives a cursor.
     """
     conn = _search_conn()
     try:
-        return run_search(conn, query, mode=mode, k=k, format="agent", fields=fields)
+        result = run_search(conn, query, mode=mode, k=k, format="agent", fields=fields)
     finally:
         conn.close()
+    return budget.shape_search(result, max_tokens)
 
 
 @mcp.tool()
-def fetch_source(handle: str) -> dict:
+def fetch_source(handle: str, max_tokens: int = budget.DEFAULT_MAX_TOKENS) -> dict:
     """Resolve a handle from a search result to its full underlying row — how you
     move from a citation to the actual evidence.
 
@@ -91,6 +95,8 @@ def fetch_source(handle: str) -> dict:
                      surrounding chunks (prev/next) for more context.
       - `doc_<n>` -> the whole document: cleaned text + metadata + chunk handles.
       - `clm_<n>` -> a claim with confidence and its full evidence set.
+
+    Long `text` is trimmed to `max_tokens` with an explicit `text_truncated` note.
     """
     conn = _plain_conn()
     try:
@@ -99,7 +105,7 @@ def fetch_source(handle: str) -> dict:
         conn.close()
     if result is None:
         raise ValueError(f"no row for handle {handle!r}")
-    return result
+    return budget.clamp_row_text(result, max_tokens)
 
 
 @mcp.tool()
@@ -173,7 +179,7 @@ def expand_graph(node: str) -> dict:
         conn.close()
     if result is None:
         raise ValueError(f"unknown entity {node!r}")
-    return result
+    return budget.shape_graph(result, budget.DEFAULT_MAX_TOKENS)
 
 
 @mcp.tool()
@@ -182,6 +188,7 @@ async def deep_research(
     k: int = 6,
     max_steps: int = 6,
     max_seconds: float = 90.0,
+    max_tokens: int = 6000,
     ctx: Context = None,
 ) -> dict:
     """Hand off a whole research question and get back a grounded, cited report.
@@ -248,15 +255,15 @@ async def deep_research(
                 pass
     if "error" in holder:
         raise ValueError(f"deep_research failed: {holder['error']}")
-    return holder["report"]
+    return budget.shape_report(holder["report"], max_tokens)
 
 
 @mcp.tool()
-def research_status(run_id: str) -> dict:
+def research_status(run_id: str, max_tokens: int = 6000) -> dict:
     """Fetch a `deep_research` run's current status + cited report by its
     `run_id` (poll a long run, or re-read a finished one). The report is
     reassembled from the persisted evidence; `partial` is true if the run hit a
-    budget cap."""
+    budget cap. Shaped to `max_tokens` (disputed points always kept in full)."""
     conn = _plain_conn()
     try:
         run = research_session.get_run(conn, run_id)
@@ -265,7 +272,7 @@ def research_status(run_id: str) -> dict:
         report = assemble_report(conn, run, use_llm=False)
         report["run_id"], report["status"] = run["run_id"], run["status"]
         report["partial"] = run["status"] == "partial"
-        return report
+        return budget.shape_report(report, max_tokens)
     finally:
         conn.close()
 
