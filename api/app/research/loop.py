@@ -62,10 +62,14 @@ def run_loop(
     max_steps: int = MAX_STEPS,
     max_seconds: float = MAX_SECONDS,
     use_llm: bool = True,
+    on_step=None,
 ) -> dict:
     """Run the plan's sub-questions with gap + contradiction follow-ups under a
     hard budget. Returns the accumulated run state (claims, per-step log,
-    per-sub-question coverage, budget)."""
+    per-sub-question coverage, budget).
+
+    ``on_step(step_record, [(claim_id, sub_question_id), ...])`` is invoked after
+    each step so a caller can persist progress incrementally (SUP-112)."""
     started = time.perf_counter()
     deadline = started + max_seconds
 
@@ -117,7 +121,7 @@ def run_loop(
                 new_disputed.append(c["id"])
         conn.commit()
 
-        steps.append({
+        step_record = {
             "step": len(steps) + 1,
             "sub_question_id": sub_id,
             "query": query,
@@ -125,7 +129,10 @@ def run_loop(
             "claims": len(step_claims),
             "new_claims": new_count,
             "disputed": len(new_disputed),
-        })
+        }
+        steps.append(step_record)
+        if on_step is not None:
+            on_step(step_record, [(c["id"], sub_id) for c in step_claims])
 
         # gap detection: one follow-up per original sub-question, budget permitting
         if reason == "plan" and sub_id not in gaps_spawned and budget_left():
