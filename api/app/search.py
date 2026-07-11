@@ -17,24 +17,68 @@ Cost and latency scale with mode; ``raw`` never touches a model. Each heavier
 stage still degrades to its heuristic fallback when no credentials are present,
 so every mode runs end-to-end without a key (lower quality, same shape).
 
+**Agent shaping (SUP-105).** Independent of mode, ``format`` and ``fields`` shape
+the payload for the consumer:
+
+- ``format="full"`` (default) — the UI contract, every top-level key present.
+- ``format="agent"`` — compact: opaque handles (``chk_``/``clm_``) instead of
+  bare rowids, evidence referenced by source handle instead of repeating the
+  URL, and null/empty sections dropped.
+- ``fields="sources,claims"`` — include only the named sections (``meta`` and
+  the query echo are always kept). Omitted → mode's default sections.
+- ``offset`` / cursor — paginate the ``sources`` list; ``meta.page`` carries the
+  next cursor.
+
 CLI:  ``uv run python -m app.search "Postgres vs MySQL" --mode full``
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import sqlite3
 import time
 
+from . import ids
 from .retrieve import retrieve
 
 log = logging.getLogger("moo.search")
 
 MODES = ("raw", "claims", "full")
-CONTRACT_VERSION = "1.0"
+FORMATS = ("full", "agent")
+CONTRACT_VERSION = "1.1"
 DEFAULT_K = 10
+
+# Top-level sections `fields` can select; `_ALWAYS` keys are never filtered out.
+_SECTIONS = ("sources", "claims", "graph", "answer", "citations")
+_ALWAYS = ("query", "mode", "intent", "meta")
+# Sections included by default per mode when `fields` is not given.
+_DEFAULT_FIELDS = {
+    "raw": {"sources"},
+    "claims": {"sources", "claims", "graph"},
+    "full": {"sources", "claims", "graph", "answer", "citations"},
+}
+
+
+# ---------------------------------------------------------------------------
+# pagination cursor (opaque base64 of the sources offset)
+# ---------------------------------------------------------------------------
+
+def encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(f"o:{offset}".encode()).decode().rstrip("=")
+
+
+def decode_cursor(cursor: str) -> int:
+    pad = "=" * (-len(cursor) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(cursor + pad).decode()
+    except Exception as e:  # noqa: BLE001 - any decode failure is a bad cursor
+        raise ValueError(f"invalid cursor: {cursor!r}") from e
+    if not raw.startswith("o:"):
+        raise ValueError(f"invalid cursor: {cursor!r}")
+    return int(raw[2:])
 
 
 def _sources(hits: list) -> list[dict]:
@@ -87,14 +131,92 @@ def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict
     return out
 
 
+# ---------------------------------------------------------------------------
+# agent-shaped payload (compact, handle-addressed, evidence-by-reference)
+# ---------------------------------------------------------------------------
+
+def _agent_sources(sources: list[dict]) -> list[dict]:
+    out = []
+    for s in sources:
+        row = {
+            "id": ids.encode(ids.CHUNK, s["chunk_id"]),
+            "url": s["url_anchor"] or s["document_url"],  # url_anchor is the deep link
+            "source_type": s["source_type"],
+            "score": s["score"],
+        }
+        if s.get("title"):
+            row["title"] = s["title"]
+        if s.get("trust_score") is not None:
+            row["trust_score"] = s["trust_score"]
+        out.append(row)
+    return out
+
+
+def _agent_claims(claims: list[dict]) -> list[dict]:
+    out = []
+    for c in claims:
+        row: dict = {"id": ids.encode(ids.CLAIM, c["id"]), "text": c["text"]}
+        if c.get("confidence") is not None:
+            row["confidence"] = c["confidence"]
+        if c.get("disputed"):
+            row["disputed"] = True
+        ev = []
+        for e in c.get("evidence", []):
+            edge = {"relation": e["relation"], "source": ids.encode(ids.CHUNK, e["chunk_id"])}
+            if e.get("strength") is not None:
+                edge["strength"] = e["strength"]
+            ev.append(edge)
+        if ev:
+            row["evidence"] = ev
+        out.append(row)
+    return out
+
+
+def _to_agent(response: dict, selected: set[str]) -> dict:
+    """Compact projection of the full contract: handles instead of rowids,
+    evidence referenced by source handle, null/empty sections dropped."""
+    out: dict = {"query": response["query"], "mode": response["mode"], "intent": response["intent"]}
+    if "sources" in selected:
+        out["sources"] = _agent_sources(response["sources"])
+    if "claims" in selected and response["claims"]:
+        out["claims"] = _agent_claims(response["claims"])
+    if "graph" in selected and (response["graph"]["nodes"] or response["graph"]["edges"]):
+        out["graph"] = response["graph"]
+    if "answer" in selected and response["answer"]:
+        out["answer"] = response["answer"]
+    if "citations" in selected and response["citations"]:
+        out["citations"] = response["citations"]
+    out["meta"] = response["meta"]
+    return out
+
+
+def _resolve_fields(fields: str | None, mode: str) -> set[str]:
+    if not fields:
+        return set(_DEFAULT_FIELDS[mode])
+    requested = {f.strip() for f in fields.split(",") if f.strip()}
+    unknown = requested - set(_SECTIONS)
+    if unknown:
+        raise ValueError(f"unknown fields {sorted(unknown)}; allowed: {list(_SECTIONS)}")
+    return requested
+
+
 def search(
     conn: sqlite3.Connection, query: str, *, mode: str = "raw", k: int = DEFAULT_K,
-    use_llm: bool = True,
+    use_llm: bool = True, format: str = "full", fields: str | None = None, offset: int = 0,
 ) -> dict:
     """Run the pipeline to the depth `mode` requests and return the unified
-    contract. `use_llm=False` forces every stage onto its heuristic path."""
+    contract. `use_llm=False` forces every stage onto its heuristic path.
+
+    `format`/`fields`/`offset` shape the payload for the consumer (see module
+    docstring); the default `format="full"` with no `fields` is the unchanged
+    v1.0 contract."""
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
+    if format not in FORMATS:
+        raise ValueError(f"format must be one of {FORMATS}, got {format!r}")
+    if offset < 0:
+        raise ValueError("offset must be >= 0")
+    selected = _resolve_fields(fields, mode)  # validate early, before any work
     started = time.perf_counter()
 
     from .understand import understand
@@ -111,7 +233,10 @@ def search(
         from .expand import expand
 
         variants = expand(conn, query, use_llm=use_llm)
-    hits = retrieve(conn, query, k=k, queries=variants, source_boost=u.source_boost)
+    # Over-fetch one past the page so `has_more` is knowable, then slice.
+    fetched = retrieve(conn, query, k=offset + k + 1, queries=variants, source_boost=u.source_boost)
+    has_more = len(fetched) > offset + k
+    hits = fetched[offset : offset + k]
 
     response: dict = {
         "query": query,
@@ -122,12 +247,21 @@ def search(
         "graph": {"nodes": [], "edges": []},
         "sources": _sources(hits),
         "citations": [],
-        "meta": {"contract_version": CONTRACT_VERSION, "entities": u.entities},
+        "meta": {
+            "contract_version": CONTRACT_VERSION,
+            "entities": u.entities,
+            "page": {
+                "offset": offset,
+                "limit": k,
+                "returned": len(hits),
+                "has_more": has_more,
+                "next_cursor": encode_cursor(offset + k) if has_more else None,
+            },
+        },
     }
 
     if mode == "raw":
-        response["meta"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
-        return response
+        return _finalize(response, started, format, fields, selected)
 
     # ---- evidence layer (claims + full) ------------------------------------
     from .evidence.claims import extract_claims
@@ -162,7 +296,21 @@ def search(
         response["citations"] = result["sources"]
         response["meta"]["generator"] = result["generator"]
 
+    return _finalize(response, started, format, fields, selected)
+
+
+def _finalize(
+    response: dict, started: float, format: str, fields: str | None, selected: set[str]
+) -> dict:
+    """Stamp elapsed time, then apply format + field selection. `full` format
+    with no explicit `fields` is left untouched (the legacy v1.0 shape)."""
     response["meta"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    if format == "agent":
+        return _to_agent(response, selected)
+    if fields is not None:
+        for section in _SECTIONS:
+            if section not in selected:
+                response.pop(section, None)
     return response
 
 
@@ -171,6 +319,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("query")
     parser.add_argument("--mode", choices=MODES, default="raw")
     parser.add_argument("-k", type=int, default=DEFAULT_K)
+    parser.add_argument("--format", choices=FORMATS, default="full")
+    parser.add_argument("--fields", default=None, help="comma-separated sections, e.g. sources,claims")
+    parser.add_argument("--offset", type=int, default=0, help="pagination offset into sources")
     parser.add_argument("--no-llm", action="store_true")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
@@ -178,7 +329,10 @@ def main(argv: list[str] | None = None) -> int:
     from .index.vector import connect
 
     conn = connect()
-    result = search(conn, args.query, mode=args.mode, k=args.k, use_llm=not args.no_llm)
+    result = search(
+        conn, args.query, mode=args.mode, k=args.k, use_llm=not args.no_llm,
+        format=args.format, fields=args.fields, offset=args.offset,
+    )
     print(json.dumps(result, indent=2, default=str))
     conn.close()
     return 0

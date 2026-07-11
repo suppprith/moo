@@ -47,6 +47,28 @@ Indexing tables are added by a later migration so Phase 0 stays dependency-free:
 
 Both are derived from `chunk`, so they are rebuildable from the tables above.
 
+## Search contract — agent shaping (SUP-105, v1.1)
+
+`/search` (and `app.search.search`) returns a versioned contract
+(`meta.contract_version`). Two axes shape the payload for the consumer,
+independent of `mode`:
+
+- **`format`** — `full` (default, the UI shape: every top-level key present) or
+  `agent` (compact: opaque handles instead of bare rowids, evidence referenced
+  by source handle instead of repeating the URL, null/empty sections dropped).
+- **`fields`** — comma-separated subset of `sources,claims,graph,answer,citations`
+  to include; `meta` and the query echo are always kept. Omitted → the mode's
+  default sections. (`full` format with no `fields` is the untouched v1.0 shape.)
+- **`offset` / `cursor`** — paginate the `sources` list. `meta.page` carries
+  `{offset, limit, returned, has_more, next_cursor}`; `next_cursor` is an opaque
+  base64 handle passed back as `cursor` to fetch the next page.
+
+**Opaque handles** ([`app/ids.py`](../api/app/ids.py)) address rows across the
+agent surface: `chk_<id>` (chunk / a search "source"), `clm_<id>` (claim),
+`doc_<id>` (document), `ent_<id>` (entity). Handles are stable (rowid-backed) and
+routable — the fetch/drill-down endpoints (SUP-106) decode the prefix. Callers
+treat them as opaque.
+
 ## Conventions
 
 - Timestamps are ISO-8601 text (`datetime('now')`).

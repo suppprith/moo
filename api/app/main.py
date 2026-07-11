@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from .db import get_connection
 from .graph import query as graph_query
-from .search import CONTRACT_VERSION, search
+from .search import CONTRACT_VERSION, decode_cursor, search
 
 app = FastAPI(
     title="moo search API",
@@ -65,6 +65,11 @@ class Claim(BaseModel):
 
 
 class SearchResponse(BaseModel):
+    """The ``format=full`` contract (the UI shape). ``format=agent`` returns a
+    compact projection with opaque handles instead — its strict schema is
+    formalized in SUP-109, so the endpoint returns a plain dict rather than
+    pinning one response_model across both shapes."""
+
     query: str
     mode: Literal["raw", "claims", "full"]
     intent: str
@@ -82,19 +87,39 @@ def health() -> dict[str, str]:
     return {"status": "ok", "contract_version": CONTRACT_VERSION}
 
 
-@app.get("/search", response_model=SearchResponse)
+@app.get("/search")
 def search_endpoint(
     q: str = Query(..., description="the search query"),
     mode: Literal["raw", "claims", "full"] = Query(
         "raw", description="raw=pure retrieval (no LLM); claims=+evidence; full=+synthesis"
     ),
     k: int = Query(10, ge=1, le=50),
+    format: Literal["full", "agent"] = Query(
+        "full", description="full=UI contract; agent=compact, opaque handles, evidence-by-reference"
+    ),
+    fields: str | None = Query(
+        None, description="comma-separated sections to include: sources,claims,graph,answer,citations"
+    ),
+    offset: int = Query(0, ge=0, le=200, description="pagination offset into the sources list"),
+    cursor: str | None = Query(
+        None, description="opaque pagination cursor from meta.page.next_cursor (overrides offset)"
+    ),
 ) -> dict:
     """Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds
-    the evidence layer + query subgraph; `full` adds a cited synthesized answer."""
+    the evidence layer + query subgraph; `full` adds a cited synthesized answer.
+
+    `format=agent` returns a compact, handle-addressed payload for AI agents;
+    `fields` selects sections; `offset`/`cursor` paginate `sources`."""
+    if cursor is not None:
+        try:
+            offset = decode_cursor(cursor)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     conn = get_connection_for_search()
     try:
-        return search(conn, q, mode=mode, k=k)
+        return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset)
+    except ValueError as e:  # bad fields/format/offset
+        raise HTTPException(status_code=422, detail=str(e))
     finally:
         conn.close()
 
