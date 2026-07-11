@@ -96,6 +96,25 @@ document handle + prev/next context, a claim its full evidence set
 event if it fails mid-stream (the 200 status is already committed). The
 deep-research endpoint (SUP-114) reuses this event schema.
 
+## Deep research (SUP-110–114)
+
+The deep-research engine (`app/research/`) wraps the pipeline in
+planner -> iterative multi-hop loop -> persisted run -> cited report:
+
+- **`POST /research`** `{question, k, max_steps, max_seconds, use_llm}` -> the full
+  cited report `{executive_answer, findings[], disputed_points[], open_questions[],
+  sources[], run_id, status, steps[], coverage[], budget}`. Budget enforced
+  end-to-end; a run that hits a cap returns `status: partial`.
+- **`POST /research/stream`** streams the same run over SSE (`app/streaming.py`
+  events): `plan` -> a `progress` event per step (with `reason`:
+  plan/gap/contradiction) -> terminal `report` + `done`, or `error`.
+- **`GET /research/{run_id}`** re-fetches a persisted run's status + report for
+  polling/resume (report reassembled deterministically, no LLM).
+
+Runs persist to `research_run` / `research_step` / `research_claim` (migration
+0005); they associate with the shared claim/evidence graph rather than owning it,
+so a run is purgeable without harming the graph.
+
 ## Conventions
 
 - Timestamps are ISO-8601 text (`datetime('now')`).

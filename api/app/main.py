@@ -13,11 +13,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import queue
+import threading
+
 from . import ids
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
 from .fetch import fetch_chunk, fetch_claim, fetch_document
 from .graph import query as graph_query
+from .research import session as research_session
+from .research.loop import run_loop
+from .research.plan import plan as make_plan
+from .research.report import assemble_report
 from .search import CONTRACT_VERSION, decode_cursor, search
 from .streaming import sse_event, sse_response
 from .websearch import OPENAI_TOOL, to_anthropic_results, web_search
@@ -353,6 +360,112 @@ def claim_endpoint(id: str) -> dict:
     if result is None:
         raise HTTPException(status_code=404, detail=f"no claim {id!r}")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Deep research: plan -> iterative loop -> cited report (SUP-114)
+# ---------------------------------------------------------------------------
+
+class ResearchRequest(BaseModel):
+    question: str
+    k: int = Field(6, ge=1, le=20, description="retrieval depth per sub-question")
+    max_steps: int = Field(6, ge=1, le=20, description="hard cap on retrieve+extract cycles")
+    max_seconds: float = Field(60.0, ge=5, le=300, description="wall-clock budget")
+    use_llm: bool = Field(True, description="use the LLM stages (falls back to heuristic keyless)")
+
+
+def _report_for_run(conn, run: dict, *, use_llm: bool) -> dict:
+    report = assemble_report(conn, run, use_llm=use_llm)
+    report["run_id"] = run.get("run_id")
+    report["status"] = run.get("status")
+    report["steps"] = run.get("steps", [])
+    report["coverage"] = run.get("coverage", [])
+    report["budget"] = run.get("budget")
+    return report
+
+
+@app.post("/research")
+def research_post(req: ResearchRequest) -> dict:
+    """Run a full deep-research run (plan -> iterative loop -> cited report) and
+    return the structured report. Budget is enforced end-to-end; a run that hits
+    a cap returns `status: partial`. Use POST /research/stream for progress, or
+    GET /research/{id} to re-fetch."""
+    conn = get_connection_for_search()
+    try:
+        run = research_session.run_research(
+            conn, req.question, k=req.k, max_steps=req.max_steps,
+            max_seconds=req.max_seconds, use_llm=req.use_llm,
+        )
+        return _report_for_run(conn, run, use_llm=req.use_llm)
+    finally:
+        conn.close()
+
+
+@app.post("/research/stream")
+def research_stream(req: ResearchRequest):
+    """Streaming (SSE) deep research: emits `plan`, a `progress` event per step
+    (with why it was spawned), then a terminal `report` + `done` — or `error`.
+    Reuses the app.streaming event contract."""
+
+    def frames():
+        events: queue.Queue = queue.Queue()
+
+        def worker():
+            conn = None
+            try:
+                conn = get_connection_for_search()
+                plan = make_plan(conn, req.question, use_llm=req.use_llm)
+                events.put(("plan", {
+                    "intent": plan["intent"], "entities": plan["entities"],
+                    "sub_questions": plan["sub_questions"],
+                }))
+                run_id = research_session.create_run(conn, req.question, plan)
+                events.put(("run", {"run_id": run_id, "status": "running"}))
+
+                def on_step(step, assocs):
+                    research_session.record_step(conn, run_id, step, assocs)
+                    events.put(("progress", step))
+
+                result = run_loop(
+                    conn, plan, k=req.k, max_steps=req.max_steps,
+                    max_seconds=req.max_seconds, use_llm=req.use_llm, on_step=on_step,
+                )
+                status = "partial" if result["budget"]["exhausted"] else "done"
+                research_session.finalize_run(conn, run_id, result, status)
+                result["run_id"] = run_id
+                result["status"] = status
+                events.put(("report", _report_for_run(conn, result, use_llm=req.use_llm)))
+                events.put(("done", {"run_id": run_id, "status": status}))
+            except Exception:  # noqa: BLE001 - report in-band, stream already 200
+                events.put(("error", envelope("internal", "research failed", True, new_request_id())))
+            finally:
+                if conn is not None:
+                    conn.close()
+                events.put(None)  # sentinel
+
+        threading.Thread(target=worker, daemon=True).start()
+        while True:
+            item = events.get()
+            if item is None:
+                break
+            event, data = item
+            yield sse_event(event, data)
+
+    return sse_response(frames())
+
+
+@app.get("/research/{run_id}")
+def research_get(run_id: str) -> dict:
+    """Fetch a run's status + cited report for polling/resume. The report is
+    reassembled deterministically (no LLM) from the persisted evidence."""
+    conn = get_connection()
+    try:
+        run = research_session.get_run(conn, run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"no research run {run_id!r}")
+        return _report_for_run(conn, run, use_llm=False)
+    finally:
+        conn.close()
 
 
 @app.get("/graph")
