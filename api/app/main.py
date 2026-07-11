@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 import queue
 import threading
 
-from . import ids
+from . import auth, ids
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
 from .fetch import fetch_chunk, fetch_claim, fetch_document
@@ -53,11 +53,28 @@ app.add_middleware(
 # Request IDs + structured error envelope (SUP-107)
 # ---------------------------------------------------------------------------
 
+_AUTH_EXEMPT = {"/", "/health", "/v1/tools", "/openapi.json", "/docs", "/redoc"}
+
+
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     """Tag every request with an id echoed in the response header and in any
-    error envelope, so a failing call is traceable end to end."""
+    error envelope, so a failing call is traceable end to end. Also enforces
+    optional API-key auth + per-key rate limiting (SUP-108)."""
     request.state.request_id = new_request_id()
+    path = request.url.path
+    if auth.enabled() and path not in _AUTH_EXEMPT and not path.startswith(("/docs", "/openapi")):
+        try:
+            auth.check(request)
+        except ApiError as exc:
+            headers = {"X-Request-ID": request.state.request_id}
+            if exc.retry_after is not None:
+                headers["Retry-After"] = str(exc.retry_after)
+            return JSONResponse(
+                status_code=exc.status,
+                content=envelope(exc.code, exc.message, exc.retryable, request.state.request_id),
+                headers=headers,
+            )
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     return response
@@ -70,10 +87,13 @@ def _request_id(request: Request) -> str:
 @app.exception_handler(ApiError)
 async def _handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
     rid = _request_id(request)
+    headers = {"X-Request-ID": rid}
+    if exc.retry_after is not None:
+        headers["Retry-After"] = str(exc.retry_after)
     return JSONResponse(
         status_code=exc.status,
         content=envelope(exc.code, exc.message, exc.retryable, rid),
-        headers={"X-Request-ID": rid},
+        headers=headers,
     )
 
 
@@ -158,9 +178,15 @@ class SearchResponse(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict:
     """Liveness probe."""
-    return {"status": "ok", "contract_version": CONTRACT_VERSION}
+    return {"status": "ok", "contract_version": CONTRACT_VERSION, "auth": auth.enabled()}
+
+
+@app.get("/usage")
+def usage() -> dict:
+    """Per-key request counts (masked). Requires a valid key when auth is on."""
+    return {"enabled": auth.enabled(), "usage": auth.usage()}
 
 
 @app.get("/search")

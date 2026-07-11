@@ -31,7 +31,8 @@ class ApiError(Exception):
     """Raise with a taxonomy ``code``; the handler renders the envelope."""
 
     def __init__(
-        self, code: str, message: str, *, retryable: bool | None = None, status: int | None = None
+        self, code: str, message: str, *, retryable: bool | None = None, status: int | None = None,
+        retry_after: int | None = None,
     ):
         if code not in CODES:
             code = "internal"
@@ -40,6 +41,7 @@ class ApiError(Exception):
         self.message = message
         self.status = status or default_status
         self.retryable = default_retryable if retryable is None else retryable
+        self.retry_after = retry_after  # seconds; sets the Retry-After header
         super().__init__(message)
 
 

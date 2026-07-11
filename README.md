@@ -138,6 +138,19 @@ see `api/.env.example`). Without any key the stages run deterministic heuristics
 the pipeline works end to end, quality is just better with a model. Run a local
 model and nothing leaves the machine.
 
+## Serving
+
+Runs fully open locally. To gate it when exposed, set API keys and a per-key
+rate limit:
+
+```bash
+MOO_API_KEYS=key1,key2 MOO_RATE_LIMIT_PER_MIN=60 uv run fastapi dev app/main.py
+```
+
+Clients pass `Authorization: Bearer <key>` or `X-API-Key`. `/health` and
+`/v1/tools` stay open; over-limit requests get a `429` with `Retry-After`.
+`GET /usage` reports masked per-key request counts. No query content is logged.
+
 ## Benchmarks
 
 `uv run python -m app.eval.benchmark` scores the engine on a versioned task set
