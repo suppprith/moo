@@ -37,7 +37,7 @@ from .research.plan import plan as make_plan
 from .research.report import assemble_report
 from .search import search as run_search
 
-mcp = FastMCP("moo-search")
+mcp = FastMCP("moo")
 
 
 def _search_conn():

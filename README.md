@@ -1,160 +1,150 @@
-# moo search 🐮
+# moo
 
-An **evidence-graph search engine** for developers. Instead of ten blue links or one
-confident AI paragraph, moo answers a query with **claims** backed by typed **evidence**
-(supports / contradicts / explains), each source scored for **trust**, each claim scored for
-**confidence** — explorable as an interactive graph.
+A CS/coding-specialized search backend for AI agents — the tool a coding agent
+routes its `web_search` to for software-engineering questions. Instead of ranked
+links or one unverifiable paragraph, moo returns **claims** backed by typed
+**evidence** (supports / contradicts / explains), each source scored for
+**trust** and each claim for **confidence**, with stable handles to drill from a
+citation down to the exact source.
 
-Design principles: **AI is opt-in, never automatic** (the default result page is pure
-retrieval, zero LLM calls); CLI-style *interaction* (command palette, keyboard-first) with
-clean modern visuals; simpler than DuckDuckGo; self-hostable and private (no query logging).
+It runs on your own hardware: a single SQLite file, local embeddings, no query
+logging, no per-query cost, and no API key required to run (the LLM stages fall
+back to deterministic heuristics without one).
 
-## Monorepo layout
+## Why moo
 
-| Path   | Stack                                   | Purpose                                  |
-| ------ | --------------------------------------- | ---------------------------------------- |
-| `api/` | Python · FastAPI · uv · SQLite          | Ingestion, retrieval, evidence, `/search` |
-| `web/` | Next.js · TypeScript (App Router)       | Search UI, claims/evidence, graph explorer |
-| `docs/`| Markdown                                | Domain scope, gold queries, decisions    |
+| Capability | Exa / Tavily | Perplexity / built-in web_search | moo |
+| --- | --- | --- | --- |
+| Returns ranked snippets/content | ✅ | ✅ | ✅ |
+| Synthesized answer + citations | partial | ✅ | ✅ (`full` mode) |
+| Claims with per-claim confidence | ❌ | ❌ | ✅ |
+| Surfaces contradictions instead of averaging them | ❌ | ❌ | ✅ (`list_contradictions`, disputed flags) |
+| Typed evidence edges (supports/contradicts/explains) | ❌ | ❌ | ✅ |
+| Per-source trust rubric (maintainer > forum, recency decay) | ❌ | ❌ | ✅ |
+| Stable drill-down handles (citation → span → doc) | contents API | ❌ | ✅ (`fetch_source`) |
+| CS "dark knowledge" (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ specialist |
+| Self-hosted, private, keyless, zero per-query cost | ❌ paid API | ❌ paid API | ✅ |
 
-## Architecture
+moo is deliberately not a general web search: it indexes GitHub issues/PRs,
+release notes, official docs, engineering blogs, and Stack Overflow — the sources
+that hold the real answer to a coding problem but that general search ranks
+poorly. Coverage and freshness are traded for a specialist, verifiable evidence
+layer.
 
-```
-                    ┌──────────────────────────────────────────────┐
-   connectors       │  Ingestion                                   │
-   GitHub · docs ──▶│  fetch → clean → chunk                       │
-   blogs · SO/HN    └───────────────┬──────────────────────────────┘
-                                    ▼
-                    ┌──────────────────────────────────────────────┐
-                    │  Indexing (single SQLite file)               │
-                    │  FTS5 (BM25)  +  sqlite-vec (embeddings)     │
-                    └───────────────┬──────────────────────────────┘
-                                    ▼
-   query ──▶ understanding ──▶ expansion ──▶ hybrid retrieval (RRF)
-                                    │
-                                    ▼
-              claim extraction ──▶ evidence linking ──▶ confidence
-              (supports / contradicts / explains)      + source trust
-                                    │
-                                    ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │  /search  →  { answer, claims[], graph, sources[] }           │
-   │  mode = raw (default, no LLM) | claims | full                 │
-   └───────────────┬──────────────────────────────────────────────┘
-                   ▼
-   web/ (search page · claims view · evidence graph)   +   moo CLI
-```
+## Two ways in
 
-## Quickstart
+1. **Primitive tools** — the agent drives its own loop: `search`, `fetch_source`,
+   `get_claim`, `list_contradictions`, `expand_graph`.
+2. **Deep research** — hand off a whole question: `deep_research` runs
+   plan → iterative multi-hop retrieval → a cited, confidence-scored report;
+   `research_status` polls/resumes it.
+
+Both are exposed over **MCP**; `search` is also available as a drop-in
+**`web_search`** HTTP adapter. Full tool reference and workflow:
+[docs/agents.md](docs/agents.md).
+
+## Connect an agent (MCP)
 
 ```bash
-# API
-cd api && uv sync && uv run fastapi dev app/main.py   # http://127.0.0.1:8000/health
-
-# Web
-cd web && npm install && npm run dev                  # http://localhost:3000
-```
-
-## Connect an agent (MCP) in 2 minutes
-
-moo doubles as a **CS/coding search backend for AI agents** — the tool a coding
-agent routes its `web_search` to for software-engineering questions. It ships an
-MCP server exposing `search`, `fetch_source`, `get_claim`, `list_contradictions`,
-and `expand_graph`, all returning compact, grounded results with opaque handles
-you can drill into.
-
-```bash
-cd api && uv sync                       # once
+cd api && uv sync
 uv run python -m app.mcp_server         # stdio server (no install needed)
-# or, if installed as a tool (uv tool install . / pipx install .):
-moo-mcp                                 # stdio   ·   moo-mcp --http   (streamable HTTP on :8000/mcp)
+# or install it: uv tool install .  ->  moo-mcp [--http]
 ```
 
-Point a client at it (replace the path with your absolute checkout path):
+**Claude Code** — `claude mcp add moo -- uv run --directory "/abs/path/to/moo/api" python -m app.mcp_server`
 
-**Claude Code** — `claude mcp add moo -- uv run --directory "/abs/path/to/moo search/api" python -m app.mcp_server`
-
-**Claude Desktop** — add to `claude_desktop_config.json`:
+**Claude Desktop** — in `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "moo": {
       "command": "uv",
-      "args": ["run", "--directory", "/abs/path/to/moo search/api", "python", "-m", "app.mcp_server"]
+      "args": ["run", "--directory", "/abs/path/to/moo/api", "python", "-m", "app.mcp_server"]
     }
   }
 }
 ```
 
-**Any MCP client (installed)** — `{ "mcpServers": { "moo": { "command": "moo-mcp" } } }`,
-or run `moo-mcp --http` and connect to `http://127.0.0.1:8000/mcp`.
+Runs keyless locally. First `search` warms the embedding model (a few seconds);
+after that a typical flow is `search` → `fetch_source(chk_…)` for the evidence,
+or `deep_research` for a full report.
 
-Runs **keyless** locally (no API key, no query logging; per-key auth arrives with
-serving). The first `search` warms the embedding model (~a few seconds), then a
-typical agent flow is: `search` → read `sources` → `fetch_source(chk_…)` for the
-full evidence, or `list_contradictions` to see where sources disagree.
+## Drop-in web_search
 
-### Or: route an existing `web_search` tool to moo
-
-For agents that don't speak MCP, moo also serves the **universal web-search shape**
-(`{title, url, snippet}`) so it drops in wherever a general web search was:
+For agents that don't speak MCP, moo serves the universal web-search shape
+(`{title, url, snippet}`):
 
 ```bash
-uv run fastapi dev app/main.py            # API on :8000
-curl -s localhost:8000/v1/tools           # the OpenAI web_search function-tool definition
+uv run fastapi dev app/main.py
+curl -s localhost:8000/v1/tools           # OpenAI web_search function-tool definition
 curl -s -X POST localhost:8000/v1/web_search \
-     -H 'content-type: application/json' \
-     -d '{"query":"why is my Postgres query slow","max_results":5}'
+     -H 'content-type: application/json' -d '{"query":"why is my Postgres query slow"}'
 ```
 
-- **OpenAI-style** — register the definition from `/v1/tools` as a function tool
-  (it's named `web_search`), and execute each call against `POST /v1/web_search`.
-- **Anthropic-style** — pass `"shape":"anthropic"` to get `web_search_result`
-  content blocks.
+Register the definition from `/v1/tools` (named `web_search`) and execute calls
+against `POST /v1/web_search`. Pass `"shape":"anthropic"` for `web_search_result`
+blocks. `depth=claims` attaches the evidence layer as an optional field.
 
-`depth=raw` (default) returns just ranked results with zero LLM calls; `depth=claims`
-attaches moo's evidence layer (claims + confidence + citations) as an optional
-`evidence` field the caller can use or ignore.
+## Deep research
 
-**Interface parity.** The MCP server is the full surface (search, fetch_source,
-get_claim, list_contradictions, expand_graph, deep_research, research_status). The
-`/v1/web_search` adapter covers the search entry point in web-search shape;
-drill-down, graph, and deep-research tools are MCP-only.
+`deep_research(question)` (MCP) or `POST /research` / `POST /research/stream`
+(HTTP) returns `{executive_answer, findings[] (confidence + citations),
+disputed_points[], open_questions[], sources[], groundedness}`. It decomposes the
+question, iterates retrieval to fill gaps and chase contradictions under a
+budget, and every finding traces to a source — uncited claims never ship.
 
-### Deep research
+Reproducible demo: `uv run python -m app.eval.demo` ([recorded transcript](docs/agent-demo.md)).
 
-Hand off a whole question and get a grounded, cited report:
-
-- **MCP**: `deep_research(question)` → `{executive_answer, findings[] (confidence +
-  citations), disputed_points[], open_questions[], sources[], groundedness}`;
-  `research_status(run_id)` to poll/resume. Progress streams as MCP events.
-- **HTTP**: `POST /research` (or `POST /research/stream` for SSE), `GET /research/{id}`.
-
-moo decomposes the question, iterates retrieval to fill gaps and chase
-contradictions (budgeted), and every finding traces to a source (uncited claims
-never ship). Full tool reference, workflow, and benchmark numbers:
-**[docs/agents.md](docs/agents.md)**. Reproducible demo: `uv run python -m app.eval.demo`
-([recorded transcript](docs/agent-demo.md)).
-
-## Data model
-
-Single SQLite file; stdlib `sqlite3`, no ORM. Full detail in
-[`docs/data-model.md`](docs/data-model.md); schema in
-[`api/migrations/0001_init.sql`](api/migrations/0001_init.sql).
+## Architecture
 
 ```
- document 1───∞ chunk ∞───∞ claim ∞───∞ entity
-    │            │   └────────┐  │  ┌──────┘ │
-    │            │  (claim_chunk)│(claim_entity)
-    │            │            │  │           │
-    │            └──∞ evidence ∞─┘           │
-    │              (supports/contradicts/    │
-    │               explains, strength)      │
-    └──────── relation (entity↔entity) ──────┘
-
- FTS5 + sqlite-vec indexes over `chunk` are added in Phase 2.
+connectors (GitHub · docs · blogs · SO/HN/Reddit)
+        → fetch → clean → chunk
+        → index: FTS5 (BM25) + sqlite-vec (embeddings)   [one SQLite file]
+query   → understanding → expansion → hybrid retrieval (RRF)
+        → claim extraction → evidence linking → confidence + source trust
+        → knowledge graph → rerank → cited synthesis
+agents  ← MCP tools · /v1/web_search · /search · /research
 ```
 
-The v1 domain scope, seed sources, and 15 gold queries live in
-[`docs/v1-vertical.md`](docs/v1-vertical.md).
+Semantic search is treated as infrastructure; the evidence + reasoning layer on
+top is the product.
+
+## Layout
+
+| Path | Stack | Purpose |
+| --- | --- | --- |
+| `api/` | Python · FastAPI · uv · SQLite | Ingestion, retrieval, evidence, research engine, MCP server, HTTP API |
+| `web/` | Next.js · TypeScript | Optional human search UI |
+| `docs/` | Markdown | Data model, agent guide, domain scope |
+
+## Develop
+
+```bash
+cd api
+uv sync
+uv run python -m app.db          # apply migrations
+uv run fastapi dev app/main.py   # http://127.0.0.1:8000
+uv run pytest
+uv run ruff check .
+```
+
+The LLM stages (query expansion, claim/evidence extraction, synthesis) use
+Google Gemini. Without a key they run deterministic heuristics — the pipeline
+works end to end, but claim and answer quality are better with one. Set
+`GEMINI_API_KEY` in `api/.env` (gitignored; see `api/.env.example`).
+
+## Benchmarks
+
+`uv run python -m app.eval.benchmark` scores the engine on a versioned task set
+(coverage, citation accuracy, source recall, contradiction recall, token cost)
+and compares single-shot search vs. `deep_research`. Baseline in
+[`api/app/eval/baseline.json`](api/app/eval/baseline.json).
+
+Data model: [docs/data-model.md](docs/data-model.md). Domain scope and gold
+queries: [docs/v1-vertical.md](docs/v1-vertical.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

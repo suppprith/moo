@@ -27,7 +27,7 @@ _TOOLS = {"search", "fetch_source", "get_claim", "list_contradictions", "expand_
 def test_server_smoke_lists_tools():
     """CI smoke check (SUP-118): the server object builds and exposes its tools,
     and the `moo-mcp` entry point is importable."""
-    assert m.mcp.name == "moo-search"
+    assert m.mcp.name == "moo"
     assert callable(m.main)
     tools = asyncio.run(m.mcp.list_tools())
     assert len(tools) == len(_TOOLS)

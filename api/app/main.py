@@ -1,4 +1,4 @@
-"""moo search API entrypoint.
+"""moo API entrypoint.
 
 Run locally with:  uv run fastapi dev app/main.py
 """
@@ -30,9 +30,9 @@ from .streaming import sse_event, sse_response
 from .websearch import OPENAI_TOOL, to_anthropic_results, web_search
 
 app = FastAPI(
-    title="moo search API",
+    title="moo",
     version="0.1.0",
-    summary="Evidence-graph search engine",
+    summary="CS/coding evidence search for AI agents",
 )
 
 # Let the web/ dev server (and a self-hosted UI) call the API from the browser.
