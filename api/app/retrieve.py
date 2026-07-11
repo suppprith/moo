@@ -127,16 +127,19 @@ def _collapse_near_dups(
         row = rows.get(cid)
         if row is None:
             continue
+        # simhash the candidate once, not once per kept cluster (was O(n^2) over
+        # full chunk text — the dominant cost of retrieval before this).
+        h = simhash(row["text"])
         # exact-dup safety net: fold anything pointing at an already-kept canonical
         canon = row["canonical_chunk_id"]
         folded = False
         for kcid, khash, alts in kept:
-            if canon == kcid or hamming(simhash(row["text"]), khash) <= SIMHASH_HAMMING:
+            if canon == kcid or hamming(h, khash) <= SIMHASH_HAMMING:
                 alts.append(cid)
                 folded = True
                 break
         if not folded:
-            kept.append((cid, simhash(row["text"]), []))
+            kept.append((cid, h, []))
     return [(cid, alts) for cid, _, alts in kept]
 
 
