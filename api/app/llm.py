@@ -1,14 +1,25 @@
-"""Pluggable LLM provider layer (SUP-82; groundwork for SUP-104).
+"""Pluggable LLM provider layer — bring your own key (SUP-82, SUP-126).
 
-Every LLM stage in the pipeline goes through ``generate_json()`` so the
-provider is swappable and results are cached in the ``llm_cache`` table by
-stage + normalized-input hash — repeat queries never hit the API.
+Every LLM stage in the pipeline goes through ``generate_json()`` so the provider
+is swappable and results are cached in ``llm_cache`` by stage + content hash
+(repeat runs never hit the API). The operator brings their own key for whatever
+provider they run; nothing is hard-coded to one vendor.
 
-Active provider: **Google Gemini** (``google-genai``), cheap/fast tier for the
-expansion/claims/rerank stages. Credentials resolve from ``GEMINI_API_KEY`` /
-``GOOGLE_API_KEY`` (also read from ``api/.env`` for convenience); when none are
-available, callers fall back to their heuristic path so retrieval always works.
-``MOO_LLM_MODEL`` overrides the model. The Ollama option (SUP-104) plugs in here.
+Config (env, also read from ``api/.env``):
+
+- ``MOO_LLM_PROVIDER`` — ``gemini`` | ``openai`` | ``openai-compatible`` |
+  ``ollama`` | ``anthropic``. If unset, inferred from whichever key is present
+  (``GEMINI_API_KEY``/``GOOGLE_API_KEY`` → gemini, ``ANTHROPIC_API_KEY`` →
+  anthropic, ``OPENAI_API_KEY`` → openai).
+- ``MOO_LLM_API_KEY`` — the key (or the provider-specific env var above).
+- ``MOO_LLM_MODEL`` — model override (per-provider default otherwise).
+- ``MOO_LLM_BASE_URL`` — for openai-compatible / local servers (Ollama, vLLM,
+  LM Studio, llama.cpp).
+
+One OpenAI-compatible path (httpx) covers OpenAI + most hosted/local servers;
+Gemini uses ``google-genai``; Anthropic uses the Messages API (httpx). When no
+provider resolves, ``generate_json`` returns ``None`` and callers fall back to
+their deterministic heuristic — the pipeline always runs.
 """
 
 from __future__ import annotations
@@ -23,16 +34,29 @@ from pathlib import Path
 
 log = logging.getLogger("moo.llm")
 
-# Cheap/fast model for expansion, claims, evidence linking, rerank.
-CHEAP_MODEL = os.environ.get("MOO_LLM_MODEL", "gemini-2.5-flash")
-
 _API_DIR = Path(__file__).resolve().parent.parent
-_client = None
-_client_checked = False
+
+# per-provider defaults
+_DEFAULT_MODELS = {
+    "gemini": "gemini-2.5-flash",
+    "openai": "gpt-4o-mini",
+    "openai-compatible": "gpt-4o-mini",
+    "ollama": "llama3.1",
+    "anthropic": "claude-haiku-4-5-20251001",
+}
+_DEFAULT_BASE_URLS = {
+    "openai": "https://api.openai.com/v1",
+    "ollama": "http://localhost:11434/v1",
+    "anthropic": "https://api.anthropic.com/v1",
+}
+# providers that can run without an API key (local servers)
+_KEYLESS_OK = {"ollama", "openai-compatible"}
+
+_FALLBACK_MODEL = _DEFAULT_MODELS["gemini"]
 
 
 def _load_dotenv() -> None:
-    """Best-effort: populate GEMINI/GOOGLE keys from api/.env if not already set."""
+    """Best-effort: populate env from api/.env if not already set."""
     env_path = _API_DIR / ".env"
     if not env_path.exists():
         return
@@ -49,28 +73,89 @@ def _load_dotenv() -> None:
         pass
 
 
-def get_client():
-    """Return a genai.Client, or None if no credentials resolve."""
-    global _client, _client_checked
-    if _client_checked:
-        return _client
-    _client_checked = True
+# ---------------------------------------------------------------------------
+# provider config resolution
+# ---------------------------------------------------------------------------
+
+_config: dict | None = None
+_config_checked = False
+
+
+def _infer_provider() -> str | None:
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return "gemini"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    if os.environ.get("MOO_LLM_API_KEY") and os.environ.get("MOO_LLM_BASE_URL"):
+        return "openai-compatible"
+    return None
+
+
+def _resolve_config() -> dict | None:
+    """Resolve {provider, api_key, base_url, model} from config, or None when no
+    provider is available. Cached for the process."""
+    global _config, _config_checked
+    if _config_checked:
+        return _config
+    _config_checked = True
     _load_dotenv()
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        log.info("no GEMINI_API_KEY/GOOGLE_API_KEY found; LLM stages use heuristic fallbacks")
+
+    provider = (os.environ.get("MOO_LLM_PROVIDER") or "").strip().lower() or _infer_provider()
+    if provider is None:
+        log.info("no LLM provider configured; stages use heuristic fallbacks")
         return None
-    try:
-        from google import genai
+    if provider not in _DEFAULT_MODELS:
+        log.warning("unknown MOO_LLM_PROVIDER %r; using heuristics", provider)
+        return None
 
-        _client = genai.Client(api_key=api_key)
-    except Exception as exc:  # noqa: BLE001 - LLM absence must never break retrieval
-        log.warning("gemini client unavailable: %s", exc)
-    return _client
+    key = os.environ.get("MOO_LLM_API_KEY") or {
+        "gemini": os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
+        "anthropic": os.environ.get("ANTHROPIC_API_KEY"),
+        "openai": os.environ.get("OPENAI_API_KEY"),
+    }.get(provider)
+    if not key and provider not in _KEYLESS_OK:
+        log.info("provider %s selected but no API key found; using heuristics", provider)
+        return None
+
+    _config = {
+        "provider": provider,
+        "api_key": key,
+        "base_url": os.environ.get("MOO_LLM_BASE_URL") or _DEFAULT_BASE_URLS.get(provider),
+        "model": os.environ.get("MOO_LLM_MODEL") or _DEFAULT_MODELS[provider],
+    }
+    return _config
 
 
-# Per-process cost counters (SUP-122). Reset around a run to measure it; note
-# they are process-global, so a single run at a time gets clean numbers.
+def _reset_config() -> None:
+    """Re-read config on next use (tests / after env changes)."""
+    global _config, _config_checked
+    _config, _config_checked = None, False
+
+
+def model_name() -> str:
+    cfg = _resolve_config()
+    return cfg["model"] if cfg else _FALLBACK_MODEL
+
+
+def get_client():
+    """Truthy when a provider is configured (back-compat helper)."""
+    return _resolve_config()
+
+
+def __getattr__(name: str):
+    # `llm.CHEAP_MODEL` resolves to the configured model lazily, so existing
+    # callers keep working across providers.
+    if name == "CHEAP_MODEL":
+        return model_name()
+    raise AttributeError(name)
+
+
+# ---------------------------------------------------------------------------
+# cost counters + cache
+# ---------------------------------------------------------------------------
+
 _STATS = {"calls": 0, "cache_hits": 0, "cache_misses": 0}
 
 
@@ -107,21 +192,25 @@ def cache_put(conn: sqlite3.Connection, key: str, value, model: str) -> None:
 
 def cached_json(conn: sqlite3.Connection, stage: str, key_input: str, prompt: str, *, schema: dict, **kw):
     """cache_get -> generate_json -> cache_put in one call, keyed by content, so
-    every LLM stage is cached (SUP-122). A repeated identical run is a cache hit
-    and makes zero API calls. Non-results (heuristic fallback) are not cached."""
+    every LLM stage is cached. A repeated identical run is a cache hit and makes
+    zero API calls. Cache keys are provider-agnostic (content only); the model is
+    recorded in the row. Non-results (heuristic fallback) are not cached."""
     key = cache_key(stage, key_input)
     hit = cache_get(conn, key)
     if hit is not None:
         return hit
     result = generate_json(prompt, schema=schema, **kw)
     if result is not None:
-        cache_put(conn, key, result, kw.get("model", CHEAP_MODEL))
+        cache_put(conn, key, result, kw.get("model") or model_name())
     return result
 
 
+# ---------------------------------------------------------------------------
+# provider backends
+# ---------------------------------------------------------------------------
+
 def _gemini_schema(schema: dict) -> dict:
-    """Strip JSON-Schema keys Gemini's response_schema rejects (e.g.
-    additionalProperties)."""
+    """Strip JSON-Schema keys Gemini's response_schema rejects."""
     clean = copy.deepcopy(schema)
 
     def _walk(node):
@@ -137,46 +226,120 @@ def _gemini_schema(schema: dict) -> dict:
     return clean
 
 
+def _extract_json(text: str) -> str:
+    """Best-effort: pull the JSON object out of a model response (strip code
+    fences / surrounding prose)."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text[:4].lower() == "json":
+            text = text[4:]
+    i, j = text.find("{"), text.rfind("}")
+    return text[i : j + 1] if i != -1 and j != -1 else text
+
+
+_clients: dict = {}
+
+
+def _gemini_json(cfg, prompt, schema, system, model, max_tokens):
+    from google import genai
+    from google.genai import types
+
+    client = _clients.get(("gemini", cfg["api_key"]))
+    if client is None:
+        client = genai.Client(api_key=cfg["api_key"])
+        _clients[("gemini", cfg["api_key"])] = client
+    base = {
+        "response_mime_type": "application/json",
+        "max_output_tokens": max_tokens,
+        "system_instruction": system,
+    }
+    try:
+        config = types.GenerateContentConfig(response_schema=_gemini_schema(schema), **base)
+        resp = client.models.generate_content(model=model, contents=prompt, config=config)
+    except Exception:  # noqa: BLE001 - retry without schema; mime type still enforces JSON
+        config = types.GenerateContentConfig(**base)
+        resp = client.models.generate_content(model=model, contents=prompt, config=config)
+    return json.loads(resp.text)
+
+
+def _openai_json(cfg, prompt, schema, system, model, max_tokens):
+    import httpx
+
+    url = cfg["base_url"].rstrip("/") + "/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if cfg["api_key"]:
+        headers["Authorization"] = f"Bearer {cfg['api_key']}"
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system + " Respond with a single JSON object."},
+            {"role": "user", "content": prompt},
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": max_tokens,
+        "temperature": 0,
+    }
+    try:
+        resp = httpx.post(url, json=body, headers=headers, timeout=60)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError:  # some servers reject response_format; retry without it
+        body.pop("response_format", None)
+        resp = httpx.post(url, json=body, headers=headers, timeout=60)
+        resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"]
+    return json.loads(_extract_json(content))
+
+
+def _anthropic_json(cfg, prompt, schema, system, model, max_tokens):
+    import httpx
+
+    url = cfg["base_url"].rstrip("/") + "/messages"
+    headers = {
+        "x-api-key": cfg["api_key"] or "",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system + " Respond with only a single JSON object, no prose.",
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    resp = httpx.post(url, json=body, headers=headers, timeout=60)
+    resp.raise_for_status()
+    content = resp.json()["content"][0]["text"]
+    return json.loads(_extract_json(content))
+
+
+_BACKENDS = {
+    "gemini": _gemini_json,
+    "openai": _openai_json,
+    "openai-compatible": _openai_json,
+    "ollama": _openai_json,
+    "anthropic": _anthropic_json,
+}
+
+
 def generate_json(
     prompt: str,
     *,
     schema: dict,
     system: str | None = None,
-    model: str = CHEAP_MODEL,
+    model: str | None = None,
     max_tokens: int = 1024,
 ):
-    """One structured LLM call. Returns parsed JSON, or None if no
-    client/credentials are available or the call fails (callers fall back)."""
-    client = get_client()
-    if client is None:
+    """One structured LLM call via the configured provider. Returns parsed JSON,
+    or ``None`` when no provider is configured or the call fails (callers fall
+    back to heuristics — an LLM failure never breaks retrieval)."""
+    cfg = _resolve_config()
+    if cfg is None:
         return None
     _STATS["calls"] += 1
+    system = system or "You are a component in a search pipeline. Output only JSON."
+    backend = _BACKENDS[cfg["provider"]]
     try:
-        from google.genai import types
-    except Exception as exc:  # noqa: BLE001
-        log.warning("google-genai unavailable: %s", exc)
-        return None
-
-    default_system = "You are a component in a search pipeline. Output only JSON."
-    base = {
-        "response_mime_type": "application/json",
-        "max_output_tokens": max_tokens,
-        "system_instruction": system or default_system,
-    }
-    try:
-        config = types.GenerateContentConfig(response_schema=_gemini_schema(schema), **base)
-        resp = client.models.generate_content(model=model, contents=prompt, config=config)
-    except Exception as exc:  # noqa: BLE001 - retry without schema; mime type still enforces JSON
-        log.debug("schema-constrained call failed (%s); retrying plain JSON", exc)
-        try:
-            config = types.GenerateContentConfig(**base)
-            resp = client.models.generate_content(model=model, contents=prompt, config=config)
-        except Exception as exc2:  # noqa: BLE001 - degrade to heuristics, never crash retrieval
-            log.warning("LLM call failed (%s); falling back", exc2)
-            return None
-    try:
-        return json.loads(resp.text)
-    except (ValueError, AttributeError, TypeError) as exc:
-        # blocked/empty response or non-JSON text
-        log.warning("LLM returned no usable JSON (%s); falling back", exc)
+        return backend(cfg, prompt, schema, system, model or cfg["model"], max_tokens)
+    except Exception as exc:  # noqa: BLE001 - degrade to heuristics, never crash retrieval
+        log.warning("LLM call failed (%s); falling back", exc)
         return None

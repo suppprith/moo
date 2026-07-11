@@ -130,10 +130,13 @@ uv run pytest
 uv run ruff check .
 ```
 
-The LLM stages (query expansion, claim/evidence extraction, synthesis) use
-Google Gemini. Without a key they run deterministic heuristics — the pipeline
-works end to end, but claim and answer quality are better with one. Set
-`GEMINI_API_KEY` in `api/.env` (gitignored; see `api/.env.example`).
+The LLM stages (query expansion, claim/evidence extraction, synthesis) are
+**bring-your-own-key**: Gemini, OpenAI, Anthropic, or any OpenAI-compatible /
+local server (Ollama, vLLM, LM Studio). Configure via `MOO_LLM_PROVIDER` /
+`MOO_LLM_API_KEY` / `MOO_LLM_MODEL` / `MOO_LLM_BASE_URL` in `api/.env` (gitignored;
+see `api/.env.example`). Without any key the stages run deterministic heuristics —
+the pipeline works end to end, quality is just better with a model. Run a local
+model and nothing leaves the machine.
 
 ## Benchmarks
 

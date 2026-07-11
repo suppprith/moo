@@ -97,6 +97,8 @@ get_claim → fetch_source → list_contradictions). A recorded transcript is in
 ## Note on quality
 
 The LLM stages (plan, claims, evidence linking, synthesis) fall back to
-deterministic heuristics when no key is set — the pipeline runs end to end
-keyless, but claim/answer *quality* is much better with a key. Set
-`GEMINI_API_KEY` in `api/.env` to enable the Gemini path.
+deterministic heuristics when no provider is configured — the pipeline runs end
+to end keyless, but claim/answer *quality* is much better with a model. It's
+bring-your-own-key: Gemini, OpenAI, Anthropic, or any OpenAI-compatible / local
+server (Ollama, vLLM, LM Studio) via `MOO_LLM_PROVIDER` / `MOO_LLM_API_KEY` /
+`MOO_LLM_MODEL` / `MOO_LLM_BASE_URL` in `api/.env` (see `api/.env.example`).
