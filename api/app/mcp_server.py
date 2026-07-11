@@ -6,6 +6,10 @@ call moo's CS/coding evidence search directly — the tool an agent routes its
 agent-shaped payload (opaque ``chk_``/``clm_`` handles, evidence referenced by
 handle) so results stay small and drill-downable rather than dumping the corpus.
 
+Tools: ``search``, ``fetch_source``, ``get_claim``, ``list_contradictions``,
+``expand_graph`` (the primitives an agent drives itself), plus ``deep_research``
++ ``research_status`` (hand off a whole question, get a cited report).
+
 The tool descriptions are load-bearing: they are what an agent reads to decide
 whether and how to call moo, so they spell out when to prefer moo over a general
 web search and how the handles chain (search -> fetch_source -> ...).
@@ -17,12 +21,19 @@ Run:  uv run python -m app.mcp_server              # stdio (default)
 from __future__ import annotations
 
 import argparse
+import queue
+import threading
 from typing import Literal
 
-from mcp.server.fastmcp import FastMCP
+import anyio
+from mcp.server.fastmcp import Context, FastMCP
 
 from . import fetch as fetch_mod
 from . import ids
+from .research import session as research_session
+from .research.loop import run_loop
+from .research.plan import plan as make_plan
+from .research.report import assemble_report
 from .search import search as run_search
 
 mcp = FastMCP("moo-search")
@@ -163,6 +174,100 @@ def expand_graph(node: str) -> dict:
     if result is None:
         raise ValueError(f"unknown entity {node!r}")
     return result
+
+
+@mcp.tool()
+async def deep_research(
+    question: str,
+    k: int = 6,
+    max_steps: int = 6,
+    max_seconds: float = 90.0,
+    ctx: Context = None,
+) -> dict:
+    """Hand off a whole research question and get back a grounded, cited report.
+
+    moo decomposes the question into sub-questions, iterates retrieval to fill
+    gaps and chase contradictions (bounded by `max_steps` / `max_seconds`), and
+    returns `{run_id, status, partial, executive_answer, findings[],
+    disputed_points[], open_questions[], sources[]}`. Every finding carries a
+    confidence and citations; `disputed_points` show where sources disagree;
+    `open_questions` are what it could not cover. If a budget cap is hit,
+    `partial` is true.
+
+    Progress streams as MCP progress events. Pass a source/claim handle from the
+    report to `fetch_source`/`get_claim` to drill into the evidence. Re-fetch a
+    run later with `research_status(run_id)`.
+    """
+    events: queue.Queue = queue.Queue()
+    holder: dict = {}
+
+    def worker():
+        conn = _search_conn()
+        try:
+            plan = make_plan(conn, question, use_llm=True)
+            events.put(("plan", {"sub_questions": len(plan["sub_questions"]), "intent": plan["intent"]}))
+            run_id = research_session.create_run(conn, question, plan)
+            holder["run_id"] = run_id
+
+            def on_step(step, assocs):
+                research_session.record_step(conn, run_id, step, assocs)
+                events.put(("progress", step))
+
+            res = run_loop(conn, plan, k=k, max_steps=max_steps, max_seconds=max_seconds,
+                           use_llm=True, on_step=on_step)
+            status = "partial" if res["budget"]["exhausted"] else "done"
+            research_session.finalize_run(conn, run_id, res, status)
+            res["run_id"], res["status"] = run_id, status
+            report = assemble_report(conn, res, use_llm=True)
+            report["run_id"], report["status"], report["partial"] = run_id, status, status == "partial"
+            holder["report"] = report
+        except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
+            holder["error"] = str(exc)
+        finally:
+            conn.close()
+            events.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+    steps_done = 0
+    while True:
+        item = await anyio.to_thread.run_sync(events.get)
+        if item is None:
+            break
+        kind, data = item
+        if ctx is not None:
+            try:  # progress reporting must never break the run
+                if kind == "plan":
+                    await ctx.info(f"planned {data['sub_questions']} sub-questions ({data['intent']})")
+                elif kind == "progress":
+                    steps_done += 1
+                    await ctx.report_progress(
+                        progress=steps_done, total=max_steps,
+                        message=f"step {data['step']} [{data['reason']}]: {data['claims']} claims",
+                    )
+            except Exception:  # noqa: BLE001
+                pass
+    if "error" in holder:
+        raise ValueError(f"deep_research failed: {holder['error']}")
+    return holder["report"]
+
+
+@mcp.tool()
+def research_status(run_id: str) -> dict:
+    """Fetch a `deep_research` run's current status + cited report by its
+    `run_id` (poll a long run, or re-read a finished one). The report is
+    reassembled from the persisted evidence; `partial` is true if the run hit a
+    budget cap."""
+    conn = _plain_conn()
+    try:
+        run = research_session.get_run(conn, run_id)
+        if run is None:
+            raise ValueError(f"no research run {run_id!r}")
+        report = assemble_report(conn, run, use_llm=False)
+        report["run_id"], report["status"] = run["run_id"], run["status"]
+        report["partial"] = run["status"] == "partial"
+        return report
+    finally:
+        conn.close()
 
 
 def main(argv: list[str] | None = None) -> int:
