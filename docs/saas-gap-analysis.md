@@ -1,6 +1,6 @@
 # moo as a SaaS: gap analysis vs Tavily, Firecrawl, Exa
 
-*Written 2026-07-12. Companion to the Phase 14 live-crawl pivot and the competitive tickets (SUP-127..146). This doc is about the **product/business layer**, not the engine — the engine plan already exists in Linear.*
+*Written 2026-07-12; competitor facts verified against live docs/pricing pages the same day (sources at bottom). Companion to the Phase 14 live-crawl pivot and the competitive tickets (SUP-127..146). This doc is about the **product/business layer**, not the engine — the engine plan already exists in Linear.*
 
 ## Where moo actually stands
 
@@ -8,22 +8,37 @@ What's built (Phases 0–13): hybrid retrieval, evidence graph (claims / support
 
 What that is today: **an excellent self-hostable engine**. What it is not yet: **a product someone can adopt in 5 minutes without cloning a repo**. Tavily/Firecrawl/Exa win less on retrieval quality than on *adoption friction being near zero*: signup → key → `pip install` → working call in under 3 minutes, generous free tier, SDKs in every framework's docs.
 
-## The honest competitive frame
+## The honest competitive frame (verified 2026-07-12)
+
+What each actually ships today:
+
+- **Tavily**: `/search` (depths ultra-fast→advanced; topic general/news/finance; time ranges; domain filters; `auto_parameters`), `/extract`, `/crawl`, `/map`, **`/research`** (mini/pro models, SSE streaming, custom `output_schema`, citation formats — a full deep-research endpoint, not "partial"), `/usage`. Free 1,000 credits/mo; PAYG $0.008/credit; basic search = 1 credit, advanced = 2.
+- **Firecrawl**: Scrape (1 credit/page), Crawl, Map, **Search** (2 credits/10 results — they compete in search too, not just scraping), Interact (browser automation, 2 credits/min), **Monitor** (page-change tracking), Agent (preview). Free 1,000 credits; Hobby $16/mo (5k credits) → Scale $599/mo (1M).
+- **Exa**: six search modes (instant/fast/auto/deep-lite/deep/deep-reasoning), `/contents` ($1/1k pages), highlights + summaries, **structured `outputSchema` with field-level grounding, citations, and low/medium/high confidence levels**, SSE streaming, Monitors, Websets, Agent, MCP server. Free tier up to 20k requests/mo; search $7/1k; deep search $12–15/1k.
 
 | | Tavily | Firecrawl | Exa | moo (today) |
 |---|---|---|---|---|
 | Hosted API + signup | ✅ | ✅ | ✅ | ❌ local only |
-| Free tier (credits) | ✅ 1k/mo | ✅ | ✅ | n/a |
-| Python + JS SDKs | ✅ | ✅ | ✅ | ❌ raw HTTP/MCP |
-| LangChain / LlamaIndex / Vercel AI integrations | ✅ | ✅ | ✅ | ❌ |
-| URL → clean content (`/extract`, `/scrape`) | ✅ | ✅ core | ✅ `/contents` | ❌ internal only |
+| Free tier | ✅ 1k credits/mo | ✅ 1k credits | ✅ ~20k req/mo | n/a |
+| Python + JS SDKs + framework listings | ✅ | ✅ | ✅ | ❌ raw HTTP/MCP |
+| URL → clean content | ✅ `/extract` | ✅ core | ✅ `/contents` | ❌ internal only |
+| Crawl / map a site | ✅ | ✅ core | subpages | ❌ |
 | Live web coverage | ✅ | ✅ | ✅ (own index) | ❌ until SUP-130 |
-| Docs site + playground | ✅ | ✅ | ✅ | ❌ README only |
-| Evidence graph, contradictions, confidence | ❌ | ❌ | ❌ | ✅ **unique** |
-| Grounded deep research w/ resumable runs | partial | ❌ | partial | ✅ **unique** |
-| Self-hostable / private / BYOK | ❌ | partial | ❌ | ✅ **unique** |
+| Deep research endpoint w/ cited report | ✅ `/research` | ❌ (Agent preview) | ✅ deep modes | ✅ |
+| Structured output schema for research | ✅ | ✅ (extract) | ✅ | ❌ |
+| Confidence signals on output | ❌ | ❌ | ✅ field-level low/med/high | ✅ per-claim numeric |
+| Change monitoring | ❌ | ✅ Monitor | ✅ Monitors | ❌ |
+| **Contradiction detection / disputed claims (two-sided evidence)** | ❌ | ❌ | ❌ | ✅ **unique** |
+| **Persistent evidence graph accumulating across queries** | ❌ | ❌ | ❌ | ✅ **unique** |
+| **Claim-level provenance handles (drill from any claim to exact source chunk)** | ❌ | ❌ | ❌ | ✅ **unique** |
+| Self-hostable / private / BYOK | ❌ | partial (OSS repo) | ❌ | ✅ **unique** |
+| Resumable research runs (poll/resume by run_id) | ❌ | ❌ | ❌ | ✅ |
 
-Conclusion: moo's differentiation is real (bottom three rows — nobody else has them). But differentiation only matters after **table-stakes adoption mechanics** exist. A better engine that requires cloning a repo loses to a worse engine with `pip install tavily-python`.
+Two sober corrections this research forced:
+1. **"Deep research" alone is not a moat.** Tavily `/research` and Exa deep/deep-reasoning both ship cited, streamed, schema-structured research. moo's deep_research is table stakes in that company — what's differentiated is *what's inside it*: contradictions surfaced as first-class output, per-claim confidence with inspectable evidence edges, and runs that persist/resume.
+2. **Exa already sells "confidence."** Field-level low/med/high grounding confidence. moo's version is stronger (numeric, per-claim, derived from an inspectable support/contradict evidence graph rather than an opaque label) — but the pitch can't pretend confidence itself is novel. The novel word is **disagreement**: nobody tells the agent when sources contradict each other.
+
+Conclusion stands, sharpened: differentiation is real but narrower than the engine plan assumed, and it only matters after **table-stakes adoption mechanics** exist. A better engine that requires cloning a repo loses to a worse engine with `pip install tavily-python`.
 
 ## Gap list (ranked by leverage)
 
@@ -43,7 +58,12 @@ Free tier with metered credits is the standard growth motion (Tavily: 1k credits
 README + docs/*.md is fine for self-hosters, invisible to everyone else. Needs: hosted docs (Mintlify/Fumadocs — fast to stand up from existing markdown + OpenAPI) and a keyless playground (the web UI is 80% of this already — put a rate-limited demo instance behind it).
 
 ### 6. No positioning artifact
-"Evidence-graph search engine" describes the tech, not the buyer's problem. The pitch that maps to a real pain: **agents confidently cite stale or contradicted information; moo is the search API that tells the agent when sources disagree and how confident to be.** One landing page + one comparison blog post ("we ran Claude with Tavily vs moo on 50 coding research tasks — here's where each failed") does more than any feature. Depends on SUP-129/141 benchmark numbers being real (which depends on SUP-128, the LLM key).
+"Evidence-graph search engine" describes the tech, not the buyer's problem. Post-research, the pitch must center on the one thing verified as unique: **disagreement. Every search API gives your agent answers; none of them tell it when the sources contradict each other. moo does — with the evidence for both sides.** (Confidence alone can't carry the pitch — Exa already ships field-level confidence labels; moo's is better-grounded, which is a supporting point, not the headline.) One landing page + one comparison blog post ("we ran Claude with Tavily vs moo on 50 coding research tasks — here's where each failed") does more than any feature. Depends on SUP-129/141 benchmark numbers being real (which depends on SUP-128, the LLM key). Note the eval must benchmark against Tavily `/research` and Exa deep mode — their real research products — not just their basic search.
+
+### 6b. Feature gaps surfaced by the research (candidates, not yet critical)
+- **Structured `output_schema` on deep_research** — all three competitors let callers define the JSON shape of synthesized output. moo returns a fixed report shape; agents increasingly expect schema-in. Cheap to add on top of the existing report assembler.
+- **Site crawl/map endpoint** — Tavily and Firecrawl both ship it; natural extension of `/extract` (SUP-147) once the fetch path exists. Defer until extract has users.
+- **Monitors / change tracking** — Exa and Firecrawl both sell this. For moo it's actually a *strong* fit later: "watch this claim — alert me when new evidence contradicts it" is a monitor product nobody else can build. Post-launch.
 
 ### 7. Ops/trust basics (needed at launch, not before)
 Status page, uptime monitoring, structured request logging with the existing no-query-content privacy stance made into a written policy, rate-limit headers (partially done), SLO for fast mode (<1s p50 — SUP-146 covers the engineering side).
@@ -65,4 +85,13 @@ Status page, uptime monitoring, structured request logging with the existing no-
 6. **SUP-131** (injection safety — required before hosting arbitrary live fetches for strangers) + **SUP-141/129** (benchmark) → launch post with head-to-head numbers.
 7. Framework integrations + billing — after first external users, not before.
 
-The one-sentence strategy: **reach zero-friction parity on adoption (hosted, SDK, extract, free tier), then win on the three rows of the table nobody else has.**
+The one-sentence strategy: **reach zero-friction parity on adoption (hosted, SDK, extract, free tier), then win on the rows of the table nobody else has — led by contradiction detection.**
+
+## Sources (verified 2026-07-12)
+
+- Tavily search API reference: https://docs.tavily.com/documentation/api-reference/endpoint/search (endpoints incl. /research, /crawl, /map; credit costs)
+- Tavily /research reference: https://docs.tavily.com/documentation/api-reference/endpoint/research (models, streaming, output_schema, citation formats)
+- Tavily pricing: https://www.tavily.com/pricing (1k credits/mo free, $0.008/credit PAYG)
+- Firecrawl pricing: https://www.firecrawl.dev/pricing (products + tiers + credit costs)
+- Exa pricing: https://exa.ai/pricing (free ~20k req/mo, $7/1k search, $12–15/1k deep, monitors/agent/websets)
+- Exa search/research API reference: https://exa.ai/docs/reference/research/create-a-task (six modes, outputSchema, field-level grounding + confidence, SSE)
