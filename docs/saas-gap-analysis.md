@@ -79,6 +79,12 @@ Status page, uptime monitoring, structured request logging with the existing no-
 - **Enterprise features** (SSO, VPC peering, SOC2) — years early. Self-hosting IS moo's enterprise story for now.
 - **More engine features** — the engine is ahead of the product. Pausing engine work (except SUP-130/143, which make the demo real) to ship adoption mechanics is the right trade.
 
+## The USP, made enforceable (2026-07-12)
+
+The USP is one falsifiable capability: **given a query whose popular answer is stale or contradicted, moo returns the current answer, marks the old one superseded/disputed, and shows evidence for both sides — competitors return the stale answer with no warning.**
+
+In Linear this is now protected structurally: the `usp` label marks the tickets that carry it (SUP-143 on-demand evidence, SUP-136 version-aware answers, SUP-137 supersedes edges, SUP-138 corroboration ranking, SUP-144 accumulating evidence cache), and **SUP-156 is the acceptance gate** — a stale-trap benchmark (10–20 real queries with verifiably outdated popular answers, run against moo + Tavily /search+/research + Exa auto+deep) that must pass before SUP-153 can launch. If a scope cut ever threatens a `usp` ticket, the cut is wrong.
+
 ## Recommended sequence
 
 1. **SUP-128** — set an LLM key (unblocks real evidence quality + honest benchmarks; 10 minutes).
