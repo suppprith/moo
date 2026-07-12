@@ -45,6 +45,16 @@ export function search(
   return getJson<SearchResponse>(`/search?${params}`, opts.signal);
 }
 
+export function graphForQuery(
+  q: string,
+  opts: { depth?: number; cap?: number; signal?: AbortSignal } = {},
+): Promise<Graph> {
+  const params = new URLSearchParams({ q });
+  if (opts.depth) params.set("depth", String(opts.depth));
+  if (opts.cap) params.set("cap", String(opts.cap));
+  return getJson<Graph>(`/graph?${params}`, opts.signal);
+}
+
 export function expandNode(node: string, signal?: AbortSignal): Promise<Graph> {
   return getJson<Graph>(`/graph/expand?node=${encodeURIComponent(node)}`, signal);
 }

@@ -850,3 +850,35 @@ button {
 .disputed-sides .side.contradicts { color: var(--contradicts); }
 .open-questions { margin: 0 0 8px; padding-left: 20px; color: var(--ink-2); display: flex; flex-direction: column; gap: 5px; }
 .open-questions li { font-size: 14px; }
+
+/* ---- evidence graph (SUP-95) ---- */
+.deep-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.graph-status { color: var(--ink-2); font-size: 14px; padding: 32px 0; text-align: center; }
+.graph {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--panel-2); overflow: hidden;
+}
+.graph-svg { display: block; width: 100%; height: auto; background: var(--panel); }
+.g-label {
+  font-size: 12px; font-weight: 600; fill: var(--ink);
+  paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round;
+}
+.g-node:hover circle { filter: brightness(1.1); }
+.graph-legend {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-2);
+}
+.leg { display: inline-flex; align-items: center; gap: 6px; }
+.leg i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.leg-note { margin-left: auto; color: var(--ink-3); font-style: italic; }
+.graph-detail { padding: 14px; border-top: 1px solid var(--border); }
+.gd-head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.gd-dot { width: 10px; height: 10px; border-radius: 50%; }
+.gd-type { color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.gd-desc { color: var(--ink-2); font-size: 13px; margin: 8px 0 0; }
+.gd-claims { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.gd-claims li {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--ink); line-height: 1.45;
+}
+.gd-empty { color: var(--ink-3); font-size: 13px; margin: 10px 0 0; }

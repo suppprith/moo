@@ -5,6 +5,7 @@ import { ApiError, search } from "@/lib/api";
 import type { Mode, SearchResponse } from "@/lib/types";
 import { Answer } from "@/components/Answer";
 import { ClaimList } from "@/components/ClaimList";
+import { GraphView } from "@/components/GraphView";
 import { ModeBar } from "@/components/ModeBar";
 import { ResearchView } from "@/components/ResearchView";
 import { SearchBox } from "@/components/SearchBox";
@@ -42,6 +43,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [research, setResearch] = useState<string | null>(null);
+  const [graph, setGraph] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async (q: string, m: Mode) => {
@@ -66,6 +68,7 @@ export default function Home() {
     setQuery(q);
     setSearched(true);
     setResearch(null);
+    setGraph(null);
     run(q, mode);
   };
 
@@ -81,6 +84,7 @@ export default function Home() {
     setQuery("");
     setMode("raw");
     setResearch(null);
+    setGraph(null);
   };
 
   // ---- home (pre-search) hero ----
@@ -138,10 +142,22 @@ export default function Home() {
               Deep research →
             </button>
           )}
+          {query && (
+            <button
+              className={`deep-btn${graph !== null ? " active" : ""}`}
+              onClick={() => setGraph((g) => (g ? null : query))}
+            >
+              Evidence graph {graph !== null ? "✕" : "→"}
+            </button>
+          )}
         </div>
 
         {error && <div className="error">{error}</div>}
 
+        {graph !== null ? (
+          <GraphView query={graph} />
+        ) : (
+        <>
         {loading && !data && <ResultSkeleton />}
 
         {data && !error && (
@@ -168,6 +184,8 @@ export default function Home() {
             </div>
             <SourceList sources={data.sources} />
           </>
+        )}
+        </>
         )}
           </>
         )}
