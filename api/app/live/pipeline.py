@@ -1,4 +1,4 @@
-"""Per-query live retrieval pipeline (SUP-130).
+"""Per-query live retrieval pipeline (SUP-130, perf pass SUP-146).
 
 ``live_fetch(conn, query)`` runs: discover candidate URLs (provider) -> rank
 them with the software-domain policy -> fetch + extract each page -> write
@@ -12,7 +12,16 @@ searches, so:
   ETag/Last-Modified cache and skips unchanged content via the document
   content-hash, so warm queries cost almost nothing (SUP-144 adds TTL policy).
 
-Fetching is serial in this cut; SUP-146 adds per-host concurrency + deadlines.
+**Concurrency + budget (SUP-146).** Network fetch is the latency floor of live
+mode, so pages are fetched **concurrently across hosts** while every host's own
+requests stay serial in one worker — per-host politeness (Fetcher throttle,
+robots) is preserved exactly. A wall-clock deadline (``max_seconds``, env
+``MOO_LIVE_MAX_SECONDS``) bounds the whole fetch stage: when it expires the
+pipeline returns **partial results** (whatever finished) instead of blocking on
+stragglers; unfinished pages are counted in ``timed_out``. Fetch + extraction
+run in workers; all SQLite writes stay on the calling thread (sqlite3
+connections are not thread-safe). ``report.cost`` accounts provider calls and
+pages attempted so per-query external cost is always visible.
 
 CLI:  ``uv run python -m app.live "how does postgres vacuum work"``
 """
@@ -20,8 +29,12 @@ CLI:  ``uv run python -m app.live "how does postgres vacuum work"``
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
+import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from urllib.parse import urlsplit
 
 import trafilatura
 
@@ -32,12 +45,14 @@ from ..ingest.base import store
 from ..ingest.fetcher import Fetcher
 from ..ingest.models import RawDoc
 from . import policy
-from .providers import Provider, resolve_provider
+from .providers import Provider, get_stats, resolve_provider
 
 log = logging.getLogger("moo.live")
 
 DEFAULT_MAX_PAGES = 6
 DISCOVER_COUNT = 16  # candidates asked from the provider (pre-policy)
+DEFAULT_MAX_SECONDS = float(os.environ.get("MOO_LIVE_MAX_SECONDS", "12"))
+MAX_WORKERS = 6      # concurrent host workers (one host is never parallelized)
 
 # One shared fetcher: keeps per-host politeness state + the on-disk HTTP cache
 # warm across queries in the same process.
@@ -82,6 +97,56 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
     )
 
 
+def _fetch_extract_all(
+    fetcher, ranked: list, deadline: float
+) -> tuple[list[tuple[int, object, policy.DomainInfo, RawDoc | None]], int]:
+    """Fetch + extract candidates concurrently across hosts, serially within a
+    host. One future per page; a per-host lock serializes same-host requests so
+    the Fetcher's politeness (throttle/robots) is preserved exactly. Results
+    are collected page-by-page, so a deadline expiry keeps everything already
+    finished (partial results) and abandons only the stragglers."""
+    hosts = {urlsplit(cand.url).netloc for cand, _ in ranked}
+    host_locks = {h: threading.Lock() for h in hosts}
+
+    def page_worker(idx: int, cand, info: policy.DomainInfo):
+        lock = host_locks[urlsplit(cand.url).netloc]
+        with lock:  # same-host requests never overlap
+            if time.monotonic() > deadline:
+                return None  # queued behind slower same-host pages: timed out
+            res = fetcher.get(cand.url)
+        doc = None
+        if res.ok and res.text:
+            doc = _extract(cand.url, res.text, info)  # CPU work outside the lock
+        return (idx, cand, info, doc)
+
+    done_items: list[tuple[int, object, policy.DomainInfo, RawDoc | None]] = []
+    executor = ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(ranked)))
+    try:
+        pending: set[Future] = {
+            executor.submit(page_worker, idx, cand, info)
+            for idx, (cand, info) in enumerate(ranked)
+        }
+        while pending:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break  # abandon stragglers; partial results beat blocking
+            finished, pending = wait(pending, timeout=remaining, return_when=FIRST_COMPLETED)
+            for fut in finished:
+                try:
+                    item = fut.result()
+                except Exception as exc:  # noqa: BLE001 - one page must not kill the query
+                    log.warning("page worker failed: %s", exc)
+                    continue
+                if item is not None:
+                    done_items.append(item)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    timed_out = len(ranked) - len(done_items)
+    done_items.sort(key=lambda t: t[0])  # deterministic store order by rank
+    return done_items, timed_out
+
+
 def _doc_id(conn: sqlite3.Connection, url: str) -> int | None:
     row = conn.execute("SELECT id FROM document WHERE url = ?", (url,)).fetchone()
     return row["id"] if row else None
@@ -104,15 +169,21 @@ def live_fetch(
     query: str,
     *,
     max_pages: int = DEFAULT_MAX_PAGES,
+    max_seconds: float = DEFAULT_MAX_SECONDS,
     provider: Provider | None = None,
     fetcher: Fetcher | None = None,
 ) -> dict:
     """Discover + fetch live pages for ``query`` into the store.
 
+    ``max_pages`` caps pages fetched; ``max_seconds`` (env
+    ``MOO_LIVE_MAX_SECONDS``) is a wall-clock deadline on the fetch stage —
+    on expiry the pipeline continues with whatever finished (partial results),
+    counting the rest in ``timed_out``.
+
     Returns a JSON-able report (also embedded in search ``meta.live``):
     ``{available, provider, out_of_domain, domain_confidence, discovered,
-    considered[], fetched, unchanged, failed, new_docs, updated_docs,
-    new_chunks, embedded, timings_ms{}}``.
+    considered[], fetched, unchanged, failed, timed_out, new_docs,
+    updated_docs, new_chunks, embedded, timings_ms{}, cost{}}``.
 
     Requires a vec-enabled connection (``vector.connect()``) because new
     embeddings are synced into ``chunk_vec``.
@@ -127,11 +198,13 @@ def live_fetch(
         "fetched": 0,
         "unchanged": 0,
         "failed": 0,
+        "timed_out": 0,
         "new_docs": [],
         "updated_docs": [],
         "new_chunks": 0,
         "embedded": 0,
         "timings_ms": {},
+        "cost": {"provider_calls": 0, "pages_attempted": 0, "max_seconds": max_seconds},
     }
 
     provider = provider or resolve_provider()
@@ -142,7 +215,9 @@ def live_fetch(
 
     # -- discover -------------------------------------------------------------
     t0 = time.perf_counter()
+    calls_before = get_stats()["calls"]
     cands = provider.discover(query, count=DISCOVER_COUNT)
+    report["cost"]["provider_calls"] = get_stats()["calls"] - calls_before
     report["timings_ms"]["discover"] = round((time.perf_counter() - t0) * 1000, 1)
     report["discovered"] = len(cands)
     if not cands:
@@ -159,15 +234,15 @@ def live_fetch(
         {"url": c.url, "tier": d.tier, "prior": d.prior} for c, d in ranked
     ]
 
-    # -- fetch + extract + upsert ----------------------------------------------
+    # -- fetch + extract (concurrent, deadline-bounded) -------------------------
     fetcher = fetcher or _default_fetcher()
     t0 = time.perf_counter()
-    for cand, info in ranked:
-        res = fetcher.get(cand.url)
-        if not res.ok or not res.text:
-            report["failed"] += 1
-            continue
-        doc = _extract(cand.url, res.text, info)
+    report["cost"]["pages_attempted"] = len(ranked)
+    deadline = time.monotonic() + max_seconds
+    results, report["timed_out"] = _fetch_extract_all(fetcher, ranked, deadline)
+
+    # -- upsert (main thread: sqlite3 connections are not thread-safe) ----------
+    for _idx, cand, _info, doc in results:
         if doc is None:
             report["failed"] += 1
             continue

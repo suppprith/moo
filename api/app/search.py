@@ -299,8 +299,10 @@ def search(
             "fetched": live_report["fetched"],
             "unchanged": live_report["unchanged"],
             "failed": live_report["failed"],
+            "timed_out": live_report["timed_out"],
             "new_chunks": live_report["new_chunks"],
             "timings_ms": live_report["timings_ms"],
+            "cost": live_report["cost"],
         }
 
     if mode == "raw":
