@@ -51,6 +51,10 @@ FORMATS = ("full", "agent")
 CONTRACT_VERSION = "1.1"
 DEFAULT_K = 10
 
+# Live retrieval page caps per mode (SUP-145): fast mode fetches fewer pages to
+# stay fast; deep modes may pull more before the evidence pass.
+LIVE_PAGES = {"raw": 4, "claims": 6, "full": 6}
+
 # Top-level sections `fields` can select; `_ALWAYS` keys are never filtered out.
 _SECTIONS = ("sources", "claims", "graph", "answer", "citations")
 _ALWAYS = ("query", "mode", "intent", "meta")
@@ -203,13 +207,21 @@ def _resolve_fields(fields: str | None, mode: str) -> set[str]:
 def search(
     conn: sqlite3.Connection, query: str, *, mode: str = "raw", k: int = DEFAULT_K,
     use_llm: bool = True, format: str = "full", fields: str | None = None, offset: int = 0,
+    live: bool | None = None, live_provider=None, live_fetcher=None,
 ) -> dict:
     """Run the pipeline to the depth `mode` requests and return the unified
     contract. `use_llm=False` forces every stage onto its heuristic path.
 
     `format`/`fields`/`offset` shape the payload for the consumer (see module
     docstring); the default `format="full"` with no `fields` is the unchanged
-    v1.0 contract."""
+    v1.0 contract.
+
+    **Live retrieval (SUP-145).** `live=None` (default) auto-refreshes the store
+    from the live web before searching it, when a search provider is configured
+    (`MOO_SEARXNG_URL` / `MOO_BRAVE_API_KEY`); `live=False` forces store-only.
+    Live fetch makes **zero LLM calls**, so `mode=raw` + live is still the fast,
+    model-free path — fast mode = live snippets, deep modes = live + evidence.
+    What live retrieval did (or why it didn't run) lands in `meta.live`."""
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     if format not in FORMATS:
@@ -222,6 +234,25 @@ def search(
     from .understand import understand
 
     u = understand(query, conn)
+
+    # ---- live retrieval: refresh the store before searching it ---------------
+    live_report = None
+    if live is not False:
+        provider = live_provider
+        if provider is None:
+            from .live.providers import resolve_provider
+
+            provider = resolve_provider()
+        if provider is not None:
+            from .live.pipeline import live_fetch
+
+            try:
+                live_report = live_fetch(
+                    conn, query, max_pages=LIVE_PAGES[mode],
+                    provider=provider, fetcher=live_fetcher,
+                )
+            except Exception as exc:  # noqa: BLE001 - degrade to the store, never fail
+                log.warning("live fetch failed, serving from store: %s", exc)
 
     # ---- retrieval (every mode) --------------------------------------------
     if mode == "raw":
@@ -259,6 +290,18 @@ def search(
             },
         },
     }
+    if live_report is not None:
+        # compact summary; the shape is additive (absent when live is off)
+        response["meta"]["live"] = {
+            "provider": live_report["provider"],
+            "out_of_domain": live_report["out_of_domain"],
+            "domain_confidence": live_report["domain_confidence"],
+            "fetched": live_report["fetched"],
+            "unchanged": live_report["unchanged"],
+            "failed": live_report["failed"],
+            "new_chunks": live_report["new_chunks"],
+            "timings_ms": live_report["timings_ms"],
+        }
 
     if mode == "raw":
         return _finalize(response, started, format, fields, selected)
@@ -323,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fields", default=None, help="comma-separated sections, e.g. sources,claims")
     parser.add_argument("--offset", type=int, default=0, help="pagination offset into sources")
     parser.add_argument("--no-llm", action="store_true")
+    parser.add_argument("--no-live", action="store_true", help="store-only: skip live web fetch")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
 
@@ -332,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     result = search(
         conn, args.query, mode=args.mode, k=args.k, use_llm=not args.no_llm,
         format=args.format, fields=args.fields, offset=args.offset,
+        live=False if args.no_live else None,
     )
     print(json.dumps(result, indent=2, default=str))
     conn.close()

@@ -126,6 +126,31 @@ near-duplicate spawned follow-ups (token-Jaccard) so it does not re-retrieve
 covered ground. Measured warm on the dev box: a 3-step run ≈ 0.8s loop + ~1ms
 plan; retrieval-only path is well under 1s (post the near-dup simhash fix).
 
+## Live retrieval — fast vs deep mode (SUP-130/143/145)
+
+moo searches the **live web**, not a frozen index. With a search provider
+configured (`MOO_SEARXNG_URL` keyless self-hosted, or `MOO_BRAVE_API_KEY`;
+`MOO_SEARCH_PROVIDER` picks/disables explicitly), every search first runs
+`app/live`: discover candidate URLs → rank by the software-domain source policy
+(official docs > repos/registries/Q&A > blogs > unknown; junk blocked; clearly
+non-software queries flagged `out_of_domain` and not fetched) → fetch + extract →
+write through the standard document→chunk→embed→index path. The store is the
+**cache**: unchanged pages cost ~nothing on re-fetch (ETag + content-hash),
+updated pages are re-chunked, and the evidence graph accumulates across queries.
+
+- **Fast mode** = `mode/depth=raw` + live: fresh snippets, zero LLM calls
+  (page cap 4). The drop-in `web_search` default.
+- **Deep mode** = `claims`/`full` + live (page cap 6), and `deep_research`,
+  where every loop step live-fetches its own query under a shared page budget
+  (`LIVE_PAGES_TOTAL` = 18/run) — evidence extraction runs over pages fetched
+  seconds ago.
+- `live=false` (param on `/search`, `/v1/web_search`, MCP `search`;
+  `live: False` on `run_research`) forces store-only. Default `null` = auto.
+- What live did is reported additively: `meta.live` on `/search`
+  (`provider, out_of_domain, domain_confidence, fetched, unchanged, failed,
+  new_chunks, timings_ms`), a compact `live` block on `/v1/web_search`, and
+  `cost.live` on research runs. Absent = live didn't run (legacy shape intact).
+
 ## Conventions
 
 - Timestamps are ISO-8601 text (`datetime('now')`).

@@ -21,8 +21,16 @@ unverifiable paragraph.
 | CS "dark knowledge" (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ specialist |
 | Self-hosted, private, keyless, zero per-query cost | ❌ paid API | ❌ paid API | ✅ |
 
-moo trades coverage/freshness for a specialist, verifiable evidence layer: for a
-coding question it returns claims you can check, not links or one paragraph.
+moo pairs a specialist, verifiable evidence layer with **live retrieval**: with
+a search provider configured (`MOO_SEARXNG_URL` self-hosted/keyless or
+`MOO_BRAVE_API_KEY`), every query discovers + fetches fresh pages from the
+software source universe first — trusted dev domains ranked ahead, junk
+dropped, non-software queries flagged `out_of_domain` — then answers over them.
+Fast mode (`raw`) is live snippets with zero LLM calls; deep modes and
+`deep_research` run the claims/contradiction/trust pipeline **on pages fetched
+seconds ago** — something no general search API does. Without a provider, moo
+serves its local store/cache only. For a coding question it returns claims you
+can check, not links or one paragraph.
 
 ## Two ways in
 

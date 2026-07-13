@@ -109,6 +109,17 @@
             "title": "Depth",
             "type": "string"
           },
+          "live": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live"
+          },
           "max_results": {
             "default": 8,
             "maximum": 50.0,
@@ -528,7 +539,7 @@
     },
     "/search": {
       "get": {
-        "description": "Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds\nthe evidence layer + query subgraph; `full` adds a cited synthesized answer.\n\n`format=agent` returns a compact, handle-addressed payload for AI agents;\n`fields` selects sections; `offset`/`cursor` paginate `sources`.",
+        "description": "Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds\nthe evidence layer + query subgraph; `full` adds a cited synthesized answer.\nWith a search provider configured, results come from the live web (fast mode\n= live snippets, deep modes = live + evidence); `meta.live` reports it.\n\n`format=agent` returns a compact, handle-addressed payload for AI agents;\n`fields` selects sections; `offset`/`cursor` paginate `sources`.",
         "operationId": "search_endpoint_search_get",
         "parameters": [
           {
@@ -635,6 +646,24 @@
               ],
               "description": "opaque pagination cursor from meta.page.next_cursor (overrides offset)",
               "title": "Cursor"
+            }
+          },
+          {
+            "description": "fetch fresh pages from the live web first (default: auto when a search provider is configured; false = local store only)",
+            "in": "query",
+            "name": "live",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "fetch fresh pages from the live web first (default: auto when a search provider is configured; false = local store only)",
+              "title": "Live"
             }
           }
         ],
@@ -892,6 +921,24 @@
               "title": "Shape",
               "type": "string"
             }
+          },
+          {
+            "description": "live web fetch (default auto; false = store only)",
+            "in": "query",
+            "name": "live",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "live web fetch (default auto; false = store only)",
+              "title": "Live"
+            }
           }
         ],
         "responses": {
@@ -921,7 +968,7 @@
         "summary": "Web Search Get"
       },
       "post": {
-        "description": "Drop-in web search for coding agents: point your agent's `web_search` tool\nhere and get CS-specialist `{title, url, snippet}` results (plus moo's\nevidence layer as optional fields). `depth=raw` (default) makes zero LLM\ncalls. Register `GET /v1/tools` as the tool definition.",
+        "description": "Drop-in web search for coding agents: point your agent's `web_search` tool\nhere and get software-specialist `{title, url, snippet}` results fetched\nlive from the web (plus moo's evidence layer as optional fields).\n`depth=raw` (default) makes zero LLM calls. Register `GET /v1/tools` as the\ntool definition.",
         "operationId": "web_search_post_v1_web_search_post",
         "requestBody": {
           "content": {

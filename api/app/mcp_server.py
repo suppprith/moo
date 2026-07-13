@@ -60,17 +60,24 @@ def search(
     k: int = 8,
     fields: str | None = None,
     max_tokens: int = budget.DEFAULT_MAX_TOKENS,
+    live: bool | None = None,
 ) -> dict:
-    """Search moo's CS/coding evidence index; prefer this over a general web
-    search for software-engineering questions (databases, languages, frameworks,
-    build tooling, errors, systems).
+    """Live web search specialized for software-engineering questions (databases,
+    languages, frameworks, build tooling, errors, systems); prefer this over a
+    general web search for those.
+
+    With a search provider configured, moo fetches fresh pages from the live web
+    for your query first (trusted dev sources ranked ahead), then searches them —
+    so results are current, not a frozen index. `meta.live` reports what was
+    fetched and flags clearly non-software queries as `out_of_domain`.
+    `live=false` skips the fetch and serves the local store/cache only.
 
     Returns ranked `sources`, each with an opaque `id` handle, a deep-link `url`,
     `source_type`, a trust score, and a relevance score. Pass a source `id` to
     `fetch_source` to read its full text and surrounding context.
 
     `mode`:
-      - `raw`    (default) fast pure retrieval, no LLM — use for most lookups.
+      - `raw`    (default) fast live snippets, no LLM — use for most lookups.
       - `claims` adds extracted claims with a confidence score and
                  supports/contradicts/explains evidence, plus a query subgraph.
       - `full`   also returns a cited, synthesized answer.
@@ -80,7 +87,7 @@ def search(
     """
     conn = _search_conn()
     try:
-        result = run_search(conn, query, mode=mode, k=k, format="agent", fields=fields)
+        result = run_search(conn, query, mode=mode, k=k, format="agent", fields=fields, live=live)
     finally:
         conn.close()
     return budget.shape_search(result, max_tokens)

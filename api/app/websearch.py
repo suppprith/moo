@@ -82,16 +82,26 @@ def web_search(
     depth: str = "raw",
     snippet_chars: int = _SNIPPET_CHARS,
     use_llm: bool = True,
+    live: bool | None = None,
+    live_provider=None,
+    live_fetcher=None,
 ) -> dict:
     """Run moo and return ``{query, results, evidence?}`` in web-search shape.
 
     ``depth``: ``raw`` (default, no LLM), ``claims`` (attach the evidence layer),
     ``full`` (also a cited answer). ``results`` rows carry the familiar
     ``title``/``url``/``snippet`` plus moo extras (``id`` handle, ``source_type``,
-    ``trust_score``, ``score``) a caller may ignore."""
+    ``trust_score``, ``score``) a caller may ignore.
+
+    ``live=None`` (default) fetches fresh pages from the live web first when a
+    search provider is configured — depth=raw + live is the fast mode (live
+    snippets, zero LLM); ``live=False`` serves from the local store only. A
+    compact ``live`` summary (with the ``out_of_domain`` flag) is attached when
+    live retrieval ran."""
     if depth not in ("raw", "claims", "full"):
         raise ValueError(f"depth must be raw|claims|full, got {depth!r}")
-    resp = run_search(conn, query, mode=depth, k=k, format="full", use_llm=use_llm)
+    resp = run_search(conn, query, mode=depth, k=k, format="full", use_llm=use_llm,
+                      live=live, live_provider=live_provider, live_fetcher=live_fetcher)
     sources = resp["sources"]
     texts = _chunk_texts(conn, [s["chunk_id"] for s in sources])
 
@@ -112,6 +122,13 @@ def web_search(
         )
 
     out: dict = {"query": query, "results": results}
+    if resp["meta"].get("live") is not None:
+        live_meta = resp["meta"]["live"]
+        out["live"] = {
+            "provider": live_meta["provider"],
+            "out_of_domain": live_meta["out_of_domain"],
+            "fetched": live_meta["fetched"],
+        }
     if resp["claims"] or resp["answer"]:
         out["evidence"] = {
             "answer": resp["answer"],

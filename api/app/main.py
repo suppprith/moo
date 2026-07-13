@@ -240,9 +240,16 @@ def search_endpoint(
     cursor: str | None = Query(
         None, description="opaque pagination cursor from meta.page.next_cursor (overrides offset)"
     ),
+    live: bool | None = Query(
+        None,
+        description="fetch fresh pages from the live web first (default: auto when a "
+        "search provider is configured; false = local store only)",
+    ),
 ) -> dict:
     """Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds
     the evidence layer + query subgraph; `full` adds a cited synthesized answer.
+    With a search provider configured, results come from the live web (fast mode
+    = live snippets, deep modes = live + evidence); `meta.live` reports it.
 
     `format=agent` returns a compact, handle-addressed payload for AI agents;
     `fields` selects sections; `offset`/`cursor` paginate `sources`."""
@@ -253,7 +260,7 @@ def search_endpoint(
             raise HTTPException(status_code=422, detail=str(e))
     conn = get_connection_for_search()
     try:
-        return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset)
+        return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset, live=live)
     except ValueError as e:  # bad fields/format/offset
         raise HTTPException(status_code=422, detail=str(e))
     finally:
@@ -317,12 +324,15 @@ class WebSearchRequest(BaseModel):
     max_results: int = Field(8, ge=1, le=50)
     depth: Literal["raw", "claims", "full"] = "raw"
     shape: Literal["web", "anthropic"] = "web"
+    live: bool | None = None
 
 
-def _run_web_search(query: str, max_results: int, depth: str, shape: str) -> dict:
+def _run_web_search(
+    query: str, max_results: int, depth: str, shape: str, live: bool | None = None
+) -> dict:
     conn = get_connection_for_search()
     try:
-        out = web_search(conn, query, k=max_results, depth=depth)
+        out = web_search(conn, query, k=max_results, depth=depth, live=live)
     finally:
         conn.close()
     if shape == "anthropic":
@@ -333,10 +343,11 @@ def _run_web_search(query: str, max_results: int, depth: str, shape: str) -> dic
 @app.post("/v1/web_search")
 def web_search_post(req: WebSearchRequest) -> dict:
     """Drop-in web search for coding agents: point your agent's `web_search` tool
-    here and get CS-specialist `{title, url, snippet}` results (plus moo's
-    evidence layer as optional fields). `depth=raw` (default) makes zero LLM
-    calls. Register `GET /v1/tools` as the tool definition."""
-    return _run_web_search(req.query, req.max_results, req.depth, req.shape)
+    here and get software-specialist `{title, url, snippet}` results fetched
+    live from the web (plus moo's evidence layer as optional fields).
+    `depth=raw` (default) makes zero LLM calls. Register `GET /v1/tools` as the
+    tool definition."""
+    return _run_web_search(req.query, req.max_results, req.depth, req.shape, req.live)
 
 
 @app.get("/v1/web_search")
@@ -345,9 +356,10 @@ def web_search_get(
     max_results: int = Query(8, ge=1, le=50),
     depth: Literal["raw", "claims", "full"] = Query("raw"),
     shape: Literal["web", "anthropic"] = Query("web"),
+    live: bool | None = Query(None, description="live web fetch (default auto; false = store only)"),
 ) -> dict:
     """GET convenience form of the drop-in web search (see POST /v1/web_search)."""
-    return _run_web_search(q, max_results, depth, shape)
+    return _run_web_search(q, max_results, depth, shape, live)
 
 
 @app.get("/v1/tools")
