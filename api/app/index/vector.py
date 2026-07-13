@@ -116,11 +116,18 @@ def search(
     """Return [(chunk_id, cosine_similarity)] best-first."""
     allowed = _allowed_ids(conn, source_types, since)
     fetch = k if allowed is None else k * 8  # over-fetch, then filter
-    rows = conn.execute(
-        "SELECT chunk_id, distance FROM chunk_vec "
-        "WHERE embedding MATCH ? AND k = ? ORDER BY distance",
-        (query_vec, fetch),
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            "SELECT chunk_id, distance FROM chunk_vec "
+            "WHERE embedding MATCH ? AND k = ? ORDER BY distance",
+            (query_vec, fetch),
+        ).fetchall()
+    except sqlite3.OperationalError as exc:
+        if "chunk_vec" in str(exc):
+            # fresh store: index not built yet (live-first deployments start
+            # empty; the first live_fetch creates it). No results, not a crash.
+            return []
+        raise
     out: list[tuple[int, float]] = []
     for chunk_id, dist in rows:
         if allowed is not None and chunk_id not in allowed:

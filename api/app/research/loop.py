@@ -15,9 +15,15 @@ cap. Every step is logged with the query and *why* it was spawned
 (``plan`` / ``gap`` / ``contradiction``).
 
 Claims dedup naturally: ``extract_claims`` persists by ``normalized_key``, so the
-same claim surfaced by two sub-questions is one row (linked/scored once). The
-corpus is fixed, so a contradiction chase surfaces *neighbouring* evidence and
-claims rather than new documents — honest for a self-hosted index.
+same claim surfaced by two sub-questions is one row (linked/scored once).
+
+**Live research (SUP-143).** The loop itself is source-agnostic: an optional
+``pre_step(query)`` hook runs before each step's evidence pass. When live
+retrieval is configured, ``session.run_research`` wires that hook to
+``live.pipeline.live_fetch`` under a shared page budget, so every step —
+including gap follow-ups and contradiction chases — can pull fresh pages into
+the store *before* extracting claims from it. A pre-step failure is logged and
+skipped: research always degrades to whatever the store already holds.
 """
 
 from __future__ import annotations
@@ -76,13 +82,16 @@ def run_loop(
     max_seconds: float = MAX_SECONDS,
     use_llm: bool = True,
     on_step=None,
+    pre_step=None,
 ) -> dict:
     """Run the plan's sub-questions with gap + contradiction follow-ups under a
     hard budget. Returns the accumulated run state (claims, per-step log,
     per-sub-question coverage, budget).
 
     ``on_step(step_record, [(claim_id, sub_question_id), ...])`` is invoked after
-    each step so a caller can persist progress incrementally (SUP-112)."""
+    each step so a caller can persist progress incrementally (SUP-112).
+    ``pre_step(query)`` is invoked before each step's evidence pass — the live
+    retrieval hook (SUP-143); its failures are logged, never fatal."""
     started = time.perf_counter()
     deadline = started + max_seconds
 
@@ -110,6 +119,12 @@ def run_loop(
         if nq in run_queries or (reason != "plan" and _too_similar(nq, run_queries)):
             continue
         run_queries.add(nq)
+
+        if pre_step is not None:
+            try:
+                pre_step(query)
+            except Exception as exc:  # noqa: BLE001 - live fetch must never kill research
+                log.warning("pre_step failed for step %d: %s", len(steps) + 1, exc)
 
         step_claims = extract_claims(conn, query, k=k, use_llm=use_llm)
         new_disputed: list[int] = []

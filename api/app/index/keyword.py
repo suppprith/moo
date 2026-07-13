@@ -105,8 +105,15 @@ def _search_match(
         params.append(since)
     sql += " ORDER BY score LIMIT ?"
     params.append(k)
-    # bm25() is negative (more negative = better); flip to positive relevance
-    return [(cid, -score) for cid, score in conn.execute(sql, params)]
+    try:
+        # bm25() is negative (more negative = better); flip to positive relevance
+        return [(cid, -score) for cid, score in conn.execute(sql, params)]
+    except sqlite3.OperationalError as exc:
+        if "chunk_fts" in str(exc):
+            # fresh store: FTS index not built yet (live-first deployments
+            # start empty; the first live_fetch creates it).
+            return []
+        raise
 
 
 def main(argv: list[str] | None = None) -> int:

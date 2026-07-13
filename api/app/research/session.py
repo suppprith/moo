@@ -31,6 +31,38 @@ log = logging.getLogger("moo.research.session")
 
 STATUSES = ("planning", "running", "done", "partial", "failed")
 
+# Live-research page budget (SUP-143): shared across ALL steps of one run so a
+# many-step run can't fetch unbounded pages. Per-step cap keeps early steps from
+# eating the whole budget.
+LIVE_PAGES_TOTAL = 18
+LIVE_PAGES_PER_STEP = 6
+
+
+def _live_pre_step(conn: sqlite3.Connection, provider, fetcher):
+    """Build the loop's ``pre_step`` hook: live-fetch each step query under the
+    shared page budget. Returns (hook, mutable stats dict)."""
+    from ..live.pipeline import live_fetch
+
+    stats = {"steps": 0, "pages_fetched": 0, "pages_unchanged": 0,
+             "out_of_domain_steps": 0, "pages_left": LIVE_PAGES_TOTAL}
+
+    def pre_step(query: str) -> None:
+        if stats["pages_left"] <= 0:
+            return  # budget spent: later steps run over the store/cache only
+        report = live_fetch(
+            conn, query,
+            max_pages=min(LIVE_PAGES_PER_STEP, stats["pages_left"]),
+            provider=provider, fetcher=fetcher,
+        )
+        stats["steps"] += 1
+        stats["pages_fetched"] += report["fetched"]
+        stats["pages_unchanged"] += report["unchanged"]
+        if report["out_of_domain"]:
+            stats["out_of_domain_steps"] += 1
+        stats["pages_left"] -= len(report["considered"])
+
+    return pre_step, stats
+
 
 def create_run(conn: sqlite3.Connection, question: str, plan: dict) -> str:
     """Insert a new run (status ``running``) and return its id."""
@@ -167,14 +199,35 @@ def run_research(
     max_steps: int = MAX_STEPS,
     max_seconds: float = MAX_SECONDS,
     use_llm: bool = True,
+    live: bool | None = None,
+    live_provider=None,
+    live_fetcher=None,
 ) -> dict:
     """Plan -> run the loop (persisting each step) -> finalize. Returns the run
-    state including its ``run_id`` and terminal ``status`` (done|partial|failed)."""
+    state including its ``run_id`` and terminal ``status`` (done|partial|failed).
+
+    **Live research (SUP-143):** ``live=None`` (default) auto-enables per-step
+    live fetching when a search provider is configured; ``live=False`` forces
+    store-only; ``live_provider``/``live_fetcher`` inject backends (tests/DI).
+    When live, each loop step first pulls fresh pages for its query under a
+    shared page budget (``LIVE_PAGES_TOTAL``), then extracts evidence from the
+    refreshed store. ``cost.live`` reports what live retrieval did."""
     llm.reset_stats()  # measure LLM cost for this run (SUP-122)
     t0 = time.perf_counter()
     plan = make_plan(conn, question, use_llm=use_llm)
     plan_ms = round((time.perf_counter() - t0) * 1000, 1)
     run_id = create_run(conn, question, plan)
+
+    provider = None
+    if live is not False:
+        provider = live_provider
+        if provider is None:
+            from ..live.providers import resolve_provider
+
+            provider = resolve_provider()
+    pre_step = live_stats = None
+    if provider is not None:
+        pre_step, live_stats = _live_pre_step(conn, provider, live_fetcher)
 
     def on_step(step, assocs):
         record_step(conn, run_id, step, assocs)
@@ -182,7 +235,7 @@ def run_research(
     try:
         result = run_loop(
             conn, plan, k=k, max_steps=max_steps, max_seconds=max_seconds,
-            use_llm=use_llm, on_step=on_step,
+            use_llm=use_llm, on_step=on_step, pre_step=pre_step,
         )
     except Exception as exc:  # noqa: BLE001 - persist failure, then re-raise
         set_status(conn, run_id, "failed", error=str(exc))
@@ -196,5 +249,15 @@ def run_research(
         "cache_hits": stats["cache_hits"],
         "cache_misses": stats["cache_misses"],
     }
+    if live_stats is not None:
+        result["cost"]["live"] = {
+            "provider": provider.name,
+            "steps": live_stats["steps"],
+            "pages_fetched": live_stats["pages_fetched"],
+            "pages_unchanged": live_stats["pages_unchanged"],
+            "out_of_domain_steps": live_stats["out_of_domain_steps"],
+            "pages_budget": LIVE_PAGES_TOTAL,
+            "pages_left": max(live_stats["pages_left"], 0),
+        }
     finalize_run(conn, run_id, result, status)
     return {"run_id": run_id, "status": status, "plan": plan, **result}
