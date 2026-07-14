@@ -21,15 +21,29 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from .index import keyword, vector
 
 RRF_K = 60          # standard RRF constant
 K_EACH = 30         # candidates pulled from each index per query variant
 SIMHASH_BITS = 64
+
+# -- corroboration-fused ranking (SUP-138) -------------------------------------
+# Final order is not relevance alone: a result backed by high trust, multiple
+# independent copies, and recent content outranks a stale low-trust page that
+# merely matched slightly better. Multiplicative factors over the RRF score,
+# each bounded so relevance stays dominant. Component scores are surfaced on
+# every hit (rank_signals) for explainability.
+W_TRUST = 0.5          # trust 1.0 -> x1.25, trust 0.0 -> x0.75 (neutral 0.5)
+W_CORROBORATION = 0.15 # per doubling of near-dup copies elsewhere
+RECENCY_FLOOR = 0.85   # oldest content loses at most 15%
+RECENCY_DECAY_PER_YEAR = 0.05
+FUSE_OVERSAMPLE = 10   # collapse a few extra candidates so fusion can reorder
 # ≤ this hamming distance -> near-duplicate. Measured on the corpus: small edits
 # (one-word swap + trailing sentence) land at ~10-12, while 3000 random unrelated
 # chunk pairs bottom out at 19 (median 32) — 14 splits the two populations.
@@ -85,6 +99,7 @@ class RetrievedChunk:
     trust_score: float | None = None                     # source trust (SUP-85)
     fetched_at: str | None = None                        # freshness (SUP-144)
     suspicious: bool = False                             # injection-flagged (SUP-131)
+    rank_signals: dict | None = None                     # fusion components (SUP-138)
     alternates: list[int] = field(default_factory=list)  # near-dup chunk ids
 
 
@@ -146,6 +161,40 @@ def _collapse_near_dups(
     return [(cid, alts) for cid, _, alts in kept]
 
 
+def _recency_factor(published_at: str | None) -> float:
+    """1.0 for recent/undated content, decaying gently to RECENCY_FLOOR.
+    Uses the content's publish date — fetched_at says when *we* copied it,
+    not how old the information is."""
+    if not published_at:
+        return 1.0
+    try:
+        dt = datetime.fromisoformat(str(published_at).replace("Z", "+00:00"))
+    except ValueError:
+        return 1.0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    age_years = max((datetime.now(timezone.utc) - dt).days, 0) / 365.25
+    return max(RECENCY_FLOOR, 1.0 - RECENCY_DECAY_PER_YEAR * age_years)
+
+
+def fuse(hit: RetrievedChunk) -> None:
+    """Blend trust, corroboration and recency into the hit's score, in place,
+    recording the components on ``rank_signals``."""
+    rrf = hit.score
+    trust = hit.trust_score if hit.trust_score is not None else 0.5  # neutral
+    trust_f = 1.0 + W_TRUST * (trust - 0.5)
+    corroboration_f = 1.0 + W_CORROBORATION * math.log2(1 + len(hit.alternates))
+    recency_f = _recency_factor(hit.published_at)
+    hit.score = rrf * trust_f * corroboration_f * recency_f
+    hit.rank_signals = {
+        "rrf": round(rrf, 6),
+        "trust": round(trust_f, 4),
+        "corroboration": round(corroboration_f, 4),
+        "recency": round(recency_f, 4),
+        "fused": round(hit.score, 6),
+    }
+
+
 def retrieve(
     conn: sqlite3.Connection,
     query: str,
@@ -200,9 +249,15 @@ def retrieve(
                 alternates=alternates,
             )
         )
-        if len(out) >= k:
+        # keep a few beyond k so fusion can promote from just outside the page
+        if len(out) >= k + FUSE_OVERSAMPLE:
             break
-    return out
+
+    # corroboration-fused ranking (SUP-138): trust x copies x recency over RRF
+    for hit in out:
+        fuse(hit)
+    out.sort(key=lambda h: -h.score)
+    return out[:k]
 
 
 # ---------------------------------------------------------------------------

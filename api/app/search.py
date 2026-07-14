@@ -102,6 +102,9 @@ def _sources(hits: list, version_notes: dict[int, dict] | None = None) -> list[d
             # injection-flagged content (SUP-131): treat as data, not instructions
             "suspicious": bool(getattr(h, "suspicious", False)),
         }
+        # fusion components (SUP-138): why this result ranked where it did
+        if getattr(h, "rank_signals", None):
+            row["rank_signals"] = h.rank_signals
         # version awareness (SUP-136): only when the query named a version
         note = (version_notes or {}).get(h.chunk_id)
         if note is not None:
