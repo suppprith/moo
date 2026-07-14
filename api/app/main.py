@@ -26,6 +26,7 @@ from .research import session as research_session
 from .research.loop import run_loop
 from .research.plan import plan as make_plan
 from .research.report import assemble_report
+from .research.structured import structure_report, validate_schema
 from .search import CONTRACT_VERSION, decode_cursor, search
 from .streaming import sse_event, sse_response
 from .websearch import OPENAI_TOOL, to_anthropic_results, web_search
@@ -487,15 +488,24 @@ class ResearchRequest(BaseModel):
     max_steps: int = Field(6, ge=1, le=20, description="hard cap on retrieve+extract cycles")
     max_seconds: float = Field(60.0, ge=5, le=300, description="wall-clock budget")
     use_llm: bool = Field(True, description="use the LLM stages (falls back to heuristic keyless)")
+    output_schema: dict[str, Any] | None = Field(
+        None,
+        description="JSON schema for a caller-shaped `structured` section; every "
+        "populated field is traced to claim handles (`structured.grounding`), "
+        "untraceable fields are null, never fabricated",
+    )
 
 
-def _report_for_run(conn, run: dict, *, use_llm: bool) -> dict:
+def _report_for_run(conn, run: dict, *, use_llm: bool, output_schema: dict | None = None) -> dict:
     report = assemble_report(conn, run, use_llm=use_llm)
     report["run_id"] = run.get("run_id")
     report["status"] = run.get("status")
     report["steps"] = run.get("steps", [])
     report["coverage"] = run.get("coverage", [])
     report["budget"] = run.get("budget")
+    if output_schema is not None:
+        # caller-shaped output with per-field claim grounding (SUP-155)
+        report["structured"] = structure_report(conn, report, output_schema, use_llm=use_llm)
     return report
 
 
@@ -504,14 +514,20 @@ def research_post(req: ResearchRequest) -> dict:
     """Run a full deep-research run (plan -> iterative loop -> cited report) and
     return the structured report. Budget is enforced end-to-end; a run that hits
     a cap returns `status: partial`. Use POST /research/stream for progress, or
-    GET /research/{id} to re-fetch."""
+    GET /research/{id} to re-fetch. Pass `output_schema` (a JSON schema) to also
+    get a caller-shaped `structured` section with per-field claim grounding."""
+    if req.output_schema is not None:
+        try:
+            validate_schema(req.output_schema)  # reject before spending the budget
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     conn = get_connection_for_search()
     try:
         run = research_session.run_research(
             conn, req.question, k=req.k, max_steps=req.max_steps,
             max_seconds=req.max_seconds, use_llm=req.use_llm,
         )
-        return _report_for_run(conn, run, use_llm=req.use_llm)
+        return _report_for_run(conn, run, use_llm=req.use_llm, output_schema=req.output_schema)
     finally:
         conn.close()
 
@@ -521,6 +537,11 @@ def research_stream(req: ResearchRequest):
     """Streaming (SSE) deep research: emits `plan`, a `progress` event per step
     (with why it was spawned), then a terminal `report` + `done` — or `error`.
     Reuses the app.streaming event contract."""
+    if req.output_schema is not None:
+        try:
+            validate_schema(req.output_schema)  # reject before the stream opens
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     def frames():
         events: queue.Queue = queue.Queue()
@@ -549,7 +570,8 @@ def research_stream(req: ResearchRequest):
                 research_session.finalize_run(conn, run_id, result, status)
                 result["run_id"] = run_id
                 result["status"] = status
-                events.put(("report", _report_for_run(conn, result, use_llm=req.use_llm)))
+                events.put(("report", _report_for_run(
+                    conn, result, use_llm=req.use_llm, output_schema=req.output_schema)))
                 events.put(("done", {"run_id": run_id, "status": status}))
             except Exception:  # noqa: BLE001 - report in-band, stream already 200
                 events.put(("error", envelope("internal", "research failed", True, new_request_id())))

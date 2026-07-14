@@ -55,7 +55,7 @@ OpenAI-style tool defs at `/v1/tools`). See the
 | `get_claim` | `handle` | One claim by `clm_` handle: confidence, disputed flag, full evidence set (contradictions first) with backing source handles. |
 | `list_contradictions` | `query, k` | Only the disputed/contradicted claims for a query — where sources disagree. |
 | `expand_graph` | `node` | Entity neighborhood (by `ent_` handle or name): typed relations, claim-annotated. |
-| `deep_research` | `question, k, max_steps, max_seconds, max_tokens` | `{run_id, status, partial, executive_answer, findings[], disputed_points[], open_questions[], sources[], groundedness}`. Streams MCP progress. |
+| `deep_research` | `question, k, max_steps, max_seconds, max_tokens, output_schema` | `{run_id, status, partial, executive_answer, findings[], disputed_points[], open_questions[], sources[], groundedness}`. Streams MCP progress. Pass `output_schema` (JSON schema) for a caller-shaped `structured` section: `structured.grounding` traces every field to `clm_` handles; untraceable fields come back null (`ungrounded_fields`), never fabricated. |
 | `research_status` | `run_id, max_tokens` | Re-fetch a run's status + report (poll a long run or re-read a finished one). |
 
 Every handle is opaque and stable (`chk_`/`clm_`/`doc_`/`ent_`); pass it back to

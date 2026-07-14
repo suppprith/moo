@@ -73,6 +73,19 @@
             "title": "Max Steps",
             "type": "integer"
           },
+          "output_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON schema for a caller-shaped `structured` section; every populated field is traced to claim handles (`structured.grounding`), untraceable fields are null, never fabricated",
+            "title": "Output Schema"
+          },
           "question": {
             "title": "Question",
             "type": "string"
@@ -452,7 +465,7 @@
     },
     "/research": {
       "post": {
-        "description": "Run a full deep-research run (plan -> iterative loop -> cited report) and\nreturn the structured report. Budget is enforced end-to-end; a run that hits\na cap returns `status: partial`. Use POST /research/stream for progress, or\nGET /research/{id} to re-fetch.",
+        "description": "Run a full deep-research run (plan -> iterative loop -> cited report) and\nreturn the structured report. Budget is enforced end-to-end; a run that hits\na cap returns `status: partial`. Use POST /research/stream for progress, or\nGET /research/{id} to re-fetch. Pass `output_schema` (a JSON schema) to also\nget a caller-shaped `structured` section with per-field claim grounding.",
         "operationId": "research_post_research_post",
         "requestBody": {
           "content": {

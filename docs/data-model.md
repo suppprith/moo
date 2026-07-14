@@ -110,6 +110,13 @@ planner -> iterative multi-hop loop -> persisted run -> cited report:
   plan/gap/contradiction) -> terminal `report` + `done`, or `error`.
 - **`GET /research/{run_id}`** re-fetches a persisted run's status + report for
   polling/resume (report reassembled deterministically, no LLM).
+- **`output_schema`** (SUP-155, on `POST /research`, `/research/stream`, and the
+  `deep_research` MCP tool): a caller-supplied JSON schema adds a `structured`
+  section — `output` in the caller's shape, `grounding` mapping each field path
+  to the `clm_` handles backing it, and `ungrounded_fields` for anything that
+  couldn't be traced to a finding (set to null, never fabricated). LLM
+  structuring pass (`llm_cache` stage `structured`) with a grounded-by-
+  construction heuristic fallback; see `app/research/structured.py`.
 
 Runs persist to `research_run` / `research_step` / `research_claim` (migration
 0005); they associate with the shared claim/evidence graph rather than owning it,

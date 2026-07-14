@@ -37,6 +37,7 @@ from .research import session as research_session
 from .research.loop import run_loop
 from .research.plan import plan as make_plan
 from .research.report import assemble_report
+from .research.structured import structure_report, validate_schema
 from .search import search as run_search
 
 mcp = FastMCP("moo")
@@ -243,6 +244,7 @@ async def deep_research(
     max_steps: int = 6,
     max_seconds: float = 90.0,
     max_tokens: int = 6000,
+    output_schema: dict | None = None,
     ctx: Context = None,
 ) -> dict:
     """Hand off a whole research question and get back a grounded, cited report.
@@ -255,10 +257,18 @@ async def deep_research(
     `open_questions` are what it could not cover. If a budget cap is hit,
     `partial` is true.
 
+    Pass `output_schema` (a JSON schema object) to also get a `structured`
+    section shaped exactly to it: `structured.output` is your shape,
+    `structured.grounding` maps each field path to the `clm_` claim handles
+    backing it, and fields that can't be traced to a finding come back null
+    (listed in `ungrounded_fields`) — never fabricated.
+
     Progress streams as MCP progress events. Pass a source/claim handle from the
     report to `fetch_source`/`get_claim` to drill into the evidence. Re-fetch a
     run later with `research_status(run_id)`.
     """
+    if output_schema is not None:
+        validate_schema(output_schema)  # fail fast, before spending the budget
     events: queue.Queue = queue.Queue()
     holder: dict = {}
 
@@ -281,6 +291,8 @@ async def deep_research(
             res["run_id"], res["status"] = run_id, status
             report = assemble_report(conn, res, use_llm=True)
             report["run_id"], report["status"], report["partial"] = run_id, status, status == "partial"
+            if output_schema is not None:
+                report["structured"] = structure_report(conn, report, output_schema, use_llm=True)
             holder["report"] = report
         except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
             holder["error"] = str(exc)
