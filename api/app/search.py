@@ -85,9 +85,10 @@ def decode_cursor(cursor: str) -> int:
     return int(raw[2:])
 
 
-def _sources(hits: list) -> list[dict]:
-    return [
-        {
+def _sources(hits: list, version_notes: dict[int, dict] | None = None) -> list[dict]:
+    out = []
+    for h in hits:
+        row = {
             "chunk_id": h.chunk_id,
             "document_url": h.document_url,
             "title": h.title,
@@ -101,8 +102,15 @@ def _sources(hits: list) -> list[dict]:
             # injection-flagged content (SUP-131): treat as data, not instructions
             "suspicious": bool(getattr(h, "suspicious", False)),
         }
-        for h in hits
-    ]
+        # version awareness (SUP-136): only when the query named a version
+        note = (version_notes or {}).get(h.chunk_id)
+        if note is not None:
+            row["version_match"] = note["match"]
+            row["version_outdated"] = note["outdated"]
+            if note["mentions"]:
+                row["versions"] = note["mentions"]
+        out.append(row)
+    return out
 
 
 def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict]:
@@ -160,6 +168,10 @@ def _agent_sources(sources: list[dict]) -> list[dict]:
             row["fetched_at"] = s["fetched_at"]
         if s.get("suspicious"):
             row["suspicious"] = True
+        if s.get("version_match") is not None:
+            row["version_match"] = s["version_match"]
+            if s.get("version_outdated"):
+                row["version_outdated"] = True
         out.append(row)
     return out
 
@@ -274,6 +286,16 @@ def search(
         variants = expand(conn, query, use_llm=use_llm)
     # Over-fetch one past the page so `has_more` is knowable, then slice.
     fetched = retrieve(conn, query, k=offset + k + 1, queries=variants, source_boost=u.source_boost)
+
+    # ---- version awareness (SUP-136): scope to the version the query names ----
+    from . import versions as versions_mod
+
+    version_constraint = versions_mod.query_constraint(query)
+    version_notes: dict[int, dict] = {}
+    if version_constraint is not None:
+        # boosts matches / demotes older-major-only sources, re-sorts in place
+        version_notes = versions_mod.apply_constraint(fetched, version_constraint)
+
     has_more = len(fetched) > offset + k
     hits = fetched[offset : offset + k]
 
@@ -284,7 +306,7 @@ def search(
         "answer": None,
         "claims": [],
         "graph": {"nodes": [], "edges": []},
-        "sources": _sources(hits),
+        "sources": _sources(hits, version_notes),
         "citations": [],
         "meta": {
             "contract_version": CONTRACT_VERSION,
@@ -298,6 +320,11 @@ def search(
             },
         },
     }
+    if version_constraint is not None:
+        response["meta"]["version_constraint"] = {
+            "product": version_constraint.product,
+            "version": version_constraint.version,
+        }
     if live_report is not None:
         # compact summary; the shape is additive (absent when live is off)
         response["meta"]["live"] = {
@@ -326,7 +353,7 @@ def search(
     from .rerank import rerank
 
     hits = rerank(conn, query, hits, use_llm=use_llm)
-    response["sources"] = _sources(hits)
+    response["sources"] = _sources(hits, version_notes)
 
     claims = extract_claims(conn, query, k=k, use_llm=use_llm)
     claim_ids = [c["id"] for c in claims]
