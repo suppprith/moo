@@ -1,17 +1,20 @@
-"""Listwise LLM reranking of fused candidates (SUP-90).
+"""Reranking of fused candidates (SUP-90 LLM listwise, SUP-139 cross-encoder).
 
-`rerank(conn, query, hits)` takes the RRF candidate set from `retrieve()` and
-asks a cheap Gemini call to reorder it by true relevance and drop off-topic
-chunks — the cross-encoder-style signal RRF can't see. It's a refinement stage:
-retrieval still decides the candidate pool, rerank only reorders/filters it.
+`rerank(conn, query, hits)` takes the fused candidate set from `retrieve()`
+and reorders it by true query-document relevance — the signal rank fusion
+can't see. Two swappable backends, chosen by env ``MOO_RERANKER``:
 
-Guards:
-- **Budget** — at most ``MAX_CANDIDATES`` snippets go to the model, and exactly
-  one call per query. No candidates over budget are ever sent.
-- **Cache** — keyed by query + the candidate chunk-id set, so repeat/demo
-  queries skip the LLM entirely (``llm_cache`` stage ``rerank``).
-- **Fallback** — no credentials (or a failed/empty call) returns the RRF order
-  unchanged, so reranking can only help, never regress.
+- ``llm`` (default) — one cheap listwise LLM call, cached by query+candidate
+  set, heuristic-identity fallback when keyless (SUP-90).
+- ``cross`` — a local cross-encoder (default
+  ``cross-encoder/ms-marco-MiniLM-L-6-v2``, override with
+  ``MOO_CROSS_ENCODER_MODEL``) scores each (query, text) pair on CPU: no API,
+  no key, deterministic, ~10ms/pair — the specialist path SUP-139 builds on.
+  Scores land in ``hit.rank_signals["cross"]`` for explainability.
+- ``off`` — identity (pure fused order).
+
+Every backend is a refinement stage with the same guarantee: on any failure
+the fused order is returned unchanged — reranking can only help, never break.
 
 CLI:  ``uv run python -m app.rerank "why is my query slow"``
 """
@@ -21,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sqlite3
 
 from . import llm
@@ -30,6 +34,9 @@ log = logging.getLogger("moo.rerank")
 
 MAX_CANDIDATES = 20     # budget: never send more than this many snippets
 SNIPPET_CHARS = 350
+DEFAULT_CROSS_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+_cross_model = None  # lazy singleton (~90MB download on first use)
 
 _RERANK_SCHEMA = {
     "type": "object",
@@ -85,13 +92,51 @@ def _apply(hits: list, order: list[int], irrelevant: set[int]) -> list:
     return out
 
 
+def _get_cross_model():
+    global _cross_model
+    if _cross_model is None:
+        from sentence_transformers import CrossEncoder  # heavy import, defer
+
+        name = os.environ.get("MOO_CROSS_ENCODER_MODEL", DEFAULT_CROSS_MODEL)
+        log.info("loading cross-encoder %s", name)
+        _cross_model = CrossEncoder(name, device="cpu")
+    return _cross_model
+
+
+def cross_rerank(query: str, hits: list, *, top_n: int = MAX_CANDIDATES) -> list:
+    """Reorder the top-N hits by local cross-encoder relevance; the tail keeps
+    its fused order. Failure returns hits unchanged."""
+    if len(hits) < 2:
+        return hits
+    head, tail = hits[:top_n], hits[top_n:]
+    try:
+        scores = _get_cross_model().predict([(query, h.text) for h in head])
+    except Exception as exc:  # noqa: BLE001 - rerank must never break retrieval
+        log.warning("cross-encoder rerank failed, keeping fused order: %s", exc)
+        return hits
+    for h, s in zip(head, scores, strict=True):
+        signals = getattr(h, "rank_signals", None)
+        if isinstance(signals, dict):
+            signals["cross"] = round(float(s), 4)
+    # sort by score desc, stable on ties (never compares Hit objects)
+    order = sorted(range(len(head)), key=lambda i: -float(scores[i]))
+    return [head[i] for i in order] + tail
+
+
 def rerank(
     conn: sqlite3.Connection, query: str, hits: list, *, use_llm: bool = True
 ) -> list:
-    """Return `hits` reordered/filtered by relevance. Identity (RRF order) when
-    no LLM is available or the candidate set is trivial."""
+    """Return `hits` reordered/filtered by relevance. Backend per MOO_RERANKER
+    (llm default | cross | off); identity when trivial or unavailable."""
     if len(hits) < 2:
         return hits
+    backend = os.environ.get("MOO_RERANKER", "llm").strip().lower()
+    if backend == "off":
+        return hits
+    if backend == "cross":
+        return cross_rerank(query, hits)
+    if backend != "llm":
+        log.warning("unknown MOO_RERANKER %r; using llm backend", backend)
     candidates = [(h.chunk_id, h.text) for h in hits[:MAX_CANDIDATES]]
     chunk_ids = [cid for cid, _ in candidates]
 
