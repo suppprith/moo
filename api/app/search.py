@@ -276,9 +276,17 @@ def search(
     selected = _resolve_fields(fields, mode)  # validate early, before any work
     started = time.perf_counter()
 
+    # typed query operators (SUP-103): strip type:/site:/since:/"phrase"/-word
+    # into filters; the residual text drives retrieval. Invalid operators fail
+    # soft (kept as text, reported in meta.operators.invalid).
+    from . import queryops
+
+    ops = queryops.parse(query)
+    retrieval_query = ops.text or query  # operator-only query: keep the original
+
     from .understand import understand
 
-    u = understand(query, conn)
+    u = understand(retrieval_query, conn)
 
     # ---- live retrieval: refresh the store before searching it ---------------
     live_report = None
@@ -293,7 +301,7 @@ def search(
 
             try:
                 live_report = live_fetch(
-                    conn, query, max_pages=LIVE_PAGES[mode],
+                    conn, retrieval_query, max_pages=LIVE_PAGES[mode],
                     provider=provider, fetcher=live_fetcher,
                 )
             except Exception as exc:  # noqa: BLE001 - degrade to the store, never fail
@@ -302,7 +310,7 @@ def search(
     # ---- adaptive routing (SUP-132): pick the retrieval strategy -------------
     from .routing import route
 
-    routing = route(query, u.intent)
+    routing = route(retrieval_query, u.intent)
 
     # ---- retrieval (every mode) --------------------------------------------
     if not routing.fan_out:
@@ -311,21 +319,30 @@ def search(
         # pure retrieval: heuristic fan-out only, guaranteed zero LLM calls
         from .expand import heuristic_expand
 
-        variants = heuristic_expand(query)
+        variants = heuristic_expand(retrieval_query)
     else:
         from .expand import expand
 
-        variants = expand(conn, query, use_llm=use_llm)
+        variants = expand(conn, retrieval_query, use_llm=use_llm)
     # Over-fetch one past the page so `has_more` is knowable, then slice.
+    # Post-filter operators (site:/"phrase"/-word) discard candidates after
+    # retrieval, so over-fetch harder to keep the page full.
+    fetch_k = (offset + k + 1) * (4 if ops.has_post_filters else 1)
     fetched = retrieve(
-        conn, query, k=offset + k + 1, queries=variants, source_boost=u.source_boost,
+        conn, retrieval_query, k=fetch_k, queries=variants, source_boost=u.source_boost,
+        source_types=ops.source_types, since=ops.since,
         index_weights=(routing.vector_weight, routing.keyword_weight),
     )
+    if ops.has_post_filters:
+        fetched = [
+            h for h in fetched
+            if queryops.matches(ops, text=h.text, url=h.url_anchor or h.document_url)
+        ]
 
     # ---- version awareness (SUP-136): scope to the version the query names ----
     from . import versions as versions_mod
 
-    version_constraint = versions_mod.query_constraint(query)
+    version_constraint = versions_mod.query_constraint(retrieval_query)
     version_notes: dict[int, dict] = {}
     if version_constraint is not None:
         # boosts matches / demotes older-major-only sources, re-sorts in place
@@ -360,6 +377,9 @@ def search(
             "product": version_constraint.product,
             "version": version_constraint.version,
         }
+    # typed operators (SUP-103): what was recognized (and what failed soft)
+    if ops.active or ops.invalid:
+        response["meta"]["operators"] = ops.describe()
     # routing transparency (SUP-132): why retrieval was weighted the way it was
     response["meta"]["routing"] = {
         "strategy": routing.strategy,
@@ -387,7 +407,7 @@ def search(
 
     if mode == "raw":
         if highlights:
-            _attach_highlights(query, hits, response["sources"])
+            _attach_highlights(retrieval_query, hits, response["sources"])
         return _finalize(response, started, format, fields, selected)
 
     # ---- evidence layer (claims + full) ------------------------------------
@@ -397,12 +417,12 @@ def search(
     from .graph.query import graph_for_query
     from .rerank import rerank
 
-    hits = rerank(conn, query, hits, use_llm=use_llm)
+    hits = rerank(conn, retrieval_query, hits, use_llm=use_llm)
     response["sources"] = _sources(hits, version_notes)
     if highlights:
-        _attach_highlights(query, hits, response["sources"])
+        _attach_highlights(retrieval_query, hits, response["sources"])
 
-    claims = extract_claims(conn, query, k=k, use_llm=use_llm)
+    claims = extract_claims(conn, retrieval_query, k=k, use_llm=use_llm)
     claim_ids = [c["id"] for c in claims]
     for c in claims:
         link_claim(conn, c["id"], c["text"], use_llm=use_llm)
@@ -421,12 +441,12 @@ def search(
     temporal_process(conn, claims)
 
     response["claims"] = _claims_payload(conn, claim_ids)
-    response["graph"] = graph_for_query(conn, query)
+    response["graph"] = graph_for_query(conn, retrieval_query)
 
     if mode == "full":
         from .synthesize import synthesize
 
-        result = synthesize(conn, query, response["claims"], use_llm=use_llm)
+        result = synthesize(conn, retrieval_query, response["claims"], use_llm=use_llm)
         response["answer"] = result["answer"]
         response["citations"] = result["sources"]
         response["meta"]["generator"] = result["generator"]

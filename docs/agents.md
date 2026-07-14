@@ -49,7 +49,7 @@ OpenAI-style tool defs at `/v1/tools`). See the
 
 | Tool | Params | Returns / use |
 | ---- | ------ | ------------- |
-| `search` | `query, mode=raw\|claims\|full, k, fields, max_tokens` | Ranked `sources` (opaque `id` handle, deep-link `url`, `source_type`, trust, score). `raw` = fast, no LLM; `claims` = + claims/evidence/graph; `full` = + cited answer. |
+| `search` | `query, mode=raw\|claims\|full, k, fields, max_tokens` | Ranked `sources` (opaque `id` handle, deep-link `url`, `source_type`, trust, score). `raw` = fast, no LLM; `claims` = + claims/evidence/graph; `full` = + cited answer. Query supports typed operators (`type:docs,so` · `site:host.com` · `since:2024` · `"phrase"` · `-exclude`); invalid ones fail soft as text. |
 | `extract` | `urls[], depth=raw\|claims, max_tokens` | Fetch known URL(s) → clean markdown per page + `doc_`/`chk_` handles (page is stored + indexed). `depth=claims` also runs the evidence layer over each page. Per-URL failures; TTL-cached. HTTP twin: `POST /v1/extract`. |
 | `fetch_source` | `handle, max_tokens` | Resolve a `chk_`/`doc_`/`clm_` handle to its full row: chunk text + context, whole document, or a claim + evidence. How you go from a citation to the evidence. |
 | `get_claim` | `handle` | One claim by `clm_` handle: confidence, disputed flag, full evidence set (contradictions first) with backing source handles. |

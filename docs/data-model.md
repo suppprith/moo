@@ -69,6 +69,28 @@ agent surface: `chk_<id>` (chunk / a search "source"), `clm_<id>` (claim),
 routable — the fetch/drill-down endpoints (SUP-106) decode the prefix. Callers
 treat them as opaque.
 
+## Typed query operators (SUP-103)
+
+Parsed out of the query string before retrieval ([`app/queryops.py`](../api/app/queryops.py)),
+so the same syntax works everywhere a query enters moo — web UI, `moo` CLI,
+MCP `search`, `/search`, `/v1/web_search`:
+
+| Operator | Effect |
+| -------- | ------ |
+| `type:docs,so` | filter by source type (aliases: `docs`, `issue`, `pr`, `release`, `blog`, `so`/`qa`/`stackoverflow`, `hn`, `reddit`, `github`) — maps to the `source_types` index filter |
+| `site:github.com` | only results from that host (suffix match, `www.` ignored) |
+| `since:2024`, `since:2024-05`, `since:2024-05-02` | only content published/updated after the date — maps to the `since` index filter |
+| `"exact phrase"` | result text must contain the phrase |
+| `-word` | exclude results containing the word (`-9` and `--flag` stay text) |
+| `lang:python` | soft hint: folded into the retrieval text (doc lang metadata is too sparse to hard-filter) |
+
+**Fail-soft:** an invalid operator (`type:banana`, `since:soon`, unknown
+`name:value`) is kept as plain query text and reported in
+`meta.operators.invalid` so a UI can hint at the typo — it never empties the
+result page. `meta.operators` echoes everything that was recognized.
+Post-filter operators (`site:`, phrases, exclusions) over-fetch 4× before
+filtering so pages stay full.
+
 ## Serving contract — errors & streaming (SUP-107)
 
 **Structured errors.** Every API error renders as one shape so an agent can

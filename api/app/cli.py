@@ -123,9 +123,12 @@ def _search_inprocess(args) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="moo", description="Live web search for software questions, with receipts."
+        prog="moo", description="Live web search for software questions, with receipts.",
+        epilog='query operators: type:docs,so,issue,pr,blog,github | site:host.com | '
+               'since:2024[-05[-02]] | "exact phrase" | -exclude '
+               "(invalid operators fail soft: treated as plain text)",
     )
-    parser.add_argument("query", help="what you want to know")
+    parser.add_argument("query", help="what you want to know (typed operators supported, see below)")
     parser.add_argument("--mode", choices=("raw", "claims", "full"), default="full",
                         help="raw=sources only (fast), claims=+evidence, full=cited answer (default)")
     parser.add_argument("-k", type=int, default=8, help="number of sources")

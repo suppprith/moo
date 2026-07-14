@@ -90,6 +90,11 @@ def search(
     the result size; if sources are dropped a `truncation` marker gives a cursor.
     `highlights=true` adds the most query-relevant span(s) of each source plus a
     0-1 `relevance` comparable across queries — the cheapest way to skim results.
+
+    The query supports typed operators: `type:docs,so,issue,pr,blog,github`
+    (source-type filter), `site:host.com`, `since:2024[-05[-02]]`,
+    `"exact phrase"`, `-exclude`. Invalid operators are treated as plain text
+    (`meta.operators` reports what applied).
     """
     conn = _search_conn()
     try:
