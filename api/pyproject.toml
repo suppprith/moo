@@ -19,6 +19,9 @@ dependencies = [
 # streamable HTTP. Zero-install alternative: `uv run python -m app.mcp_server`.
 [project.scripts]
 moo-mcp = "app.mcp_server:main"
+# `moo "query"` terminal client (SUP-102): cited answers in your terminal.
+# Runs in-process by default (no server needed); --url/MOO_URL for a remote.
+moo = "app.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -96,6 +96,23 @@ budget, and every finding traces to a source — uncited claims never ship.
 
 Reproducible demo: `uv run python -m app.eval.demo` ([recorded transcript](docs/agent-demo.md)).
 
+## Search from your terminal
+
+Neither Google nor DuckDuckGo ships an official CLI — moo does:
+
+```bash
+moo "why do my containers randomly exit"        # cited answer as markdown
+moo "postgres 16 parallel vacuum" --mode raw    # ranked sources, fast
+moo "redis persistence" --json | jq '.claims'   # pipe the full response
+moo "sqlite wal mode" --open 1                  # open the top source
+```
+
+Install with `uv tool install ./api` (or `pipx install ./api`), or zero-install
+`uv run moo "..."` from `api/`. Runs the engine **in-process** by default —
+no server needed, self-initializing on first run; point it at a running
+instance with `--url http://host:8000` or `MOO_URL`. Output is pipe-friendly
+(no ANSI codes when stdout isn't a TTY).
+
 ## Architecture
 
 ```
