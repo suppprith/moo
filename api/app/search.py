@@ -281,8 +281,15 @@ def search(
             except Exception as exc:  # noqa: BLE001 - degrade to the store, never fail
                 log.warning("live fetch failed, serving from store: %s", exc)
 
+    # ---- adaptive routing (SUP-132): pick the retrieval strategy -------------
+    from .routing import route
+
+    routing = route(query, u.intent)
+
     # ---- retrieval (every mode) --------------------------------------------
-    if mode == "raw":
+    if not routing.fan_out:
+        variants = []  # paragraph query: variants add noise, not recall
+    elif mode == "raw":
         # pure retrieval: heuristic fan-out only, guaranteed zero LLM calls
         from .expand import heuristic_expand
 
@@ -292,7 +299,10 @@ def search(
 
         variants = expand(conn, query, use_llm=use_llm)
     # Over-fetch one past the page so `has_more` is knowable, then slice.
-    fetched = retrieve(conn, query, k=offset + k + 1, queries=variants, source_boost=u.source_boost)
+    fetched = retrieve(
+        conn, query, k=offset + k + 1, queries=variants, source_boost=u.source_boost,
+        index_weights=(routing.vector_weight, routing.keyword_weight),
+    )
 
     # ---- version awareness (SUP-136): scope to the version the query names ----
     from . import versions as versions_mod
@@ -332,6 +342,14 @@ def search(
             "product": version_constraint.product,
             "version": version_constraint.version,
         }
+    # routing transparency (SUP-132): why retrieval was weighted the way it was
+    response["meta"]["routing"] = {
+        "strategy": routing.strategy,
+        "vector_weight": routing.vector_weight,
+        "keyword_weight": routing.keyword_weight,
+        "fan_out": routing.fan_out,
+        "signals": routing.signals,
+    }
     if live_report is not None:
         # compact summary; the shape is additive (absent when live is off)
         response["meta"]["live"] = {

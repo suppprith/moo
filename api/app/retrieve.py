@@ -104,13 +104,18 @@ class RetrievedChunk:
 
 
 def _rrf_merge(
-    rankings: list[list[int]], boost: dict[int, float] | None = None
+    rankings: list[list[int]],
+    boost: dict[int, float] | None = None,
+    weights: list[float] | None = None,
 ) -> dict[int, float]:
-    """Fuse ranked id lists: score(id) = Σ 1/(RRF_K + rank). Optional per-id boost."""
+    """Fuse ranked id lists: score(id) = Σ w/(RRF_K + rank). ``weights`` (one
+    per ranking, default 1.0) let the router favor an index (SUP-132);
+    ``boost`` applies per-id source-type multipliers."""
     scores: dict[int, float] = {}
-    for ranking in rankings:
+    for i, ranking in enumerate(rankings):
+        w = weights[i] if weights else 1.0
         for rank, chunk_id in enumerate(ranking, start=1):
-            scores[chunk_id] = scores.get(chunk_id, 0.0) + 1.0 / (RRF_K + rank)
+            scores[chunk_id] = scores.get(chunk_id, 0.0) + w / (RRF_K + rank)
     if boost:
         for cid, mult in boost.items():
             if cid in scores:
@@ -204,17 +209,24 @@ def retrieve(
     source_types: list[str] | None = None,
     since: str | None = None,
     source_boost: dict[str, float] | None = None,
+    index_weights: tuple[float, float] | None = None,
 ) -> list[RetrievedChunk]:
     """Hybrid retrieval over both indexes. ``queries`` adds fan-out variants
     (SUP-82); ``source_boost`` lets query understanding weight source types
-    (SUP-81), e.g. {"github_issue": 1.3} for troubleshooting queries."""
+    (SUP-81), e.g. {"github_issue": 1.3} for troubleshooting queries;
+    ``index_weights`` = (vector, keyword) RRF vote multipliers from the
+    adaptive router (SUP-132)."""
     variants = [query] + [q for q in (queries or []) if q and q != query]
     filters = {"source_types": source_types, "since": since}
+    w_vec, w_kw = index_weights or (1.0, 1.0)
 
     rankings: list[list[int]] = []
+    weights: list[float] = []
     for q in variants:
         rankings.append([cid for cid, _ in vector.search_text(conn, q, k=K_EACH, **filters)])
+        weights.append(w_vec)
         rankings.append([cid for cid, _ in keyword.search(conn, q, k=K_EACH, **filters)])
+        weights.append(w_kw)
 
     rows = _hydrate(conn, list({cid for r in rankings for cid in r}))
     boost: dict[int, float] | None = None
@@ -224,7 +236,7 @@ def retrieve(
             for cid, row in rows.items()
             if row["source_type"] in source_boost
         }
-    scores = _rrf_merge(rankings, boost)
+    scores = _rrf_merge(rankings, boost, weights)
     ordered = sorted(scores, key=scores.get, reverse=True)
 
     out: list[RetrievedChunk] = []
