@@ -19,6 +19,7 @@ import threading
 from . import auth, ids
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
+from .extract import MAX_URLS as EXTRACT_MAX_URLS, extract_urls
 from .fetch import fetch_chunk, fetch_claim, fetch_document
 from .graph import query as graph_query
 from .research import session as research_session
@@ -376,9 +377,39 @@ def web_search_get(
 
 @app.get("/v1/tools")
 def web_search_tools() -> dict:
-    """The OpenAI-style function-tool definition to register so an agent routes
-    its `web_search` to moo; execute the calls against POST /v1/web_search."""
-    return {"tools": [OPENAI_TOOL]}
+    """The OpenAI-style function-tool definitions to register with an agent:
+    `web_search` (execute against POST /v1/web_search) and `extract` (execute
+    against POST /v1/extract)."""
+    from .extract import OPENAI_TOOL as EXTRACT_TOOL
+
+    return {"tools": [OPENAI_TOOL, EXTRACT_TOOL]}
+
+
+# ---------------------------------------------------------------------------
+# /v1/extract: URL(s) -> clean markdown + optional evidence (SUP-147)
+# ---------------------------------------------------------------------------
+
+class ExtractRequest(BaseModel):
+    urls: list[str] = Field(..., min_length=1, max_length=EXTRACT_MAX_URLS)
+    depth: Literal["raw", "claims"] = "raw"
+    force: bool = Field(False, description="bypass the TTL cache and re-fetch")
+
+
+@app.post("/v1/extract")
+def extract_post(req: ExtractRequest) -> dict:
+    """Fetch URL(s) and return each page as clean markdown with `doc_`/`chk_`
+    handles into the store. `depth=claims` also runs the evidence layer per
+    page (claims + confidence + contradictions — no other extract endpoint does
+    this). Failures are per-URL: each failed entry carries a structured
+    `error`, the rest of the batch still returns. Content is untrusted
+    third-party data (see `notice`)."""
+    conn = get_connection_for_search()
+    try:
+        return extract_urls(conn, req.urls, depth=req.depth, force=req.force)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

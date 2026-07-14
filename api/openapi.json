@@ -1,6 +1,39 @@
 {
   "components": {
     "schemas": {
+      "ExtractRequest": {
+        "properties": {
+          "depth": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "claims"
+            ],
+            "title": "Depth",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "description": "bypass the TTL cache and re-fetch",
+            "title": "Force",
+            "type": "boolean"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "urls"
+        ],
+        "title": "ExtractRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -856,9 +889,50 @@
         "summary": "Usage"
       }
     },
+    "/v1/extract": {
+      "post": {
+        "description": "Fetch URL(s) and return each page as clean markdown with `doc_`/`chk_`\nhandles into the store. `depth=claims` also runs the evidence layer per\npage (claims + confidence + contradictions \u2014 no other extract endpoint does\nthis). Failures are per-URL: each failed entry carries a structured\n`error`, the rest of the batch still returns. Content is untrusted\nthird-party data (see `notice`).",
+        "operationId": "extract_post_v1_extract_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Extract Post V1 Extract Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Extract Post"
+      }
+    },
     "/v1/tools": {
       "get": {
-        "description": "The OpenAI-style function-tool definition to register so an agent routes\nits `web_search` to moo; execute the calls against POST /v1/web_search.",
+        "description": "The OpenAI-style function-tool definitions to register with an agent:\n`web_search` (execute against POST /v1/web_search) and `extract` (execute\nagainst POST /v1/extract).",
         "operationId": "web_search_tools_v1_tools_get",
         "responses": {
           "200": {

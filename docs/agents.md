@@ -34,14 +34,15 @@ can check, not links or one paragraph.
 
 ## Two ways in
 
-1. **Primitive tools** — the agent drives its own loop: `search`, `fetch_source`,
-   `get_claim`, `list_contradictions`, `expand_graph`.
+1. **Primitive tools** — the agent drives its own loop: `search`, `extract`,
+   `fetch_source`, `get_claim`, `list_contradictions`, `expand_graph`.
 2. **Hosted deep research** — hand off a whole question: `deep_research` runs
    plan → iterative multi-hop retrieval → a cited, confidence-scored report;
    `research_status` polls/resumes it.
 
-Both are exposed over **MCP** (`app/mcp_server.py`) and, for `search`, over a
-drop-in **`web_search`** HTTP adapter (`/v1/web_search`). See the
+Both are exposed over **MCP** (`app/mcp_server.py`) and, for `search` and
+`extract`, over drop-in HTTP endpoints (`/v1/web_search`, `/v1/extract`;
+OpenAI-style tool defs at `/v1/tools`). See the
 [2-minute quickstart](../README.md#connect-an-agent-mcp-in-2-minutes).
 
 ## Tool reference (MCP)
@@ -49,6 +50,7 @@ drop-in **`web_search`** HTTP adapter (`/v1/web_search`). See the
 | Tool | Params | Returns / use |
 | ---- | ------ | ------------- |
 | `search` | `query, mode=raw\|claims\|full, k, fields, max_tokens` | Ranked `sources` (opaque `id` handle, deep-link `url`, `source_type`, trust, score). `raw` = fast, no LLM; `claims` = + claims/evidence/graph; `full` = + cited answer. |
+| `extract` | `urls[], depth=raw\|claims, max_tokens` | Fetch known URL(s) → clean markdown per page + `doc_`/`chk_` handles (page is stored + indexed). `depth=claims` also runs the evidence layer over each page. Per-URL failures; TTL-cached. HTTP twin: `POST /v1/extract`. |
 | `fetch_source` | `handle, max_tokens` | Resolve a `chk_`/`doc_`/`clm_` handle to its full row: chunk text + context, whole document, or a claim + evidence. How you go from a citation to the evidence. |
 | `get_claim` | `handle` | One claim by `clm_` handle: confidence, disputed flag, full evidence set (contradictions first) with backing source handles. |
 | `list_contradictions` | `query, k` | Only the disputed/contradicted claims for a query — where sources disagree. |

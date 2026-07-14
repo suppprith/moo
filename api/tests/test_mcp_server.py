@@ -20,8 +20,8 @@ def _no_real_db(monkeypatch):
 
 # ---- registration + schemas -------------------------------------------------
 
-_TOOLS = {"search", "fetch_source", "get_claim", "list_contradictions", "expand_graph",
-          "deep_research", "research_status"}
+_TOOLS = {"search", "extract", "fetch_source", "get_claim", "list_contradictions",
+          "expand_graph", "deep_research", "research_status"}
 
 
 def test_server_smoke_lists_tools():
