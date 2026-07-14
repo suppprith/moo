@@ -118,12 +118,25 @@ def test_live_fetch_end_to_end(conn):
 def test_second_run_is_warm(conn):
     fetcher = FakeFetcher(PAGES)
     live_fetch(conn, "postgres autovacuum", provider=FakeProvider(DEV_CANDS), fetcher=fetcher)
+    requests_after_cold = len(fetcher.requests)
     report2 = live_fetch(conn, "postgres autovacuum",
                          provider=FakeProvider(DEV_CANDS), fetcher=fetcher)
-    # unchanged content -> no new docs, no rechunk/re-embed work
-    assert report2["unchanged"] == 2 and report2["fetched"] == 0
+    # within TTL -> served from the store with ZERO network work
+    assert report2["fresh"] == 2 and report2["fetched"] == 0
+    assert len(fetcher.requests) == requests_after_cold
     assert report2["new_chunks"] == 0 and report2["embedded"] == 0
     assert conn.execute("SELECT count(*) FROM document").fetchone()[0] == 2
+
+
+def _expire_ttl(conn, url=None):
+    """Backdate fetched_at past every tier's TTL so a re-fetch happens."""
+    if url is None:
+        conn.execute("UPDATE document SET fetched_at = datetime('now', '-30 days')")
+    else:
+        conn.execute(
+            "UPDATE document SET fetched_at = datetime('now', '-30 days') WHERE url = ?", (url,)
+        )
+    conn.commit()
 
 
 def test_updated_page_is_rechunked(conn):
@@ -132,6 +145,7 @@ def test_updated_page_is_rechunked(conn):
     fetcher.pages[PG_URL] = PG_HTML.replace(
         "highly recommended feature", "highly recommended background daemon"
     )
+    _expire_ttl(conn)  # past TTL, otherwise the stale copy is served fresh
     report = live_fetch(conn, "postgres autovacuum",
                         provider=FakeProvider(DEV_CANDS), fetcher=fetcher)
     assert len(report["updated_docs"]) == 1

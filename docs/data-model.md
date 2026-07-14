@@ -135,8 +135,14 @@ configured (`MOO_SEARXNG_URL` keyless self-hosted, or `MOO_BRAVE_API_KEY`;
 (official docs > repos/registries/Q&A > blogs > unknown; junk blocked; clearly
 non-software queries flagged `out_of_domain` and not fetched) → fetch + extract →
 write through the standard document→chunk→embed→index path. The store is the
-**cache**: unchanged pages cost ~nothing on re-fetch (ETag + content-hash),
-updated pages are re-chunked, and the evidence graph accumulates across queries.
+**cache**: a page fetched within its tier's TTL (docs/blog 7d, registry 3d,
+repo/qa/unknown 1d) is served with zero network work (`fresh` in `meta.live`);
+past TTL, unchanged pages cost ~nothing (ETag + content-hash) and updated pages
+are re-chunked. The live-doc cache can be size-bounded (`MOO_CACHE_MAX_DOCS`,
+default unbounded) — eviction is oldest-first and never removes a document
+whose chunks back claims/evidence, so the evidence graph accumulates across
+queries. Every source row carries `fetched_at` so consumers can see how recent
+each result's copy is.
 
 - **Fast mode** = `mode/depth=raw` + live: fresh snippets, zero LLM calls
   (page cap 4). The drop-in `web_search` default.

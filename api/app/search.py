@@ -96,6 +96,8 @@ def _sources(hits: list) -> list[dict]:
             "heading": h.heading,
             "url_anchor": h.url_anchor,
             "score": round(h.score, 6),
+            # freshness (SUP-144): when this copy was fetched from the live web
+            "fetched_at": getattr(h, "fetched_at", None),
         }
         for h in hits
     ]
@@ -152,6 +154,8 @@ def _agent_sources(sources: list[dict]) -> list[dict]:
             row["title"] = s["title"]
         if s.get("trust_score") is not None:
             row["trust_score"] = s["trust_score"]
+        if s.get("fetched_at"):
+            row["fetched_at"] = s["fetched_at"]
         out.append(row)
     return out
 
@@ -297,9 +301,11 @@ def search(
             "out_of_domain": live_report["out_of_domain"],
             "domain_confidence": live_report["domain_confidence"],
             "fetched": live_report["fetched"],
+            "fresh": live_report["fresh"],
             "unchanged": live_report["unchanged"],
             "failed": live_report["failed"],
             "timed_out": live_report["timed_out"],
+            "evicted": live_report["evicted"],
             "new_chunks": live_report["new_chunks"],
             "timings_ms": live_report["timings_ms"],
             "cost": live_report["cost"],

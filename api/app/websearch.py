@@ -118,6 +118,7 @@ def web_search(
                 "source_type": s["source_type"],
                 "trust_score": s["trust_score"],
                 "score": s["score"],
+                "fetched_at": s.get("fetched_at"),
             }
         )
 

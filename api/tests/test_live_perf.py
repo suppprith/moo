@@ -127,7 +127,8 @@ def test_warm_repeat_is_faster_than_cold(conn):
                       provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
     warm = live_fetch(conn, "postgres vacuum",
                       provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
-    # warm: content unchanged -> no chunk/embed/index stages at all
-    assert warm["unchanged"] == 4 and warm["new_chunks"] == 0
+    # warm: everything within TTL -> zero network, no chunk/embed/index stages
+    assert warm["fresh"] == 4 and warm["new_chunks"] == 0
+    assert len(fetcher.log) == 4  # not a single extra request on the warm run
     assert "embed" not in warm["timings_ms"]
     assert cold["new_chunks"] > 0

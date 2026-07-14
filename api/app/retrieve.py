@@ -83,6 +83,7 @@ class RetrievedChunk:
     author_role: str | None
     popularity: int | None
     trust_score: float | None = None                     # source trust (SUP-85)
+    fetched_at: str | None = None                        # freshness (SUP-144)
     alternates: list[int] = field(default_factory=list)  # near-dup chunk ids
 
 
@@ -109,7 +110,7 @@ def _hydrate(conn: sqlite3.Connection, chunk_ids: list[int]) -> dict[int, sqlite
         f"""
         SELECT ch.id, ch.text, ch.heading, ch.url_anchor, ch.canonical_chunk_id,
                d.source_type, d.url AS document_url, d.title, d.published_at,
-               d.author_role, d.popularity, d.trust_score
+               d.author_role, d.popularity, d.trust_score, d.fetched_at
         FROM chunk ch JOIN document d ON d.id = ch.document_id
         WHERE ch.id IN ({qmarks})
         """,
@@ -192,6 +193,7 @@ def retrieve(
                 author_role=row["author_role"],
                 popularity=row["popularity"],
                 trust_score=row["trust_score"],
+                fetched_at=row["fetched_at"],
                 alternates=alternates,
             )
         )
