@@ -296,6 +296,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="HTTP bind host (with --http)")
     parser.add_argument("--port", type=int, default=8000, help="HTTP bind port (with --http)")
     args = parser.parse_args(argv)
+
+    # zero-setup first run (SUP-159): create/migrate the DB, hint at optional
+    # config via stderr logging — stdout stays clean for the stdio transport
+    from .bootstrap import ensure_ready
+
+    ensure_ready()
     if args.http:
         mcp.settings.host = args.host
         mcp.settings.port = args.port

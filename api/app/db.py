@@ -8,8 +8,11 @@ Apply migrations:  ``uv run python -m app.db``
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
+
+log = logging.getLogger("moo.db")
 
 API_DIR = Path(__file__).resolve().parent.parent
 MIGRATIONS_DIR = API_DIR / "migrations"
@@ -49,13 +52,16 @@ def migrate(db_path: Path | str = DEFAULT_DB_PATH) -> int:
             conn.executescript(f.read_text(encoding="utf-8"))
             conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (f.stem,))
             conn.commit()
-            print(f"applied {f.name}")
+            # logging, never print: stdout belongs to the MCP stdio transport
+            # and to CLIs piping JSON (both were corrupted by prints here)
+            log.info("applied %s", f.name)
         if not pending:
-            print("no pending migrations")
+            log.debug("no pending migrations")
         return len(pending)
     finally:
         conn.close()
 
 
 if __name__ == "__main__":
-    migrate()
+    n = migrate()
+    print(f"applied {n} migration(s)" if n else "no pending migrations")

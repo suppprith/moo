@@ -44,6 +44,14 @@ app = FastAPI(
     license_info={"name": "MIT", "url": "https://github.com/suppprith/moo/blob/main/LICENSE"},
 )
 
+
+@app.on_event("startup")
+def _startup() -> None:
+    # zero-setup first run (SUP-159): create/migrate the DB + log config hints
+    from .bootstrap import ensure_ready
+
+    ensure_ready()
+
 # Let the web/ dev server (and a self-hosted UI) call the API from the browser.
 # Override the allowed origins with MOO_CORS_ORIGINS (comma-separated) in prod.
 _origins = os.environ.get(
