@@ -152,6 +152,25 @@ def run_loop(
                 new_disputed.append(c["id"])
         conn.commit()
 
+        # temporal pass (SUP-137): version-separated conflicts become
+        # supersession chains instead of live disputes
+        if step_claims:
+            from ..evidence.temporal import process as temporal_process
+
+            try:
+                result = temporal_process(conn, step_claims)
+                if result["superseded"]:
+                    # some disputed flags may have been cleared: refresh
+                    for cid in list(new_disputed):
+                        row = conn.execute(
+                            "SELECT disputed FROM claim WHERE id = ?", (cid,)
+                        ).fetchone()
+                        if row and not row["disputed"]:
+                            new_disputed.remove(cid)
+                            seen[cid]["disputed"] = False
+            except Exception as exc:  # noqa: BLE001 - temporal pass is best-effort
+                log.warning("temporal pass failed: %s", exc)
+
         step_record = {
             "step": len(steps) + 1,
             "sub_question_id": sub_id,

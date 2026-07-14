@@ -170,12 +170,14 @@ def test_full_mode_wires_synthesis(monkeypatch):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.executescript(
-        "CREATE TABLE claim (id INTEGER PRIMARY KEY, text TEXT, confidence REAL, disputed INTEGER);"
+        "CREATE TABLE claim (id INTEGER PRIMARY KEY, text TEXT, confidence REAL, disputed INTEGER,"
+        " valid_product TEXT, valid_from TEXT, valid_until TEXT);"
+        "CREATE TABLE claim_link (claim_id INTEGER, target_claim_id INTEGER, relation TEXT);"
         "CREATE TABLE evidence (id INTEGER PRIMARY KEY, claim_id INTEGER, chunk_id INTEGER, relation TEXT, strength REAL);"
         "CREATE TABLE chunk (id INTEGER PRIMARY KEY, document_id INTEGER);"
         "CREATE TABLE document (id INTEGER PRIMARY KEY, url TEXT);"
     )
-    conn.execute("INSERT INTO claim VALUES (7, 'c', NULL, 0)")
+    conn.execute("INSERT INTO claim VALUES (7, 'c', NULL, 0, NULL, NULL, NULL)")
 
     out = search_mod.search(conn, "q", mode="full", use_llm=False)
     assert out["answer"] == "cited answer [S1]"

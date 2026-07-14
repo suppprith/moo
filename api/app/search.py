@@ -120,10 +120,14 @@ def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict
     """Reload the given claims with confidence + their evidence edges."""
     if not claim_ids:
         return []
+    from .evidence.temporal import superseded_by
+
     qmarks = ",".join("?" * len(claim_ids))
     claims = conn.execute(
-        f"SELECT id, text, confidence, disputed FROM claim WHERE id IN ({qmarks})", claim_ids
+        f"SELECT id, text, confidence, disputed, valid_product, valid_from, valid_until "
+        f"FROM claim WHERE id IN ({qmarks})", claim_ids
     ).fetchall()
+    superseders = superseded_by(conn, claim_ids)
     edges = conn.execute(
         f"""
         SELECT e.claim_id, e.relation, e.chunk_id, e.strength, d.url AS document_url
@@ -142,11 +146,21 @@ def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict
         })
     out = []
     for c in sorted(claims, key=lambda r: (r["confidence"] is None, -(r["confidence"] or 0))):
-        out.append({
+        row = {
             "id": c["id"], "text": c["text"],
             "confidence": c["confidence"], "disputed": bool(c["disputed"]),
             "evidence": by_claim.get(c["id"], []),
-        })
+        }
+        # temporal validity + supersession (SUP-137)
+        if c["valid_product"]:
+            row["valid"] = {
+                "product": c["valid_product"],
+                "from": c["valid_from"],
+                "until": c["valid_until"],
+            }
+        if c["id"] in superseders:
+            row["superseded_by"] = superseders[c["id"]]
+        out.append(row)
     return out
 
 
@@ -190,6 +204,10 @@ def _agent_claims(claims: list[dict]) -> list[dict]:
             row["confidence"] = c["confidence"]
         if c.get("disputed"):
             row["disputed"] = True
+        if c.get("valid"):
+            row["valid"] = c["valid"]
+        if c.get("superseded_by"):
+            row["superseded_by"] = ids.encode(ids.CLAIM, c["superseded_by"])
         ev = []
         for e in c.get("evidence", []):
             edge = {"relation": e["relation"], "source": ids.encode(ids.CHUNK, e["chunk_id"])}
@@ -395,6 +413,12 @@ def search(
             (r["confidence"], int(r["disputed"]), cid),
         )
     conn.commit()
+
+    # temporal pass (SUP-137): version validity + supersession links; an old
+    # claim contradicted by a newer-version one becomes superseded, not disputed
+    from .evidence.temporal import process as temporal_process
+
+    temporal_process(conn, claims)
 
     response["claims"] = _claims_payload(conn, claim_ids)
     response["graph"] = graph_for_query(conn, query)
