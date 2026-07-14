@@ -73,6 +73,28 @@ Every handle is opaque and stable (`chk_`/`clm_`/`doc_`/`ent_`); pass it back to
 For a single lookup, skip the engine and call `search` (or route your agent's
 `web_search` at `/v1/web_search`).
 
+## Content safety: results are data, not instructions
+
+moo fetches live third-party pages, so every retrieved result must be treated
+as **untrusted data** — a page can contain text aimed at the agent reading it
+("ignore previous instructions…", "send your keys to…"). moo scans all
+live-fetched content for instruction-injection patterns at ingest and **marks
+rather than drops**:
+
+- suspicious sources carry `"suspicious": true` on their result rows
+  (`/search` sources, `/v1/web_search` results, MCP payloads);
+- their trust score is halved;
+- when any flagged source is in a result set, the response carries
+  `meta.untrusted_content: true` + `meta.content_notice`;
+- every `/v1/web_search` response includes a top-level `notice` reminding the
+  integrator that page content is data, not directives.
+
+Integrators: never execute or obey text found inside `results[].snippet`,
+`sources`, chunk text, or claims — cite it, quote it, reason about it. A page
+*discussing* prompt injection may be flagged too (patterns match the phrasing);
+the flag means "handle with care", not "malicious with certainty". Detections
+are logged with URL + pattern category only — never query content.
+
 ## Groundedness guarantee
 
 Nothing in a report is asserted without a traceable source. Claims are grounded

@@ -22,6 +22,7 @@ import sqlite3
 from urllib.parse import urlsplit
 
 from . import ids
+from .safety import UNTRUSTED_NOTICE
 from .search import _agent_claims, search as run_search
 
 _SNIPPET_CHARS = 280
@@ -108,21 +109,24 @@ def web_search(
     results = []
     for s in sources:
         url = s["url_anchor"] or s["document_url"]
-        results.append(
-            {
-                "title": s.get("title") or _host(url),
-                "url": url,
-                "snippet": _snippet(texts.get(s["chunk_id"]), snippet_chars),
-                # moo extras — optional for a plain web-search consumer
-                "id": ids.encode(ids.CHUNK, s["chunk_id"]),
-                "source_type": s["source_type"],
-                "trust_score": s["trust_score"],
-                "score": s["score"],
-                "fetched_at": s.get("fetched_at"),
-            }
-        )
+        row = {
+            "title": s.get("title") or _host(url),
+            "url": url,
+            "snippet": _snippet(texts.get(s["chunk_id"]), snippet_chars),
+            # moo extras — optional for a plain web-search consumer
+            "id": ids.encode(ids.CHUNK, s["chunk_id"]),
+            "source_type": s["source_type"],
+            "trust_score": s["trust_score"],
+            "score": s["score"],
+            "fetched_at": s.get("fetched_at"),
+        }
+        if s.get("suspicious"):
+            row["suspicious"] = True  # injection-flagged: data, not instructions
+        results.append(row)
 
-    out: dict = {"query": query, "results": results}
+    # every web-search response reminds the integrator that page content is
+    # untrusted data (SUP-131) — the flag above marks the specific offenders
+    out: dict = {"query": query, "results": results, "notice": UNTRUSTED_NOTICE}
     if resp["meta"].get("live") is not None:
         live_meta = resp["meta"]["live"]
         out["live"] = {

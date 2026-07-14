@@ -98,6 +98,8 @@ def _sources(hits: list) -> list[dict]:
             "score": round(h.score, 6),
             # freshness (SUP-144): when this copy was fetched from the live web
             "fetched_at": getattr(h, "fetched_at", None),
+            # injection-flagged content (SUP-131): treat as data, not instructions
+            "suspicious": bool(getattr(h, "suspicious", False)),
         }
         for h in hits
     ]
@@ -156,6 +158,8 @@ def _agent_sources(sources: list[dict]) -> list[dict]:
             row["trust_score"] = s["trust_score"]
         if s.get("fetched_at"):
             row["fetched_at"] = s["fetched_at"]
+        if s.get("suspicious"):
+            row["suspicious"] = True
         out.append(row)
     return out
 
@@ -356,6 +360,13 @@ def _finalize(
     """Stamp elapsed time, then apply format + field selection. `full` format
     with no explicit `fields` is left untouched (the legacy v1.0 shape)."""
     response["meta"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    # SUP-131: when injection-flagged content is in the result set, say so
+    # loudly at the top level (per-source rows carry the flag either way).
+    if any(s.get("suspicious") for s in response.get("sources", [])):
+        from .safety import UNTRUSTED_NOTICE
+
+        response["meta"]["untrusted_content"] = True
+        response["meta"]["content_notice"] = UNTRUSTED_NOTICE
     if format == "agent":
         return _to_agent(response, selected)
     if fields is not None:

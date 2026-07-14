@@ -84,6 +84,7 @@ class RetrievedChunk:
     popularity: int | None
     trust_score: float | None = None                     # source trust (SUP-85)
     fetched_at: str | None = None                        # freshness (SUP-144)
+    suspicious: bool = False                             # injection-flagged (SUP-131)
     alternates: list[int] = field(default_factory=list)  # near-dup chunk ids
 
 
@@ -110,7 +111,8 @@ def _hydrate(conn: sqlite3.Connection, chunk_ids: list[int]) -> dict[int, sqlite
         f"""
         SELECT ch.id, ch.text, ch.heading, ch.url_anchor, ch.canonical_chunk_id,
                d.source_type, d.url AS document_url, d.title, d.published_at,
-               d.author_role, d.popularity, d.trust_score, d.fetched_at
+               d.author_role, d.popularity, d.trust_score, d.fetched_at,
+               json_extract(d.metadata, '$.suspicious') AS suspicious_cats
         FROM chunk ch JOIN document d ON d.id = ch.document_id
         WHERE ch.id IN ({qmarks})
         """,
@@ -194,6 +196,7 @@ def retrieve(
                 popularity=row["popularity"],
                 trust_score=row["trust_score"],
                 fetched_at=row["fetched_at"],
+                suspicious=bool(row["suspicious_cats"]),
                 alternates=alternates,
             )
         )

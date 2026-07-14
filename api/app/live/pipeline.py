@@ -30,6 +30,7 @@ CLI:  ``uv run python -m app.live "how does postgres vacuum work"``
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
@@ -40,8 +41,10 @@ from urllib.parse import urlsplit
 
 import trafilatura
 
+from .. import safety
 from ..chunk import rechunk
 from ..embed import embed_corpus
+from ..evidence import trust
 from ..index import keyword, vector
 from ..ingest.base import store
 from ..ingest.fetcher import Fetcher
@@ -104,6 +107,13 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
             author = getattr(meta, "author", None)
     except Exception as exc:  # noqa: BLE001 - metadata is best-effort
         log.debug("metadata extraction failed for %s: %s", url, exc)
+    metadata: dict = {"live": True, "site": info.host, "tier": info.tier}
+    # injection scan at ingest (SUP-131): mark, don't drop — the flag rides the
+    # document everywhere and halves its trust. URL + categories only, no query.
+    cats = safety.categories(md)
+    if cats:
+        metadata["suspicious"] = cats
+        log.warning("suspicious content (%s) at %s", ",".join(cats), url)
     return RawDoc(
         source_type=info.source_type,
         url=url,
@@ -113,7 +123,7 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
         published_at=published,
         content_type="text/markdown",
         # never store the query on the document (no-query-logging principle)
-        metadata={"live": True, "site": info.host, "tier": info.tier},
+        metadata=metadata,
     )
 
 
@@ -170,6 +180,29 @@ def _fetch_extract_all(
 def _doc_id(conn: sqlite3.Connection, url: str) -> int | None:
     row = conn.execute("SELECT id FROM document WHERE url = ?", (url,)).fetchone()
     return row["id"] if row else None
+
+
+def _score_trust(conn: sqlite3.Connection, doc_ids: list[int]) -> int:
+    """Give freshly ingested live docs a trust score (the offline `score_all`
+    job never sees them), halving it for suspicious content. Returns docs
+    flagged suspicious."""
+    flagged = 0
+    for did in doc_ids:
+        row = conn.execute("SELECT * FROM document WHERE id = ?", (did,)).fetchone()
+        if row is None:
+            continue
+        score, _ = trust.trust_score(dict(row))
+        meta = row["metadata"] or "{}"
+        try:
+            suspicious = bool(json.loads(meta).get("suspicious"))
+        except ValueError:
+            suspicious = False
+        if suspicious:
+            score *= safety.TRUST_PENALTY
+            flagged += 1
+        conn.execute("UPDATE document SET trust_score = ? WHERE id = ?",
+                     (round(score, 4), did))
+    return flagged
 
 
 def _is_fresh(conn: sqlite3.Connection, url: str, tier: str) -> bool:
@@ -280,6 +313,7 @@ def live_fetch(
         "failed": 0,
         "timed_out": 0,
         "evicted": 0,
+        "suspicious": 0,
         "new_docs": [],
         "updated_docs": [],
         "new_chunks": 0,
@@ -355,6 +389,10 @@ def live_fetch(
                 _drop_chunks(conn, did)  # content changed -> rechunk below
         else:  # unchanged: already cached, chunks/embeddings still valid
             report["unchanged"] += 1
+    # trust + suspicious accounting for everything just ingested (SUP-131)
+    report["suspicious"] = _score_trust(
+        conn, [d for d in report["new_docs"] + report["updated_docs"] if d is not None]
+    )
     conn.commit()
     report["timings_ms"]["fetch"] = round((time.perf_counter() - t0) * 1000, 1)
 
