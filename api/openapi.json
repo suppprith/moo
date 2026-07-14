@@ -665,6 +665,18 @@
               "description": "fetch fresh pages from the live web first (default: auto when a search provider is configured; false = local store only)",
               "title": "Live"
             }
+          },
+          {
+            "description": "add best-span highlights + 0-1 relevance to each source",
+            "in": "query",
+            "name": "highlights",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "add best-span highlights + 0-1 relevance to each source",
+              "title": "Highlights",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

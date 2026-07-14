@@ -102,7 +102,8 @@ def web_search(
     if depth not in ("raw", "claims", "full"):
         raise ValueError(f"depth must be raw|claims|full, got {depth!r}")
     resp = run_search(conn, query, mode=depth, k=k, format="full", use_llm=use_llm,
-                      live=live, live_provider=live_provider, live_fetcher=live_fetcher)
+                      live=live, live_provider=live_provider, live_fetcher=live_fetcher,
+                      highlights=True)
     sources = resp["sources"]
     texts = _chunk_texts(conn, [s["chunk_id"] for s in sources])
 
@@ -120,6 +121,10 @@ def web_search(
             "score": s["score"],
             "fetched_at": s.get("fetched_at"),
         }
+        # tightest relevant spans + a 0-1 relevance comparable across queries
+        if s.get("highlights"):
+            row["highlights"] = s["highlights"]
+            row["relevance"] = s["relevance"]
         if s.get("suspicious"):
             row["suspicious"] = True  # injection-flagged: data, not instructions
         results.append(row)

@@ -41,7 +41,7 @@ def test_all_tools_registered_with_schemas():
         assert t.description and len(t.description) > 40      # descriptions are load-bearing
         assert "properties" in (t.inputSchema or {})
     assert set(by_name["search"].inputSchema["properties"]) == {
-        "query", "mode", "k", "fields", "max_tokens", "live",
+        "query", "mode", "k", "fields", "max_tokens", "live", "highlights",
     }
 
 

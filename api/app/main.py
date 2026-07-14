@@ -245,6 +245,9 @@ def search_endpoint(
         description="fetch fresh pages from the live web first (default: auto when a "
         "search provider is configured; false = local store only)",
     ),
+    highlights: bool = Query(
+        False, description="add best-span highlights + 0-1 relevance to each source"
+    ),
 ) -> dict:
     """Unified pipeline. `mode=raw` (default) makes zero LLM calls; `claims` adds
     the evidence layer + query subgraph; `full` adds a cited synthesized answer.
@@ -260,7 +263,8 @@ def search_endpoint(
             raise HTTPException(status_code=422, detail=str(e))
     conn = get_connection_for_search()
     try:
-        return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset, live=live)
+        return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset,
+                      live=live, highlights=highlights)
     except ValueError as e:  # bad fields/format/offset
         raise HTTPException(status_code=422, detail=str(e))
     finally:

@@ -175,6 +175,9 @@ def _agent_sources(sources: list[dict]) -> list[dict]:
             row["version_match"] = s["version_match"]
             if s.get("version_outdated"):
                 row["version_outdated"] = True
+        if s.get("highlights"):
+            row["highlights"] = s["highlights"]
+            row["relevance"] = s["relevance"]
         out.append(row)
     return out
 
@@ -231,6 +234,7 @@ def search(
     conn: sqlite3.Connection, query: str, *, mode: str = "raw", k: int = DEFAULT_K,
     use_llm: bool = True, format: str = "full", fields: str | None = None, offset: int = 0,
     live: bool | None = None, live_provider=None, live_fetcher=None,
+    highlights: bool = False,
 ) -> dict:
     """Run the pipeline to the depth `mode` requests and return the unified
     contract. `use_llm=False` forces every stage onto its heuristic path.
@@ -346,6 +350,8 @@ def search(
         }
 
     if mode == "raw":
+        if highlights:
+            _attach_highlights(query, hits, response["sources"])
         return _finalize(response, started, format, fields, selected)
 
     # ---- evidence layer (claims + full) ------------------------------------
@@ -357,6 +363,8 @@ def search(
 
     hits = rerank(conn, query, hits, use_llm=use_llm)
     response["sources"] = _sources(hits, version_notes)
+    if highlights:
+        _attach_highlights(query, hits, response["sources"])
 
     claims = extract_claims(conn, query, k=k, use_llm=use_llm)
     claim_ids = [c["id"] for c in claims]
@@ -382,6 +390,16 @@ def search(
         response["meta"]["generator"] = result["generator"]
 
     return _finalize(response, started, format, fields, selected)
+
+
+def _attach_highlights(query: str, hits: list, source_rows: list[dict]) -> None:
+    """Enrich source rows with best-span highlights + calibrated relevance
+    (SUP-133). Opt-in via search(highlights=True); /v1/web_search always on."""
+    from .highlights import highlight_hits
+
+    for row, hl in zip(source_rows, highlight_hits(query, [h.text for h in hits]), strict=True):
+        row["highlights"] = hl["highlights"]
+        row["relevance"] = hl["relevance"]
 
 
 def _finalize(

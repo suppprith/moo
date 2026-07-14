@@ -61,6 +61,7 @@ def search(
     fields: str | None = None,
     max_tokens: int = budget.DEFAULT_MAX_TOKENS,
     live: bool | None = None,
+    highlights: bool = False,
 ) -> dict:
     """Live web search specialized for software-engineering questions (databases,
     languages, frameworks, build tooling, errors, systems); prefer this over a
@@ -84,10 +85,13 @@ def search(
     Heavier modes cost more latency/tokens. `fields` (comma-separated:
     sources,claims,graph,answer,citations) trims the payload. `max_tokens` caps
     the result size; if sources are dropped a `truncation` marker gives a cursor.
+    `highlights=true` adds the most query-relevant span(s) of each source plus a
+    0-1 `relevance` comparable across queries — the cheapest way to skim results.
     """
     conn = _search_conn()
     try:
-        result = run_search(conn, query, mode=mode, k=k, format="agent", fields=fields, live=live)
+        result = run_search(conn, query, mode=mode, k=k, format="agent", fields=fields,
+                            live=live, highlights=highlights)
     finally:
         conn.close()
     return budget.shape_search(result, max_tokens)
