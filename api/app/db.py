@@ -1,4 +1,4 @@
-"""SQLite connection + migration runner for moo search.
+"""SQLite connection + migration runner for moo.
 
 Stdlib-only (``sqlite3``); no ORM. Migrations are plain ``.sql`` files in
 ``api/migrations/`` applied in filename order and recorded in ``schema_migrations``.

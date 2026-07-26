@@ -1,6 +1,6 @@
 # moo-web
 
-Next.js (App Router) frontend for **moo search**.
+Next.js (App Router) frontend for **moo**.
 
 ## Develop
 
