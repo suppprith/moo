@@ -1,4 +1,4 @@
-"""Continuous competitive-eval flywheel (SUP-141).
+"""Continuous competitive-eval flywheel.
 
 Turns the one-shot benchmark into a standing loop: every run scores each
 available engine (moo always; Exa/Tavily when their keys are set) on the
@@ -35,12 +35,9 @@ from .competitors import engines
 
 HISTORY_PATH = API_DIR / "data" / "eval_history.jsonl"
 
-# gate: fail when the new value is below previous * threshold
 GATE_METRICS = ("coverage", "source_recall")
 GATE_THRESHOLD = 0.9
 
-
-# -- scoring (one engine, one task) --------------------------------------------
 
 def score_engine_output(out: dict, task: dict) -> dict:
     """Score a normalized engine response against a golden task."""
@@ -88,8 +85,6 @@ def run_flywheel(conn, *, tasks: list[dict] | None = None, engine_map: dict | No
     }
 
 
-# -- history + regression gate ----------------------------------------------------
-
 def append_history(record: dict, path: Path | str = HISTORY_PATH) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,7 +103,7 @@ def load_history(path: Path | str = HISTORY_PATH) -> list[dict]:
             try:
                 out.append(json.loads(line))
             except json.JSONDecodeError:
-                continue  # a corrupt line never breaks the gate
+                continue
     return out
 
 
@@ -126,7 +121,7 @@ def check_regression(record: dict, history: list[dict], *,
             previous = prev
             break
     if previous is None:
-        return []  # nothing to regress against yet
+        return []
     failures = []
     for metric in GATE_METRICS:
         cur, prev_v = current.get(metric), previous.get(metric)

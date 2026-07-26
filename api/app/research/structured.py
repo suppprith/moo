@@ -1,4 +1,4 @@
-"""Caller-defined output schemas for deep_research (SUP-155).
+"""Caller-defined output schemas for deep_research.
 
 Tavily ``/research``, Exa deep modes, and Firecrawl extract all let the caller
 say what JSON shape they want back. moo matches that — and keeps its edge: the
@@ -22,14 +22,11 @@ import sqlite3
 
 from .. import llm
 
-MAX_PROPERTIES = 40   # total leaves across the whole schema
+MAX_PROPERTIES = 40
 MAX_DEPTH = 4
 ALLOWED_TYPES = {"object", "array", "string", "number", "integer", "boolean"}
 
-# a populated string field must have this share of its content words present
-# in the findings that back it, or it is nulled as ungrounded
 GROUND_COVERAGE = 0.6
-# a finding contributing at least this much of a field's words is cited for it
 CITE_COVERAGE = 0.2
 
 _CITATION = re.compile(r"\[S\d+\]")
@@ -50,10 +47,6 @@ Findings:
 {findings}
 """
 
-
-# ---------------------------------------------------------------------------
-# schema validation
-# ---------------------------------------------------------------------------
 
 def validate_schema(schema: dict) -> None:
     """Sanity-check a caller-supplied JSON schema; raises ``ValueError`` with a
@@ -91,10 +84,6 @@ def validate_schema(schema: dict) -> None:
 
     walk(schema, 0)
 
-
-# ---------------------------------------------------------------------------
-# grounding: trace populated fields back to findings
-# ---------------------------------------------------------------------------
 
 def _words(text: str) -> set[str]:
     return set(_WORD.findall(_CITATION.sub(" ", str(text)).lower()))
@@ -158,10 +147,6 @@ def _ground_output(output, schema: dict, findings: list[dict]):
     return out, grounding, ungrounded
 
 
-# ---------------------------------------------------------------------------
-# fill: LLM structuring pass + grounded-by-construction heuristic fallback
-# ---------------------------------------------------------------------------
-
 def _llm_fill(conn: sqlite3.Connection, report: dict, schema: dict):
     findings_txt = "\n".join(
         f"- ({f['claim']}, confidence {f.get('confidence')}) {f['text']}"
@@ -213,7 +198,7 @@ def _heuristic_fill(report: dict, schema: dict):
             if best is not None and _score_match(name, node, best) > 0:
                 return best["text"]
             return None
-        return None  # numbers/booleans: never guessed
+        return None
 
     return {k: fill(child, k) for k, child in schema["properties"].items()}
 
@@ -240,7 +225,6 @@ def structure_report(
     output, grounding, ungrounded = _ground_output(filled, output_schema, findings)
     result: dict = {
         "output": output,
-        # field path -> clm_ handles backing it (drill down via get_claim)
         "grounding": grounding,
         "ungrounded_fields": ungrounded,
         "generator": generator,

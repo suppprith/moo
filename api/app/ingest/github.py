@@ -1,4 +1,4 @@
-"""GitHub connector (SUP-73).
+"""GitHub connector.
 
 Ingests the "dark knowledge" of the seed repos — issues + comments, pull
 requests, and releases — via the REST API. Captures ``author_association`` as a
@@ -74,10 +74,8 @@ class GitHubConnector(Connector):
             headers["Authorization"] = f"Bearer {tok}"
         else:
             log.warning("no GitHub token found; running unauthenticated (60 req/hr)")
-        # Documented API, not a crawl: skip robots, small interval.
         return Fetcher(min_interval=0.2, obey_robots=False, headers=headers)
 
-    # -- pagination ----------------------------------------------------------
     def _paged(self, url: str, cap: int) -> Iterator[dict]:
         seen = 0
         while url and seen < cap:
@@ -96,7 +94,6 @@ class GitHubConnector(Connector):
             m = _NEXT_RE.search(res.header("link"))
             url = m.group(1) if m else ""
 
-    # -- per-repo ------------------------------------------------------------
     def _issues(self, repo: str) -> Iterator[RawDoc]:
         url = f"{API}/repos/{repo}/issues?state=all&per_page=100"
         for issue in self._paged(url, self.max_issues):
@@ -123,7 +120,6 @@ class GitHubConnector(Connector):
                     "labels": [lbl.get("name") for lbl in issue.get("labels", [])],
                 },
             )
-            # comments on this issue/PR, each its own document
             if issue.get("comments", 0):
                 yield from self._comments(repo, issue)
 
@@ -158,7 +154,7 @@ class GitHubConnector(Connector):
                 title=name,
                 text=f"{name}\n\n{body}".strip(),
                 author=(rel.get("author") or {}).get("login"),
-                author_role="maintainer",  # releases are cut by maintainers
+                author_role="maintainer",
                 published_at=rel.get("published_at"),
                 content_type="text/markdown",
                 metadata={"repo": repo, "tag": rel.get("tag_name")},

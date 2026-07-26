@@ -20,7 +20,6 @@ def _db() -> sqlite3.Connection:
                                document_id INTEGER);
         """
     )
-    # A - alternative-to - B - part-of - C ;  D is isolated
     conn.executemany(
         "INSERT INTO entity (id, canonical_name, type) VALUES (?, ?, ?)",
         [(1, "A", "tool"), (2, "B", "tool"), (3, "C", "concept"), (4, "D", "tool")],
@@ -44,7 +43,6 @@ def test_resolve_canonical_and_alias():
 
 def test_neighbors_undirected_both_directions():
     conn = _db()
-    # B is reachable from A (subject side) and C is reachable from B (object side)
     assert {n["neighbor"]["id"] for n in store.neighbors(conn, 2)} == {1, 3}
     assert {n["neighbor"]["id"] for n in store.neighbors(conn, 1)} == {2}
 
@@ -58,9 +56,9 @@ def test_neighbors_type_filter():
 def test_subgraph_depth_and_provenance():
     conn = _db()
     one = store.subgraph(conn, 1, depth=1)
-    assert {n["id"] for n in one["nodes"]} == {1, 2}      # C is 2 hops away
+    assert {n["id"] for n in one["nodes"]} == {1, 2}
     two = store.subgraph(conn, 1, depth=2)
-    assert {n["id"] for n in two["nodes"]} == {1, 2, 3}   # C now included
+    assert {n["id"] for n in two["nodes"]} == {1, 2, 3}
     edge = next(e for e in two["edges"] if e["id"] == 1)
     assert edge["provenance"]["url"] == "http://x"
 
@@ -77,5 +75,5 @@ def test_shortest_path_walks_and_prunes_cycles():
     p = store.shortest_path(conn, 1, 3)
     assert [n["id"] for n in p["nodes"]] == [1, 2, 3]
     assert len(p["edges"]) == 2
-    assert store.shortest_path(conn, 1, 4) is None   # unreachable
+    assert store.shortest_path(conn, 1, 4) is None
     assert store.shortest_path(conn, 1, 1)["edges"] == []

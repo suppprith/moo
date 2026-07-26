@@ -1,4 +1,4 @@
-"""Per-query live retrieval pipeline (SUP-130, perf pass SUP-146).
+"""Per-query live retrieval pipeline.
 
 ``live_fetch(conn, query)`` runs: discover candidate URLs (provider) -> rank
 them with the software-domain policy -> fetch + extract each page -> write
@@ -8,13 +8,13 @@ searches, so:
 
 - ``retrieve()`` immediately sees "cache + just-fetched" with no new code path;
 - the evidence layer (claims/links/confidence) works over live pages unchanged;
-- the store *is* the cache (SUP-144): a document fetched within its tier's TTL
+- the store *is* the cache: a document fetched within its tier's TTL
   is served with **zero network work**; past TTL it re-fetches through the
   Fetcher's ETag cache and skips unchanged content via the content-hash. The
   live-doc cache can be bounded (``MOO_CACHE_MAX_DOCS``) with eviction that
   never touches documents backing claims/evidence — the graph accumulates.
 
-**Concurrency + budget (SUP-146).** Network fetch is the latency floor of live
+**Concurrency + budget.** Network fetch is the latency floor of live
 mode, so pages are fetched **concurrently across hosts** while every host's own
 requests stay serial in one worker — per-host politeness (Fetcher throttle,
 robots) is preserved exactly. A wall-clock deadline (``max_seconds``, env
@@ -55,37 +55,27 @@ from .providers import Provider, get_stats, resolve_provider
 log = logging.getLogger("moo.live")
 
 DEFAULT_MAX_PAGES = 6
-DISCOVER_COUNT = 16  # candidates asked from the provider (pre-policy)
+DISCOVER_COUNT = 16
 DEFAULT_MAX_SECONDS = float(os.environ.get("MOO_LIVE_MAX_SECONDS", "12"))
-MAX_WORKERS = 6      # concurrent host workers (one host is never parallelized)
+MAX_WORKERS = 6
 
-# -- cache policy (SUP-144) ---------------------------------------------------
-# A document fetched within its tier's TTL is served from the store with ZERO
-# network work — not even a conditional request. Fast-moving sources (issues,
-# Q&A) go stale quickly; reference docs are stable for a week.
 TTL_HOURS_BY_TIER = {
-    "docs": 168,      # official docs: stable
-    "repo": 24,       # issues/PRs move daily
+    "docs": 168,
+    "repo": 24,
     "registry": 72,
     "qa": 24,
     "blog": 168,
     "unknown": 24,
 }
 
-# Optional size cap on *live-fetched* documents (0 = unbounded). When over cap,
-# the oldest-fetched live docs are evicted — but never ones whose chunks back
-# claims or evidence edges: the accumulated evidence graph always survives.
 CACHE_MAX_DOCS = int(os.environ.get("MOO_CACHE_MAX_DOCS", "0"))
 
-# One shared fetcher: keeps per-host politeness state + the on-disk HTTP cache
-# warm across queries in the same process.
 _FETCHER: Fetcher | None = None
 
 
 def _default_fetcher() -> Fetcher:
     global _FETCHER
     if _FETCHER is None:
-        # live path: shorter per-request timeout than batch ingest; robots on.
         _FETCHER = Fetcher(min_interval=0.5, timeout=10.0, obey_robots=True)
     return _FETCHER
 
@@ -105,11 +95,9 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
             title = getattr(meta, "title", None) or url
             published = getattr(meta, "date", None)
             author = getattr(meta, "author", None)
-    except Exception as exc:  # noqa: BLE001 - metadata is best-effort
+    except Exception as exc:  # noqa: BLE001
         log.debug("metadata extraction failed for %s: %s", url, exc)
     metadata: dict = {"live": True, "site": info.host, "tier": info.tier}
-    # injection scan at ingest (SUP-131): mark, don't drop — the flag rides the
-    # document everywhere and halves its trust. URL + categories only, no query.
     cats = safety.categories(md)
     if cats:
         metadata["suspicious"] = cats
@@ -122,7 +110,6 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
         author=author,
         published_at=published,
         content_type="text/markdown",
-        # never store the query on the document (no-query-logging principle)
         metadata=metadata,
     )
 
@@ -140,13 +127,13 @@ def _fetch_extract_all(
 
     def page_worker(idx: int, cand, info: policy.DomainInfo):
         lock = host_locks[urlsplit(cand.url).netloc]
-        with lock:  # same-host requests never overlap
+        with lock:
             if time.monotonic() > deadline:
-                return None  # queued behind slower same-host pages: timed out
+                return None
             res = fetcher.get(cand.url)
         doc = None
         if res.ok and res.text:
-            doc = _extract(cand.url, res.text, info)  # CPU work outside the lock
+            doc = _extract(cand.url, res.text, info)
         return (idx, cand, info, doc)
 
     done_items: list[tuple[int, object, policy.DomainInfo, RawDoc | None]] = []
@@ -159,12 +146,12 @@ def _fetch_extract_all(
         while pending:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                break  # abandon stragglers; partial results beat blocking
+                break
             finished, pending = wait(pending, timeout=remaining, return_when=FIRST_COMPLETED)
             for fut in finished:
                 try:
                     item = fut.result()
-                except Exception as exc:  # noqa: BLE001 - one page must not kill the query
+                except Exception as exc:  # noqa: BLE001
                     log.warning("page worker failed: %s", exc)
                     continue
                 if item is not None:
@@ -173,7 +160,7 @@ def _fetch_extract_all(
         executor.shutdown(wait=False, cancel_futures=True)
 
     timed_out = len(ranked) - len(done_items)
-    done_items.sort(key=lambda t: t[0])  # deterministic store order by rank
+    done_items.sort(key=lambda t: t[0])
     return done_items, timed_out
 
 
@@ -324,11 +311,10 @@ def live_fetch(
 
     provider = provider or resolve_provider()
     if provider is None:
-        return report  # live search not configured; caller uses the store
+        return report
     report["available"] = True
     report["provider"] = provider.name
 
-    # -- discover -------------------------------------------------------------
     t0 = time.perf_counter()
     calls_before = get_stats()["calls"]
     cands = provider.discover(query, count=DISCOVER_COUNT)
@@ -340,7 +326,6 @@ def live_fetch(
 
     report["domain_confidence"] = round(policy.domain_confidence(cands), 3)
     if policy.out_of_domain(cands):
-        # not a software question: don't fetch food blogs into the corpus
         report["out_of_domain"] = True
         return report
 
@@ -349,7 +334,6 @@ def live_fetch(
         {"url": c.url, "tier": d.tier, "prior": d.prior} for c, d in ranked
     ]
 
-    # -- TTL: fresh stored copies need no network at all (SUP-144) --------------
     to_fetch = []
     for cand, info in ranked:
         if _is_fresh(conn, cand.url, info.tier):
@@ -357,7 +341,6 @@ def live_fetch(
         else:
             to_fetch.append((cand, info))
 
-    # -- fetch + extract (concurrent, deadline-bounded) -------------------------
     fetcher = fetcher or _default_fetcher()
     t0 = time.perf_counter()
     report["cost"]["pages_attempted"] = len(to_fetch)
@@ -365,16 +348,15 @@ def live_fetch(
     if to_fetch:
         results, report["timed_out"] = _fetch_extract_all(fetcher, to_fetch, deadline)
     else:
-        results = []  # everything within TTL: fully cache-served, zero network
+        results = []
 
-    # -- upsert (main thread: sqlite3 connections are not thread-safe) ----------
-    for _idx, cand, _info, doc in results:
+    for _idx, cand, _info, doc in results:  # main thread: sqlite3 conns aren't thread-safe
         if doc is None:
             report["failed"] += 1
             continue
         try:
             outcome = store(conn, doc)
-        except Exception as exc:  # noqa: BLE001 - one bad page never kills the query
+        except Exception as exc:  # noqa: BLE001
             log.warning("store failed for %s: %s", cand.url, exc)
             report["failed"] += 1
             continue
@@ -386,24 +368,21 @@ def live_fetch(
             report["fetched"] += 1
             report["updated_docs"].append(did)
             if did is not None:
-                _drop_chunks(conn, did)  # content changed -> rechunk below
-        else:  # unchanged: already cached, chunks/embeddings still valid
+                _drop_chunks(conn, did)
+        else:
             report["unchanged"] += 1
-    # trust + suspicious accounting for everything just ingested (SUP-131)
     report["suspicious"] = _score_trust(
         conn, [d for d in report["new_docs"] + report["updated_docs"] if d is not None]
     )
     conn.commit()
     report["timings_ms"]["fetch"] = round((time.perf_counter() - t0) * 1000, 1)
 
-    # -- cache bound (before indexing, so build() prunes evicted chunks) --------
     cap = CACHE_MAX_DOCS if cache_max_docs is None else cache_max_docs
     report["evicted"] = _evict(conn, cap)
 
     if not report["new_docs"] and not report["updated_docs"] and not report["evicted"]:
-        return report  # fully warm: nothing to chunk/embed/index
+        return report
 
-    # -- chunk -> embed -> index (all incremental) ------------------------------
     t0 = time.perf_counter()
     stats = rechunk(conn, only_new=True)
     report["new_chunks"] = stats["chunks"]

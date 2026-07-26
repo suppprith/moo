@@ -1,4 +1,4 @@
-"""Keyword index: SQLite FTS5 with BM25 (SUP-79).
+"""Keyword index: SQLite FTS5 with BM25.
 
 A standalone FTS5 table ``chunk_fts`` indexes each chunk's document title,
 heading, and body as separate columns so BM25 can weight title/heading above
@@ -21,7 +21,6 @@ from ..db import get_connection, migrate
 
 log = logging.getLogger("moo.index.keyword")
 
-# BM25 column weights: title/heading rank above body.
 W_TITLE, W_HEADING, W_BODY = 10.0, 8.0, 1.0
 
 
@@ -106,12 +105,9 @@ def _search_match(
     sql += " ORDER BY score LIMIT ?"
     params.append(k)
     try:
-        # bm25() is negative (more negative = better); flip to positive relevance
-        return [(cid, -score) for cid, score in conn.execute(sql, params)]
+        return [(cid, -score) for cid, score in conn.execute(sql, params)]  # bm25() is negative
     except sqlite3.OperationalError as exc:
         if "chunk_fts" in str(exc):
-            # fresh store: FTS index not built yet (live-first deployments
-            # start empty; the first live_fetch creates it).
             return []
         raise
 

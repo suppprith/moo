@@ -1,6 +1,3 @@
-// Presentation helpers for sources: friendly labels, deterministic glyph
-// colors, and trust tiers — so the UI reads like a product, not a data dump.
-
 const LABELS: Record<string, string> = {
   docs: "Docs",
   blog: "Blog",

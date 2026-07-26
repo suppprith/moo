@@ -1,4 +1,4 @@
-"""Export the OpenAPI spec to a checked-in file (SUP-109).
+"""Export the OpenAPI spec to a checked-in file.
 
 The spec is generated from the FastAPI app and committed to ``api/openapi.json``
 so it is reviewable and diffable. ``tests/test_openapi.py`` fails if the app and

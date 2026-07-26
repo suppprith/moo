@@ -1,4 +1,4 @@
-"""Temporal claim validity + supersession (SUP-137).
+"""Temporal claim validity + supersession.
 
 Extends the evidence graph in the dimension general search engines can't
 follow: *when* a claim is true. Two passes over freshly scored claims:
@@ -29,7 +29,7 @@ from .. import versions
 
 log = logging.getLogger("moo.evidence.temporal")
 
-SIMILARITY = 0.80  # same-subject threshold between claim texts
+SIMILARITY = 0.80
 
 
 def annotate_versions(conn: sqlite3.Connection, claims: list[dict]) -> int:
@@ -48,7 +48,6 @@ def annotate_versions(conn: sqlite3.Connection, claims: list[dict]) -> int:
             elif m.relation in ("deprecated", "removed") and valid_until is None:
                 valid_until = m.version
         if valid_from is None and valid_until is None:
-            # bare mention still scopes the claim to that version's era
             valid_from = mentions[0].version
         conn.execute(
             "UPDATE claim SET valid_product = ?, valid_from = ?, valid_until = ? WHERE id = ?",
@@ -102,9 +101,9 @@ def link_supersessions(conn: sqlite3.Connection, claim_ids: list[int]) -> list[d
                 continue
             va, vb = _claim_version(a), _claim_version(b)
             if va[: len(vb)] == vb or vb[: len(va)] == va:
-                continue  # same version era: any conflict is a live dispute
+                continue
             if float(vecs[i] @ vecs[j]) < SIMILARITY:
-                continue  # different subjects: unrelated claims
+                continue
             newer, older = (a, b) if va > vb else (b, a)
             conn.execute(
                 "INSERT OR IGNORE INTO claim_link (claim_id, target_claim_id, relation, rationale) "
@@ -114,7 +113,6 @@ def link_supersessions(conn: sqlite3.Connection, claim_ids: list[int]) -> list[d
                  f"{'.'.join(map(str, min(va, vb)))}"),
             )
             if older["disputed"]:
-                # historical change, not live controversy
                 conn.execute("UPDATE claim SET disputed = 0 WHERE id = ?", (older["id"],))
                 log.info("claim %d un-disputed: superseded by %d", older["id"], newer["id"])
             links.append({"claim_id": newer["id"], "target_claim_id": older["id"]})

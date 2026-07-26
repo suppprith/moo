@@ -1,4 +1,4 @@
-"""Embedding pipeline (SUP-77).
+"""Embedding pipeline.
 
 Batch-encodes chunk text with a small, CPU-friendly sentence-transformers model
 (default ``BAAI/bge-small-en-v1.5``, 384-dim) and stores the vector as a raw
@@ -28,7 +28,7 @@ _model_cache: dict[str, object] = {}
 def get_model(name: str):
     """Load (and cache) a sentence-transformers model on CPU."""
     if name not in _model_cache:
-        from sentence_transformers import SentenceTransformer  # heavy import, defer
+        from sentence_transformers import SentenceTransformer
 
         log.info("loading embedding model %s", name)
         _model_cache[name] = SentenceTransformer(name, device="cpu")
@@ -41,7 +41,7 @@ def embed_texts(texts: list[str], model_name: str = DEFAULT_MODEL, batch_size: i
     return model.encode(
         texts,
         batch_size=batch_size,
-        normalize_embeddings=True,   # cosine similarity == dot product
+        normalize_embeddings=True,
         convert_to_numpy=True,
         show_progress_bar=False,
     ).astype("float32")
@@ -67,7 +67,6 @@ def embed_corpus(
         return {"embedded": 0, "dims": 0}
 
     model = get_model(model_name)
-    # method was renamed across sentence-transformers versions
     get_dims = getattr(model, "get_embedding_dimension", None)
     dims = get_dims() if get_dims else model.get_sentence_embedding_dimension()
     t0 = time.perf_counter()

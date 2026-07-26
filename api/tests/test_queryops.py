@@ -1,4 +1,4 @@
-"""Typed query operators (app.queryops, SUP-103)."""
+"""Typed query operators."""
 
 import sqlite3
 from dataclasses import dataclass, field
@@ -9,8 +9,6 @@ from app import queryops
 from app import search as search_mod
 from app.queryops import matches, parse
 
-
-# ---- parsing ---------------------------------------------------------------------
 
 def test_plain_query_is_untouched():
     p = parse("how does postgres vacuum work")
@@ -34,7 +32,7 @@ def test_invalid_type_fails_soft():
     p = parse("type:banana vacuum")
     assert p.source_types is None
     assert "type:banana" in p.invalid
-    assert "type:banana" in p.text  # kept as text, never dropped
+    assert "type:banana" in p.text
 
 
 def test_since_year_month_day():
@@ -62,13 +60,13 @@ def test_quoted_phrase_required_and_kept_in_text():
 def test_exclusions_but_not_flags_or_signals():
     p = parse("kill -9 postgres --force -windows")
     assert p.excludes == ["windows"]
-    assert "-9" in p.text and "--force" in p.text  # CLI flags/signals stay text
+    assert "-9" in p.text and "--force" in p.text
 
 
 def test_lang_folds_into_text():
     p = parse("lang:python orm comparison")
     assert p.text == "python orm comparison"
-    assert not p.active  # soft hint only, no filter
+    assert not p.active
 
 
 def test_unknown_operator_is_text():
@@ -82,8 +80,6 @@ def test_operator_inside_quotes_is_literal():
     assert p.phrases == ["type:docs is an operator"]
 
 
-# ---- post-filter matching -----------------------------------------------------------
-
 def test_matches_site_suffix():
     p = parse("site:github.com x")
     assert matches(p, text="t", url="https://github.com/a/b")
@@ -94,11 +90,9 @@ def test_matches_site_suffix():
 def test_matches_phrase_and_exclusion():
     p = parse('"dead tuples" -mysql x')
     assert matches(p, text="vacuum reclaims dead tuples", url="u")
-    assert not matches(p, text="vacuum reclaims dead rows", url="u")      # phrase missing
-    assert not matches(p, text="mysql handles dead tuples", url="u")      # excluded word
+    assert not matches(p, text="vacuum reclaims dead rows", url="u")
+    assert not matches(p, text="mysql handles dead tuples", url="u")
 
-
-# ---- wired into search() -------------------------------------------------------------
 
 @dataclass
 class FakeHit:
@@ -133,8 +127,8 @@ def test_search_passes_filters_to_retrieve(conn, monkeypatch):
     monkeypatch.setattr(search_mod, "retrieve", fake_retrieve)
     out = search_mod.search(conn, "type:so since:2024 vacuum tuning", mode="raw")
     assert seen["source_types"] == ["so"] and seen["since"] == "2024-01-01"
-    assert seen["query"] == "vacuum tuning"          # operators stripped from retrieval
-    assert out["query"] == "type:so since:2024 vacuum tuning"  # echo is the original
+    assert seen["query"] == "vacuum tuning"
+    assert out["query"] == "type:so since:2024 vacuum tuning"
     assert out["meta"]["operators"] == {"source_types": ["so"], "since": "2024-01-01"}
 
 

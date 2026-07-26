@@ -1,11 +1,11 @@
-"""Cited research report assembler (SUP-113).
+"""Cited research report assembler.
 
 Turns a run's accumulated evidence (from the loop / a persisted run) into the
 structured, cited report an agent actually wants back::
 
     {executive_answer, findings[], disputed_points[], open_questions[], sources[]}
 
-Reuses the SUP-91 synthesis machinery (one shared ``_SourceRegistry`` so every
+Reuses the synthesis machinery (one shared ``_SourceRegistry`` so every
 citation across the report shares one S1..Sn numbering):
 
 - **findings** — every citeable claim, each with its confidence and citations;
@@ -69,10 +69,7 @@ def assemble_report(conn, run: dict, *, use_llm: bool = True, max_findings: int 
         supports = registry.cite(sides["supports"])
         contradicts = registry.cite(sides["contradicts"])
         if not supports and not contradicts:
-            continue  # faithfulness: an uncited claim can't be a finding
-        # a genuine two-sided dispute needs a contradicting source that isn't
-        # also on the supporting side — a single document disagreeing with
-        # itself (same S#) is not "sources disagree".
+            continue
         independent_dispute = bool(c.get("disputed")) and bool(set(contradicts) - set(supports))
         prepared.append({
             "id": c["id"],
@@ -109,7 +106,6 @@ def assemble_report(conn, run: dict, *, use_llm: bool = True, max_findings: int 
         if p["disputed"]
     ]
 
-    # executive answer over the strongest claims, sharing the registry numbering
     top = prepared[:MAX_CLAIMS]
     valid_ids = {s["index"] for s in registry.sources}
     generator = "template"

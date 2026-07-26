@@ -25,8 +25,7 @@ const edgeColor = (t: string) => EDGE_COLOR[t] ?? "var(--border-strong)";
 
 type Pos = Map<number, { x: number; y: number }>;
 
-// Deterministic radial layout: BFS levels from the query's seed entities,
-// placed on concentric rings. Readable every time, no physics needed.
+// BFS levels from the seed entities, placed on concentric rings.
 function radialLayout(nodes: GraphNode[], edges: GraphEdge[], seeds: number[]): Pos {
   const ids = new Set(nodes.map((n) => n.id));
   const adj = new Map<number, number[]>();

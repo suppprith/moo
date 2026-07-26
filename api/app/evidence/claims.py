@@ -1,4 +1,4 @@
-"""Claim extraction from retrieved chunks (SUP-83) — the heart of the product.
+"""Claim extraction from retrieved chunks.
 
 `extract_claims(conn, query)` retrieves the top chunks, pulls out declarative
 claims relevant to the query, and persists each as a `claim` row linked to its
@@ -32,8 +32,8 @@ from ..understand import BUILTIN_ALIASES
 log = logging.getLogger("moo.claims")
 
 MAX_CLAIMS = 12
-MERGE_COSINE = 0.88     # claims closer than this are the same claim
-GROUND_COSINE = 0.30    # a claim must be at least this similar to its source chunk
+MERGE_COSINE = 0.88
+GROUND_COSINE = 0.30
 
 _FENCE = re.compile(r"```.*?```", re.S)
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z`\"'(])")
@@ -83,15 +83,14 @@ def _normalize(text: str) -> str:
 
 
 def _sentences(text: str) -> list[str]:
-    prose = _FENCE.sub(" ", text)             # drop fenced code blocks
-    prose = re.sub(r"`[^`]*`", " ", prose)    # drop inline code spans
-    prose = re.sub(r"[#>*_|]+", " ", prose)   # strip markdown marks
-    prose = re.sub(r"\s+", " ", prose).strip()  # flatten newlines/whitespace
+    prose = _FENCE.sub(" ", text)
+    prose = re.sub(r"`[^`]*`", " ", prose)
+    prose = re.sub(r"[#>*_|]+", " ", prose)
+    prose = re.sub(r"\s+", " ", prose).strip()
     out = []
     for raw in _SENT_SPLIT.split(prose):
         s = raw.strip()
         n = len(s.split())
-        # readable prose sentence: right length, not a question, mostly words
         if 6 <= n <= 40 and not s.endswith("?") and len(re.findall(r"[a-zA-Z]", s)) >= 0.6 * len(s):
             out.append(s)
     return out
@@ -110,7 +109,7 @@ def _heuristic_extract(chunks: list[tuple[int, str]], max_claims: int) -> list[d
             if score > 0:
                 scored.append((score, {"text": sent, "chunk_id": chunk_id}))
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [c for _, c in scored[: max_claims * 2]]  # trimmed after clustering
+    return [c for _, c in scored[: max_claims * 2]]
 
 
 def _llm_extract(
@@ -151,22 +150,20 @@ def _persist(conn: sqlite3.Connection, candidates: list[dict], model: str) -> li
     vecs = embed_texts([c["text"] for c in candidates])
     chunk_vecs = _chunk_embeddings(conn, {c["chunk_id"] for c in candidates})
 
-    # hallucination guard: claim must be grounded in its source chunk
     grounded: list[tuple[dict, np.ndarray]] = []
     for cand, vec in zip(candidates, vecs, strict=True):
         cvec = chunk_vecs.get(cand["chunk_id"])
         if cvec is None or float(vec @ cvec) >= GROUND_COSINE:
             grounded.append((cand, vec))
 
-    # greedy near-duplicate clustering over claim text
-    clusters: list[dict] = []  # {text, vec, chunk_ids}
+    clusters: list[dict] = []
     for cand, vec in grounded:
         merged = False
         for cl in clusters:
             if float(vec @ cl["vec"]) >= MERGE_COSINE:
                 cl["chunk_ids"].add(cand["chunk_id"])
                 if len(cand["text"]) < len(cl["text"]):
-                    cl["text"] = cand["text"]  # keep the tightest phrasing
+                    cl["text"] = cand["text"]
                 merged = True
                 break
         if not merged:

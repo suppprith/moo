@@ -1,9 +1,9 @@
-"""Research planner: question -> sub-questions + evidence plan (SUP-110).
+"""Research planner: question -> sub-questions + evidence plan.
 
 The entry point of the deep-research loop. ``plan(conn, question)`` decomposes a
 research question into a small, ordered set of focused sub-questions plus the
 axes and evidence types that would answer it — the structured plan the iterative
-loop (SUP-111) executes.
+loop executes.
 
 Same shape as the other LLM stages: a structured Gemini call through
 ``app.llm``, cached in ``llm_cache`` by normalized question, with a
@@ -30,7 +30,6 @@ log = logging.getLogger("moo.research.plan")
 
 MAX_SUB_QUESTIONS = 6
 
-# Axes a comparison is split along (heuristic; the LLM may pick its own).
 _COMPARISON_AXES = [
     "performance",
     "reliability and durability",
@@ -131,7 +130,7 @@ def heuristic_plan(question: str, u=None) -> dict:
             f"What are common pitfalls when you {core}?",
             f"What are the best practices for {core}?",
         ]
-    else:  # why / default
+    else:
         texts = [
             f"What causes {core}?",
             f"Why does {core} happen?",
@@ -139,7 +138,6 @@ def heuristic_plan(question: str, u=None) -> dict:
         ]
 
     subs = [{"id": i, "question": q, "depends_on": []} for i, q in enumerate(texts[:MAX_SUB_QUESTIONS], 1)]
-    # a comparison's "which to choose" synthesizes the per-axis findings
     if u.intent == "comparison" and len(subs) >= 2:
         subs[-1]["depends_on"] = [s["id"] for s in subs[:-1]]
     return {"sub_questions": subs, "comparison_axes": axes, "evidence_targets": _default_targets(u.intent)}
@@ -173,7 +171,7 @@ def plan(conn: sqlite3.Connection, question: str, *, n: int = MAX_SUB_QUESTIONS,
     if parts is None:
         parts = heuristic_plan(question, u)
 
-    if not parts["sub_questions"]:  # never return an empty plan
+    if not parts["sub_questions"]:
         parts["sub_questions"] = [{"id": 1, "question": question.strip(), "depends_on": []}]
 
     out = {

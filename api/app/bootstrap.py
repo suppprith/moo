@@ -1,4 +1,4 @@
-"""First-run self-initialization (SUP-159, local path).
+"""First-run self-initialization.
 
 ``uvx moo-mcp`` (or the API) must go from nothing to working with zero manual
 setup: ``ensure_ready()`` creates the database and applies pending migrations

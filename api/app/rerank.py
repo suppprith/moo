@@ -1,16 +1,16 @@
-"""Reranking of fused candidates (SUP-90 LLM listwise, SUP-139 cross-encoder).
+"""Reranking of fused candidates.
 
 `rerank(conn, query, hits)` takes the fused candidate set from `retrieve()`
 and reorders it by true query-document relevance — the signal rank fusion
 can't see. Two swappable backends, chosen by env ``MOO_RERANKER``:
 
 - ``llm`` (default) — one cheap listwise LLM call, cached by query+candidate
-  set, heuristic-identity fallback when keyless (SUP-90).
+  set, heuristic-identity fallback when keyless.
 - ``cross`` — a local cross-encoder (default
   ``cross-encoder/ms-marco-MiniLM-L-6-v2``, override with
   ``MOO_CROSS_ENCODER_MODEL``) scores each (query, text) pair on CPU: no API,
-  no key, deterministic, ~10ms/pair — the specialist path SUP-139 builds on.
-  Scores land in ``hit.rank_signals["cross"]`` for explainability.
+  no key, deterministic, ~10ms/pair. Scores land in
+  ``hit.rank_signals["cross"]`` for explainability.
 - ``off`` — identity (pure fused order).
 
 Every backend is a refinement stage with the same guarantee: on any failure
@@ -32,11 +32,11 @@ from .expand import normalize_query
 
 log = logging.getLogger("moo.rerank")
 
-MAX_CANDIDATES = 20     # budget: never send more than this many snippets
+MAX_CANDIDATES = 20
 SNIPPET_CHARS = 350
 DEFAULT_CROSS_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
-_cross_model = None  # lazy singleton (~90MB download on first use)
+_cross_model = None
 
 _RERANK_SCHEMA = {
     "type": "object",
@@ -85,7 +85,7 @@ def _apply(hits: list, order: list[int], irrelevant: set[int]) -> list:
         if h is not None and cid not in irrelevant and cid not in seen:
             out.append(h)
             seen.add(cid)
-    for h in hits:  # tail: unranked survivors keep original order
+    for h in hits:
         if h.chunk_id not in seen and h.chunk_id not in irrelevant:
             out.append(h)
             seen.add(h.chunk_id)
@@ -95,7 +95,7 @@ def _apply(hits: list, order: list[int], irrelevant: set[int]) -> list:
 def _get_cross_model():
     global _cross_model
     if _cross_model is None:
-        from sentence_transformers import CrossEncoder  # heavy import, defer
+        from sentence_transformers import CrossEncoder
 
         name = os.environ.get("MOO_CROSS_ENCODER_MODEL", DEFAULT_CROSS_MODEL)
         log.info("loading cross-encoder %s", name)
@@ -111,14 +111,13 @@ def cross_rerank(query: str, hits: list, *, top_n: int = MAX_CANDIDATES) -> list
     head, tail = hits[:top_n], hits[top_n:]
     try:
         scores = _get_cross_model().predict([(query, h.text) for h in head])
-    except Exception as exc:  # noqa: BLE001 - rerank must never break retrieval
+    except Exception as exc:  # noqa: BLE001
         log.warning("cross-encoder rerank failed, keeping fused order: %s", exc)
         return hits
     for h, s in zip(head, scores, strict=True):
         signals = getattr(h, "rank_signals", None)
         if isinstance(signals, dict):
             signals["cross"] = round(float(s), 4)
-    # sort by score desc, stable on ties (never compares Hit objects)
     order = sorted(range(len(head)), key=lambda i: -float(scores[i]))
     return [head[i] for i in order] + tail
 
@@ -147,7 +146,7 @@ def rerank(
         if payload is not None:
             llm.cache_put(conn, key, payload, llm.CHEAP_MODEL)
     if payload is None:
-        return hits  # fallback: unchanged RRF order
+        return hits
 
     valid = set(chunk_ids)
     order = [c for c in payload.get("order", []) if c in valid]

@@ -1,8 +1,8 @@
-"""Stable, prefixed handles for the agent-facing API (SUP-105).
+"""Stable, prefixed handles for the agent-facing API.
 
 Every source/claim/chunk/entity in an agent-shaped response carries an opaque
 string handle like ``chk_42`` instead of a bare integer rowid. Callers treat the
-handle as opaque; the fetch/drill-down endpoints (SUP-106) decode the prefix to
+handle as opaque; the fetch/drill-down endpoints decode the prefix to
 route the lookup.
 
 The handles are stable (backed by SQLite rowids) and deliberately
@@ -13,8 +13,6 @@ expected (``decode`` returns the kind so the endpoint can reject a mismatch).
 
 from __future__ import annotations
 
-# kind -> prefix. A search result "source" is fundamentally a chunk-in-a-document,
-# so it is addressed with a CHUNK handle; DOCUMENT/ENTITY are for other surfaces.
 DOCUMENT = "doc"
 CHUNK = "chk"
 CLAIM = "clm"

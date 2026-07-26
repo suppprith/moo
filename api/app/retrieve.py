@@ -1,4 +1,4 @@
-"""Hybrid retrieval: vector + BM25 fused with reciprocal rank fusion (SUP-80).
+"""Hybrid retrieval: vector + BM25 fused with reciprocal rank fusion.
 
 ``retrieve()`` runs both indexes, merges the ranked lists with RRF
 (score = Σ 1/(RRF_K + rank)), then collapses *near*-duplicate candidates with
@@ -10,7 +10,7 @@ Exact duplicates were already collapsed at chunk time (canonical_chunk_id);
 simhash here catches the near-misses (quote wrappers, small edits). It runs on
 the fused candidate set only (~60 rows), so cost is negligible per query.
 
-Multi-query fan-out (SUP-82) reuses the same RRF merge: pass several query
+Multi-query fan-out reuses the same RRF merge: pass several query
 variants and every (index, variant) ranking becomes one more voter.
 
 CLI:  ``uv run python -m app.retrieve "why is my query slow" [--compare]``
@@ -29,30 +29,17 @@ from datetime import datetime, timezone
 
 from .index import keyword, vector
 
-RRF_K = 60          # standard RRF constant
-K_EACH = 30         # candidates pulled from each index per query variant
+RRF_K = 60
+K_EACH = 30
 SIMHASH_BITS = 64
 
-# -- corroboration-fused ranking (SUP-138) -------------------------------------
-# Final order is not relevance alone: a result backed by high trust, multiple
-# independent copies, and recent content outranks a stale low-trust page that
-# merely matched slightly better. Multiplicative factors over the RRF score,
-# each bounded so relevance stays dominant. Component scores are surfaced on
-# every hit (rank_signals) for explainability.
-W_TRUST = 0.5          # trust 1.0 -> x1.25, trust 0.0 -> x0.75 (neutral 0.5)
-W_CORROBORATION = 0.15 # per doubling of near-dup copies elsewhere
-RECENCY_FLOOR = 0.85   # oldest content loses at most 15%
+W_TRUST = 0.5
+W_CORROBORATION = 0.15
+RECENCY_FLOOR = 0.85
 RECENCY_DECAY_PER_YEAR = 0.05
-FUSE_OVERSAMPLE = 10   # collapse a few extra candidates so fusion can reorder
-# ≤ this hamming distance -> near-duplicate. Measured on the corpus: small edits
-# (one-word swap + trailing sentence) land at ~10-12, while 3000 random unrelated
-# chunk pairs bottom out at 19 (median 32) — 14 splits the two populations.
-SIMHASH_HAMMING = 14
+FUSE_OVERSAMPLE = 10
+SIMHASH_HAMMING = 14  # measured: near-dups land at ~10-12, unrelated pairs at >=19
 
-
-# ---------------------------------------------------------------------------
-# simhash
-# ---------------------------------------------------------------------------
 
 def _shingles(text: str, n: int = 3):
     words = re.findall(r"\w+", text.lower())
@@ -79,14 +66,10 @@ def hamming(a: int, b: int) -> int:
     return (a ^ b).bit_count()
 
 
-# ---------------------------------------------------------------------------
-# retrieval
-# ---------------------------------------------------------------------------
-
 @dataclass
 class RetrievedChunk:
     chunk_id: int
-    score: float                      # fused RRF score
+    score: float
     text: str
     heading: str | None
     url_anchor: str
@@ -96,11 +79,11 @@ class RetrievedChunk:
     published_at: str | None
     author_role: str | None
     popularity: int | None
-    trust_score: float | None = None                     # source trust (SUP-85)
-    fetched_at: str | None = None                        # freshness (SUP-144)
-    suspicious: bool = False                             # injection-flagged (SUP-131)
-    rank_signals: dict | None = None                     # fusion components (SUP-138)
-    alternates: list[int] = field(default_factory=list)  # near-dup chunk ids
+    trust_score: float | None = None
+    fetched_at: str | None = None
+    suspicious: bool = False
+    rank_signals: dict | None = None
+    alternates: list[int] = field(default_factory=list)
 
 
 def _rrf_merge(
@@ -109,7 +92,7 @@ def _rrf_merge(
     weights: list[float] | None = None,
 ) -> dict[int, float]:
     """Fuse ranked id lists: score(id) = Σ w/(RRF_K + rank). ``weights`` (one
-    per ranking, default 1.0) let the router favor an index (SUP-132);
+    per ranking, default 1.0) let the router favor an index;
     ``boost`` applies per-id source-type multipliers."""
     scores: dict[int, float] = {}
     for i, ranking in enumerate(rankings):
@@ -145,15 +128,12 @@ def _collapse_near_dups(
     ordered: list[int], rows: dict[int, sqlite3.Row]
 ) -> list[tuple[int, list[int]]]:
     """Greedy simhash clustering, best-ranked chunk wins. Returns (canonical, alternates)."""
-    kept: list[tuple[int, int, list[int]]] = []  # (chunk_id, simhash, alternates)
+    kept: list[tuple[int, int, list[int]]] = []
     for cid in ordered:
         row = rows.get(cid)
         if row is None:
             continue
-        # simhash the candidate once, not once per kept cluster (was O(n^2) over
-        # full chunk text — the dominant cost of retrieval before this).
-        h = simhash(row["text"])
-        # exact-dup safety net: fold anything pointing at an already-kept canonical
+        h = simhash(row["text"])  # once per candidate, never inside the cluster loop
         canon = row["canonical_chunk_id"]
         folded = False
         for kcid, khash, alts in kept:
@@ -186,7 +166,7 @@ def fuse(hit: RetrievedChunk) -> None:
     """Blend trust, corroboration and recency into the hit's score, in place,
     recording the components on ``rank_signals``."""
     rrf = hit.score
-    trust = hit.trust_score if hit.trust_score is not None else 0.5  # neutral
+    trust = hit.trust_score if hit.trust_score is not None else 0.5
     trust_f = 1.0 + W_TRUST * (trust - 0.5)
     corroboration_f = 1.0 + W_CORROBORATION * math.log2(1 + len(hit.alternates))
     recency_f = _recency_factor(hit.published_at)
@@ -212,10 +192,10 @@ def retrieve(
     index_weights: tuple[float, float] | None = None,
 ) -> list[RetrievedChunk]:
     """Hybrid retrieval over both indexes. ``queries`` adds fan-out variants
-    (SUP-82); ``source_boost`` lets query understanding weight source types
-    (SUP-81), e.g. {"github_issue": 1.3} for troubleshooting queries;
+; ``source_boost`` lets query understanding weight source types
+, e.g. {"github_issue": 1.3} for troubleshooting queries;
     ``index_weights`` = (vector, keyword) RRF vote multipliers from the
-    adaptive router (SUP-132)."""
+    adaptive router."""
     variants = [query] + [q for q in (queries or []) if q and q != query]
     filters = {"source_types": source_types, "since": since}
     w_vec, w_kw = index_weights or (1.0, 1.0)
@@ -261,20 +241,14 @@ def retrieve(
                 alternates=alternates,
             )
         )
-        # keep a few beyond k so fusion can promote from just outside the page
         if len(out) >= k + FUSE_OVERSAMPLE:
             break
 
-    # corroboration-fused ranking (SUP-138): trust x copies x recency over RRF
     for hit in out:
         fuse(hit)
     out.sort(key=lambda h: -h.score)
     return out[:k]
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 def _print_hits(label: str, items: list[tuple[int, str, str]]) -> None:
     print(f"--- {label} ---")

@@ -1,4 +1,4 @@
-"""Evidence linking: supports / contradicts / explains (SUP-84).
+"""Evidence linking: supports / contradicts / explains.
 
 For each claim, retrieve related chunks and classify the (claim, chunk)
 relationship as a typed ``evidence`` edge with a strength. Contradiction
@@ -27,9 +27,9 @@ from ..retrieve import retrieve
 
 log = logging.getLogger("moo.links")
 
-PER_CLAIM = 6          # candidate chunks considered per claim
-MIN_RELATED = 0.30     # below this cosine, claim and chunk are unrelated -> no edge
-SUPPORT_SIM = 0.55     # topical agreement threshold
+PER_CLAIM = 6
+MIN_RELATED = 0.30
+SUPPORT_SIM = 0.55
 
 _CONTRAST = re.compile(
     r"\b(but|however|unlike|whereas|instead|although|though|conversely|"
@@ -83,7 +83,6 @@ def _classify_heuristic(chunk_text: str, sim: float) -> tuple[str, float] | None
     if sim >= SUPPORT_SIM and not contrast:
         return "supports", round(sim, 3)
     if contrast and MIN_RELATED <= sim < 0.65:
-        # related but carrying a contrast/negation cue -> possible disagreement
         return "contradicts", round(0.35 + 0.35 * sim, 3)
     if causal and sim >= 0.40:
         return "explains", round(0.3 + 0.4 * sim, 3)
@@ -95,7 +94,6 @@ def _classify_heuristic(chunk_text: str, sim: float) -> tuple[str, float] | None
 def _candidates(conn: sqlite3.Connection, claim_text: str, claim_id: int) -> list[tuple[int, str]]:
     hits = retrieve(conn, claim_text, k=PER_CLAIM)
     pairs = [(h.chunk_id, h.text) for h in hits]
-    # always include the claim's own provenance chunks
     own = conn.execute(
         "SELECT ch.id, ch.text FROM claim_chunk cc JOIN chunk ch ON ch.id = cc.chunk_id "
         "WHERE cc.claim_id = ?",
@@ -127,7 +125,6 @@ def link_claim(conn: sqlite3.Connection, claim_id: int, claim_text: str, *, use_
         return {}
     edges = _llm_edges(conn, claim_text, candidates) if use_llm else None
     if edges is None:
-        # heuristic: cosine between claim and each candidate + lexical cues
         cvec = embed_texts([claim_text])[0]
         ids = [cid for cid, _ in candidates]
         qmarks = ",".join("?" * len(ids))

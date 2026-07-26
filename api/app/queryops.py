@@ -1,4 +1,4 @@
-"""Typed query operators (SUP-103).
+"""Typed query operators.
 
 Power-user syntax parsed out of the query string *before* retrieval, so the
 same syntax works everywhere a query enters moo (web UI, CLI, MCP tools, the
@@ -27,7 +27,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-# operator value -> document.source_type list
 TYPE_ALIASES: dict[str, list[str]] = {
     "docs": ["docs"],
     "issue": ["github_issue"],
@@ -49,19 +48,18 @@ _OPERATOR = re.compile(r'^(?P<name>[a-zA-Z]+):(?P<value>\S+)$')
 _YEAR = re.compile(r"^\d{4}$")
 _YEAR_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 _FULL_DATE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
-# quoted phrases first so operators/exclusions inside quotes stay literal text
 _TOKEN = re.compile(r'"([^"]+)"|(\S+)')
 
 
 @dataclass
 class ParsedQuery:
-    text: str                                  # residual retrieval text
-    source_types: list[str] | None = None      # type:  -> retrieve(source_types=)
-    since: str | None = None                   # since: -> retrieve(since=)
-    site: str | None = None                    # site:  -> post-filter on host
-    phrases: list[str] = field(default_factory=list)   # "..." -> must appear
-    excludes: list[str] = field(default_factory=list)  # -word -> must not appear
-    invalid: list[str] = field(default_factory=list)   # kept as text, hint in UI
+    text: str
+    source_types: list[str] | None = None
+    since: str | None = None
+    site: str | None = None
+    phrases: list[str] = field(default_factory=list)
+    excludes: list[str] = field(default_factory=list)
+    invalid: list[str] = field(default_factory=list)
 
     @property
     def active(self) -> bool:
@@ -102,10 +100,8 @@ def parse(query: str) -> ParsedQuery:
         phrase, token = m.group(1), m.group(2)
         if phrase is not None:
             parsed.phrases.append(phrase)
-            text_parts.append(phrase)  # the phrase still guides retrieval
+            text_parts.append(phrase)
             continue
-        # exclusion must look like -word: "-9" (signal) or "--flag" (CLI option)
-        # are query text, not exclusions
         if token.startswith("-") and len(token) > 1 and token[1].isalpha():
             parsed.excludes.append(token[1:].lower())
             continue
@@ -136,12 +132,8 @@ def parse(query: str) -> ParsedQuery:
             else:
                 parsed.since = date
         elif name == "lang":
-            # soft hint: fold the language into the retrieval text (document
-            # lang metadata is too sparse to hard-filter on without emptying
-            # results — fail-soft principle)
             text_parts.append(value)
         else:
-            # unknown operator: plain text (e.g. a URL fragment or "re:invent")
             parsed.invalid.append(token)
             text_parts.append(token)
 

@@ -18,8 +18,6 @@ def para(n_repeats: int) -> str:
     return (LOREM * n_repeats).strip()
 
 
-# -- code-fence invariant ------------------------------------------------------
-
 def test_code_fence_never_split():
     code = "```sql\n" + "SELECT * FROM t WHERE id = 1;\n" * 120 + "```"
     md = f"# Heading\n\n{para(3)}\n\n{code}\n\n{para(3)}"
@@ -34,10 +32,8 @@ def test_oversized_code_block_is_own_chunk():
     chunks = list(chunk_markdown(md))
     code_chunks = [t for _, t in chunks if t.startswith("```")]
     assert len(code_chunks) == 1
-    assert est_tokens(code_chunks[0]) > TARGET_TOKENS  # kept atomic despite budget
+    assert est_tokens(code_chunks[0]) > TARGET_TOKENS
 
-
-# -- sizing behavior -----------------------------------------------------------
 
 def test_long_section_splits_near_target():
     md = "# H\n\n" + "\n\n".join(para(2) for _ in range(30))
@@ -49,7 +45,6 @@ def test_long_section_splits_near_target():
 def test_heading_dense_page_merges_small_sections():
     md = "\n\n".join(f"## Section {i}\n\nOne short line." for i in range(20))
     chunks = list(chunk_markdown(md))
-    # 20 tiny sections must not become 20 tiny chunks
     assert len(chunks) < 10
 
 
@@ -61,13 +56,11 @@ def test_big_sections_split_at_headings():
     assert est_tokens(chunks[0][1]) >= MIN_TOKENS
 
 
-# -- html cleaning --------------------------------------------------------------
-
 def test_html_pre_block_preserved_with_lang():
     html = '<p>Intro text.</p><pre><code class="language-sql">SELECT &amp; 1;</code></pre>'
     md = _html_to_markdown(html)
     assert "```sql" in md
-    assert "SELECT & 1;" in md  # entities unescaped, code verbatim
+    assert "SELECT & 1;" in md
 
 
 def test_html_headings_and_inline_code():

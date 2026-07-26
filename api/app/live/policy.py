@@ -1,4 +1,4 @@
-"""Software-domain source policy (SUP-130).
+"""Software-domain source policy.
 
 moo is scoped to software/CS — all of it, not one vertical, and not the general
 web. Under live retrieval that scope is enforced here rather than by what was
@@ -18,26 +18,18 @@ from urllib.parse import urlsplit
 
 from .providers import Candidate
 
-# tier -> prior. Priors feed candidate ranking only; document trust scoring
-# (app/evidence/trust.py) stays the authority once content is fetched.
 TIER_PRIORS = {
-    "docs": 1.0,       # official documentation / reference
-    "repo": 0.85,      # source forges (issues, PRs, READMEs)
-    "registry": 0.8,   # package registries
-    "qa": 0.8,         # community Q&A
-    "blog": 0.55,      # engineering blogs / dev platforms
-    "unknown": 0.35,   # never seen it — surfaces, ranked low
+    "docs": 1.0,
+    "repo": 0.85,
+    "registry": 0.8,
+    "qa": 0.8,
+    "blog": 0.55,
+    "unknown": 0.35,
 }
 
-# A query is out-of-domain when the mean prior of its top candidates is below
-# this: software queries land mostly on tiered dev domains (mean >= ~0.6),
-# recipe/news/shopping queries land almost entirely on unknowns (~0.35).
 OFF_DOMAIN_THRESHOLD = 0.5
 
-# host suffix -> (tier, source_type). Matched longest-suffix-first, so
-# "docs.python.org" wins over a hypothetical "python.org" entry.
 _HOSTS: dict[str, tuple[str, str]] = {
-    # -- official docs / reference ------------------------------------------
     "docs.python.org": ("docs", "docs"),
     "developer.mozilla.org": ("docs", "docs"),
     "learn.microsoft.com": ("docs", "docs"),
@@ -73,14 +65,12 @@ _HOSTS: dict[str, tuple[str, str]] = {
     "docs.astral.sh": ("docs", "docs"),
     "pip.pypa.io": ("docs", "docs"),
     "packaging.python.org": ("docs", "docs"),
-    "readthedocs.io": ("docs", "docs"),          # *.readthedocs.io
+    "readthedocs.io": ("docs", "docs"),
     "kernel.org": ("docs", "docs"),
     "wiki.postgresql.org": ("docs", "docs"),
-    # -- source forges --------------------------------------------------------
-    "github.com": ("repo", "docs"),              # refined by path below
+    "github.com": ("repo", "docs"),
     "gitlab.com": ("repo", "docs"),
     "bitbucket.org": ("repo", "docs"),
-    # -- package registries ---------------------------------------------------
     "pypi.org": ("registry", "docs"),
     "npmjs.com": ("registry", "docs"),
     "crates.io": ("registry", "docs"),
@@ -88,32 +78,27 @@ _HOSTS: dict[str, tuple[str, str]] = {
     "nuget.org": ("registry", "docs"),
     "hex.pm": ("registry", "docs"),
     "mvnrepository.com": ("registry", "docs"),
-    # -- community Q&A --------------------------------------------------------
     "stackoverflow.com": ("qa", "so"),
-    "stackexchange.com": ("qa", "so"),           # *.stackexchange.com
+    "stackexchange.com": ("qa", "so"),
     "serverfault.com": ("qa", "so"),
     "superuser.com": ("qa", "so"),
     "askubuntu.com": ("qa", "so"),
     "news.ycombinator.com": ("qa", "hn"),
     "reddit.com": ("qa", "reddit"),
-    # -- dev blogs / platforms ------------------------------------------------
     "dev.to": ("blog", "blog"),
     "medium.com": ("blog", "blog"),
     "hashnode.dev": ("blog", "blog"),
     "substack.com": ("blog", "blog"),
-    "github.io": ("blog", "blog"),               # *.github.io project pages
+    "github.io": ("blog", "blog"),
     "martinfowler.com": ("blog", "blog"),
     "use-the-index-luke.com": ("blog", "blog"),
     "baeldung.com": ("blog", "blog"),
-    "digitalocean.com": ("blog", "blog"),        # community tutorials
+    "digitalocean.com": ("blog", "blog"),
     "geeksforgeeks.org": ("blog", "blog"),
     "w3schools.com": ("blog", "blog"),
     "realpython.com": ("blog", "blog"),
 }
 
-# Unfetchable or never-software hosts. Kept deliberately short — the soft
-# prior does the real filtering; blocking is only for pages we can't extract
-# (video, walled social) at all.
 _BLOCKED = {
     "youtube.com", "youtu.be", "vimeo.com",
     "facebook.com", "instagram.com", "tiktok.com", "pinterest.com",
@@ -124,9 +109,9 @@ _BLOCKED = {
 @dataclass
 class DomainInfo:
     host: str
-    tier: str          # docs | repo | registry | qa | blog | unknown | blocked
+    tier: str
     prior: float
-    source_type: str   # maps onto document.source_type for trust scoring
+    source_type: str
 
 
 def _suffixes(host: str) -> list[str]:
@@ -143,7 +128,6 @@ def classify(url: str) -> DomainInfo:
             return DomainInfo(host, "blocked", 0.0, "blog")
         if suffix in _HOSTS:
             tier, source_type = _HOSTS[suffix]
-            # source forges: issues/PRs carry different trust than repo docs
             if tier == "repo":
                 if "/issues/" in path:
                     source_type = "github_issue"

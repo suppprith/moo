@@ -1,4 +1,4 @@
-"""Fetch / drill-down resolution for agent citations (SUP-106).
+"""Fetch / drill-down resolution for agent citations.
 
 An agent gets opaque handles (``chk_``/``clm_``/``doc_``) in an agent-shaped
 search response; these resolvers turn a handle back into the full underlying row
@@ -16,7 +16,7 @@ import sqlite3
 
 from . import ids
 
-_CONTEXT_PREVIEW = 240  # chars of neighbouring-chunk / excerpt text returned inline
+_CONTEXT_PREVIEW = 240
 
 
 def _preview(text: str | None, n: int = _CONTEXT_PREVIEW) -> str | None:
@@ -102,7 +102,6 @@ def fetch_chunk(conn: sqlite3.Connection, chunk_id: int) -> dict | None:
         "context": {"prev": neighbour(-1), "next": neighbour(+1)},
     }
     if row["canonical_chunk_id"] is not None:
-        # this chunk is a near-dup alternate; point at the canonical voice
         out["canonical"] = ids.encode(ids.CHUNK, row["canonical_chunk_id"])
     return out
 
@@ -115,7 +114,6 @@ def fetch_claim(conn: sqlite3.Connection, claim_id: int) -> dict | None:
     ).fetchone()
     if claim is None:
         return None
-    # contradictions first so disagreement is never buried, then by strength
     edges = conn.execute(
         """SELECT e.relation, e.strength, e.rationale, e.chunk_id,
                   ch.text, ch.url_anchor, d.source_type, d.trust_score

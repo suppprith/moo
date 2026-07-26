@@ -31,5 +31,5 @@ def test_expansions_deduped_and_capped():
     out = heuristic_expand("postgres slow")
     assert len(out) <= MAX_EXPANSIONS
     normalized = [normalize_query(q) for q in out]
-    assert len(set(normalized)) == len(normalized)          # no dups among variants
-    assert normalize_query("postgres slow") not in normalized  # original not repeated
+    assert len(set(normalized)) == len(normalized)
+    assert normalize_query("postgres slow") not in normalized

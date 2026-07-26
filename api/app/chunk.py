@@ -1,4 +1,4 @@
-"""Cleaning & chunking pipeline (SUP-76).
+"""Cleaning & chunking pipeline.
 
 Turns ``document.raw_text`` into ``chunk`` rows:
 
@@ -30,17 +30,13 @@ from .db import get_connection, migrate
 log = logging.getLogger("moo.chunk")
 
 TARGET_TOKENS = 450
-MIN_TOKENS = 120  # don't flush at a heading until at least this big (avoids tiny chunks)
+MIN_TOKENS = 120
 OVERLAP_TOKENS = 60
 
 _CODE_LANG_RE = re.compile(r'class="[^"]*(?:language|lang|highlight-source)-([a-z0-9+#]+)', re.I)
 _FENCE_RE = re.compile(r"```.*?```", re.S)
 _HEADING_RE = re.compile(r"^#{1,6}\s")
 
-
-# ---------------------------------------------------------------------------
-# cleaning
-# ---------------------------------------------------------------------------
 
 def _html_to_markdown(text: str) -> str:
     """Best-effort HTML fragment -> markdown, preserving code verbatim."""
@@ -65,7 +61,7 @@ def _html_to_markdown(text: str) -> str:
     s = re.sub(r"<li\b[^>]*>", "\n- ", s, flags=re.I)
     s = re.sub(r"</(p|div|h[1-6]|ul|ol|li|blockquote|tr|table)>", "\n\n", s, flags=re.I)
     s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
-    s = re.sub(r"<[^>]+>", "", s)  # strip anything left
+    s = re.sub(r"<[^>]+>", "", s)
     s = html_lib.unescape(s)
     for i, block in enumerate(codes):
         s = s.replace(f"\x00CODE{i}\x00", block)
@@ -79,10 +75,6 @@ def clean(raw_text: str, content_type: str | None) -> str:
         return _html_to_markdown(raw_text)
     return raw_text.strip()
 
-
-# ---------------------------------------------------------------------------
-# chunking
-# ---------------------------------------------------------------------------
 
 def est_tokens(text: str) -> int:
     return max(1, round(len(text.split()) * 1.3))
@@ -161,14 +153,12 @@ def chunk_markdown(md: str) -> Iterator[tuple[str | None, str]]:
 
     for heading, kind, body in _doc_blocks(md):
         t = est_tokens(body)
-        # prefer a boundary at a heading, once the current chunk is big enough
         if cur and heading != start_heading and cur_tokens >= MIN_TOKENS:
             yield start_heading, join(cur)
             cur, cur_tokens = _overlap_tail(cur)
             start_heading = heading
         if not cur:
             start_heading = heading
-        # a code block bigger than the budget becomes its own chunk
         if kind == "code" and t > TARGET_TOKENS:
             if cur:
                 yield start_heading, join(cur)
@@ -186,10 +176,6 @@ def chunk_markdown(md: str) -> Iterator[tuple[str | None, str]]:
         yield start_heading, join(cur)
 
 
-# ---------------------------------------------------------------------------
-# pipeline
-# ---------------------------------------------------------------------------
-
 def rechunk(conn: sqlite3.Connection, *, only_new: bool = False) -> dict[str, int]:
     seen: dict[str, int] = {}
     stats = {"documents": 0, "chunks": 0, "duplicates": 0}
@@ -198,12 +184,8 @@ def rechunk(conn: sqlite3.Connection, *, only_new: bool = False) -> dict[str, in
         "WHERE raw_text IS NOT NULL AND length(raw_text) > 0"
     ).fetchall()
     if not only_new:
-        # full rebuild: clear in one shot (per-doc deletes would trip the
-        # canonical_chunk_id self-FK when a dup in another doc points at the row)
-        conn.execute("DELETE FROM chunk")
+        conn.execute("DELETE FROM chunk")  # one shot: per-doc deletes trip the canonical self-FK
     else:
-        # incremental: preload existing canonical hashes so new chunks that
-        # duplicate already-stored ones still collapse onto them
         for row in conn.execute(
             "SELECT content_hash, id FROM chunk WHERE canonical_chunk_id IS NULL"
         ):

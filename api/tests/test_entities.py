@@ -33,7 +33,6 @@ def test_dedup_by_alias_keeps_one_node():
     conn = _db()
     idx = {}
     a = upsert_entity(conn, idx, "PostgreSQL", "tool", aliases=["postgres", "pg"])
-    # a later mention by an alias must resolve to the same entity, not a new one
     b = upsert_entity(conn, idx, "pg", "tool")
     assert a == b
     assert conn.execute("SELECT COUNT(*) FROM entity").fetchone()[0] == 1
@@ -77,10 +76,8 @@ def test_seed_covers_domain_with_aliases():
     conn = _db()
     seed_domain(conn, _alias_index(conn))
     idx = _alias_index(conn)
-    # canonical + every alias resolves to a node
     for name in ("PostgreSQL", "postgres", "pg", "SQLite", "Redis"):
         assert name.lower() in idx
-    # definitional part-of seed edge exists
     assert conn.execute(
         "SELECT COUNT(*) FROM relation WHERE type='part-of'"
     ).fetchone()[0] >= 1
@@ -91,9 +88,7 @@ def test_heuristic_alternative_to_needs_comparison_cue():
     idx = _alias_index(conn)
     seed_domain(conn, idx)
     before = conn.execute("SELECT COUNT(*) FROM relation WHERE type='alternative-to'").fetchone()[0]
-    # no comparison cue -> no edge
     assert _heuristic_relations(conn, idx, 1, "PostgreSQL and MySQL are databases.") == 0
-    # comparison cue between two tools -> an alternative-to edge with provenance
     n = _heuristic_relations(conn, idx, 7, "PostgreSQL vs MySQL for a new app.")
     assert n == 1
     after = conn.execute(

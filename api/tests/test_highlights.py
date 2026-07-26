@@ -1,4 +1,4 @@
-"""Span highlights + calibrated relevance (app.highlights, SUP-133)."""
+"""Span highlights + calibrated relevance."""
 
 import pytest
 
@@ -8,7 +8,6 @@ from app.index import vector
 from app.websearch import web_search
 from tests.test_live_pipeline import DEV_CANDS, PAGES, FakeFetcher, FakeProvider
 
-# -- span extraction ----------------------------------------------------------------
 
 def test_spans_split_prose_sentences():
     text = ("Autovacuum triggers when dead tuples exceed the threshold. "
@@ -33,8 +32,6 @@ def test_spans_skip_tiny_fragments():
     ]
 
 
-# -- highlighting (real model) --------------------------------------------------------
-
 ON_TOPIC = ("The autovacuum daemon runs when dead tuples exceed a churn threshold. "
             "Our office coffee machine descaling schedule is posted in the kitchen.")
 OFF_TOPIC = ("Sourdough starter needs feeding twice a day in warm weather. "
@@ -51,16 +48,14 @@ def test_relevance_calibrated_across_texts():
     got = highlight_hits("when does postgres autovacuum run", [ON_TOPIC, OFF_TOPIC])
     on, off = got[0]["relevance"], got[1]["relevance"]
     assert 0.0 <= off < on <= 1.0
-    assert on > 0.6          # directly on topic scores high on an absolute scale
-    assert off < 0.55        # baking content scores low for a database query
+    assert on > 0.6
+    assert off < 0.55
 
 
 def test_empty_texts_safe():
     got = highlight_hits("query", ["", "   "])
     assert got == [{"highlights": [], "relevance": 0.0}] * 2
 
-
-# -- end-to-end through web_search (always on there) ----------------------------------
 
 @pytest.fixture
 def conn(tmp_path):

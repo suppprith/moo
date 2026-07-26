@@ -1,4 +1,4 @@
-"""Shared HTTP fetcher for all connectors (SUP-72).
+"""Shared HTTP fetcher for all connectors.
 
 Responsibilities:
 - per-host rate limiting (min interval between requests to the same host)
@@ -36,15 +36,13 @@ class FetchResult:
     url: str
     status: int
     text: str
-    headers: dict[str, str]        # keys normalized to lowercase
-    from_cache: bool = False       # served from disk (304 or offline hit)
-    not_modified: bool = False     # server said 304
+    headers: dict[str, str]
+    from_cache: bool = False
+    not_modified: bool = False
     ok: bool = True
     error: str | None = None
 
     def __post_init__(self) -> None:
-        # httpx lowercases keys when cast to dict, but hand-built dicts (cache
-        # fallbacks, tests) may not — normalize so lookups are predictable.
         self.headers = {k.lower(): v for k, v in self.headers.items()}
 
     def header(self, name: str, default: str = "") -> str:
@@ -81,7 +79,6 @@ class Fetcher:
         self._last_request: dict[str, float] = {}
         self._robots: dict[str, urllib.robotparser.RobotFileParser | None] = {}
 
-    # -- context manager -----------------------------------------------------
     def __enter__(self) -> Fetcher:
         return self
 
@@ -91,7 +88,6 @@ class Fetcher:
     def close(self) -> None:
         self._client.close()
 
-    # -- caching -------------------------------------------------------------
     def _cache_path(self, url: str) -> Path:
         digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
         return self.cache_dir / f"{digest}.json"
@@ -119,10 +115,9 @@ class Fetcher:
             self._cache_path(url).write_text(
                 json.dumps(entry, ensure_ascii=False), encoding="utf-8"
             )
-        except OSError as exc:  # noqa: BLE001 - caching is best-effort
+        except OSError as exc:  # noqa: BLE001
             log.warning("cache write failed for %s: %s", url, exc)
 
-    # -- politeness ----------------------------------------------------------
     def _throttle(self, host: str) -> None:
         last = self._last_request.get(host)
         if last is not None:
@@ -142,7 +137,7 @@ class Fetcher:
                 if resp.status_code == 200:
                     rp.parse(resp.text.splitlines())
                 else:
-                    rp = None  # no robots -> allow
+                    rp = None
             except httpx.HTTPError as exc:
                 log.debug("robots fetch failed for %s: %s", host, exc)
                 rp = None
@@ -150,7 +145,6 @@ class Fetcher:
         rp = self._robots[host]
         return True if rp is None else rp.can_fetch(USER_AGENT, url)
 
-    # -- fetch ---------------------------------------------------------------
     def get(self, url: str, *, obey_robots: bool | None = None) -> FetchResult:
         """GET a URL with caching + politeness. Never raises."""
         obey = self.obey_robots if obey_robots is None else obey_robots
@@ -175,7 +169,7 @@ class Fetcher:
             except httpx.HTTPError as exc:
                 log.warning("fetch error %s (%d/%d): %s", url, attempt, self.max_retries, exc)
                 if attempt == self.max_retries:
-                    if cached:  # fall back to stale cache rather than nothing
+                    if cached:
                         return FetchResult(
                             url, cached["status"], cached["text"],
                             {"Content-Type": cached.get("content_type", "")},
@@ -216,5 +210,4 @@ class Fetcher:
             self._write_cache(url, resp.status_code, resp.headers, resp.text)
             return FetchResult(url, resp.status_code, resp.text, dict(resp.headers))
 
-        # unreachable
         return FetchResult(url, 0, "", {}, ok=False, error="exhausted retries")

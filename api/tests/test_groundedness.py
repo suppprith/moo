@@ -1,4 +1,4 @@
-"""Groundedness / faithfulness guard (app.research.groundedness, SUP-120)."""
+"""Groundedness / faithfulness guard."""
 
 import sqlite3
 
@@ -19,13 +19,10 @@ def conn():
         CREATE TABLE claim_chunk (claim_id INTEGER, chunk_id INTEGER);
         """
     )
-    # doc1 -> chunk 10, doc2 -> chunk 20
     c.execute("INSERT INTO chunk VALUES (10, 1, NULL)")
     c.execute("INSERT INTO chunk VALUES (20, 2, NULL)")
-    # claim 1 backed by doc1 (evidence) + doc2 (provenance) -> 2 independent docs
     c.execute("INSERT INTO evidence VALUES (1, 1, 10, 'supports', 0.9)")
     c.execute("INSERT INTO claim_chunk VALUES (1, 20)")
-    # claim 2 backed only by doc1
     c.execute("INSERT INTO evidence VALUES (2, 2, 10, 'supports', 0.8)")
     c.commit()
     return c
@@ -55,7 +52,6 @@ def test_grounded_finding_passes(conn):
 
 
 def test_hallucinated_citation_flagged_ungrounded(conn):
-    # claim 2 is backed only by doc1, but the finding cites S2 (doc2)
     r = g.attach_groundedness(conn, _report([{"claim": "clm_2", "citations": [2]}]))
     f = r["findings"][0]
     assert f["grounded"] is False
@@ -79,8 +75,6 @@ def test_empty_report_is_trivially_grounded(conn):
     r = g.attach_groundedness(conn, {"executive_answer": "", "findings": [], "sources": []})
     assert r["groundedness"]["pct_grounded"] == 1.0 and r["groundedness"]["findings_total"] == 0
 
-
-# ---- integration: every assemble_report finding is grounded -----------------
 
 def test_assembled_report_has_zero_ungrounded(monkeypatch):
     c = sqlite3.connect(":memory:")

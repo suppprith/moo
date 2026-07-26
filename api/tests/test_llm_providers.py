@@ -1,4 +1,4 @@
-"""Pluggable LLM provider config + dispatch (app.llm, SUP-126)."""
+"""Pluggable LLM provider config + dispatch."""
 
 import json
 
@@ -12,7 +12,7 @@ _ENV = ["MOO_LLM_PROVIDER", "MOO_LLM_API_KEY", "MOO_LLM_MODEL", "MOO_LLM_BASE_UR
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    monkeypatch.setattr(llm, "_load_dotenv", lambda: None)  # ignore any real api/.env
+    monkeypatch.setattr(llm, "_load_dotenv", lambda: None)
     for v in _ENV:
         monkeypatch.delenv(v, raising=False)
     llm._reset_config()
@@ -24,8 +24,6 @@ def _cfg():
     llm._reset_config()
     return llm._resolve_config()
 
-
-# ---- config resolution ------------------------------------------------------
 
 def test_no_provider_returns_none():
     assert _cfg() is None
@@ -61,7 +59,7 @@ def test_ollama_needs_no_key(monkeypatch):
 
 
 def test_provider_without_key_falls_back(monkeypatch):
-    monkeypatch.setenv("MOO_LLM_PROVIDER", "openai")  # no key
+    monkeypatch.setenv("MOO_LLM_PROVIDER", "openai")
     assert _cfg() is None
 
 
@@ -76,10 +74,8 @@ def test_cheap_model_tracks_config(monkeypatch):
     monkeypatch.setenv("MOO_LLM_API_KEY", "k")
     llm._reset_config()
     assert llm.model_name().startswith("claude")
-    assert llm.CHEAP_MODEL == llm.model_name()   # backward-compat attribute
+    assert llm.CHEAP_MODEL == llm.model_name()
 
-
-# ---- dispatch + backends ----------------------------------------------------
 
 def test_generate_json_dispatches_by_provider(monkeypatch):
     monkeypatch.setenv("MOO_LLM_PROVIDER", "openai")
@@ -105,7 +101,7 @@ def test_backend_exception_degrades_to_none(monkeypatch):
         raise RuntimeError("upstream down")
 
     monkeypatch.setitem(llm._BACKENDS, "openai", boom)
-    assert llm.generate_json("p", schema={}) is None   # never raises
+    assert llm.generate_json("p", schema={}) is None
 
 
 def test_extract_json_strips_fences_and_prose():

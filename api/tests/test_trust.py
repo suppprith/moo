@@ -12,9 +12,7 @@ def score(**doc):
 
 
 def test_tier_ordering():
-    # rubric ordering holds at equal recency: official docs > maintainer comment
-    # > engineering blog > accepted SO answer > forum post
-    d = "2026-06-15"  # recent + uniform so base tiers, not decay, decide order
+    d = "2026-06-15"
     docs = score(source_type="docs", published_at=d)
     maint = score(source_type="github_comment", author_role="maintainer", published_at=d)
     blog = score(source_type="blog", published_at=d)
@@ -42,7 +40,6 @@ def test_recency_decay():
 
 
 def test_docs_no_date_not_penalized():
-    # a docs page with no publish date tracks "current" — full recency
     assert recency_multiplier("docs", None, NOW) == 1.0
     assert recency_multiplier("blog", None, NOW) < 1.0
 

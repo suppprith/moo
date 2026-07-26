@@ -1,4 +1,4 @@
-"""Graph store + traversal (SUP-88).
+"""Graph store + traversal.
 
 Read helpers over the `entity` / `relation` tables. No graph database — at
 corpus scale (tens of entities, low-hundreds of edges) SQLite recursive CTEs are
@@ -24,7 +24,6 @@ import argparse
 import json
 import sqlite3
 
-# undirected edge view over the directed relation table, reused by every traversal
 _UNDIRECTED = """
     edges(a, b, rid) AS (
         SELECT subject_entity_id, object_entity_id, id FROM relation{where}
@@ -120,7 +119,7 @@ def neighbors(
     seen: set[int] = set()
     out = []
     for r in conn.execute(sql, params):
-        if r["rid"] in seen:  # both directions of the same edge land here
+        if r["rid"] in seen:
             continue
         seen.add(r["rid"])
         out.append({
@@ -156,7 +155,7 @@ def subgraph(
     call. Nodes are capped (nearest first); edges are every relation among the
     kept nodes, each carrying document provenance. Center id is echoed back."""
     ids = _reachable(conn, entity_id, depth, rel_types, node_cap)
-    if entity_id not in ids:  # isolated entity: still return it as a lone node
+    if entity_id not in ids:
         ids = [entity_id] + ids
     return {
         "center": entity_id,
@@ -188,7 +187,6 @@ def shortest_path(
     if not row:
         return None
     node_ids = [int(x) for x in row["ids"].strip(",").split(",") if x]
-    # keep only the consecutive edges that make up this path
     step_types = None if rel_types is None else rel_types
     node_set = node_ids
     edges = _edges_among(conn, node_set, step_types)
@@ -200,10 +198,6 @@ def shortest_path(
         "edges": path_edges,
     }
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.graph.store", description="Traverse the knowledge graph")

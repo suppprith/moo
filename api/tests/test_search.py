@@ -46,7 +46,7 @@ def test_raw_mode_makes_zero_llm_calls(patched):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     out = search_mod.search(conn, "Postgres vs MySQL", mode="raw", use_llm=True)
-    assert patched["n"] == 0                      # the whole point of raw
+    assert patched["n"] == 0
     assert out["answer"] is None and out["claims"] == []
     assert len(out["sources"]) == 2
     assert out["meta"]["contract_version"] == search_mod.CONTRACT_VERSION
@@ -81,19 +81,14 @@ def test_invalid_fields_rejected(patched):
         search_mod.search(conn, "q", fields="sources,bogus")
 
 
-# ---- agent shaping (SUP-105) ------------------------------------------------
-
 def test_agent_format_is_compact_and_handle_addressed(patched):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     out = search_mod.search(conn, "q", mode="raw", format="agent")
-    # opaque handles, not bare rowids
     assert out["sources"][0]["id"].startswith("chk_")
     assert "chunk_id" not in out["sources"][0]
     assert out["sources"][0]["url"] and "score" in out["sources"][0]
-    # empty/null sections dropped in agent format
     assert "answer" not in out and "claims" not in out
-    # always-present keys survive
     for key in ("query", "mode", "intent", "meta"):
         assert key in out
 
@@ -105,7 +100,6 @@ def test_fields_selection_drops_unselected_sections(patched):
     assert "sources" in out
     for dropped in ("claims", "graph", "answer", "citations"):
         assert dropped not in out
-    # meta + echo always kept
     assert out["query"] == "q" and "meta" in out
 
 
@@ -120,12 +114,10 @@ def test_full_format_no_fields_is_unchanged_legacy_shape(patched):
 def test_pagination_meta_and_has_more(patched):
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
-    # stub always yields 2 hits; k=1 -> one returned, more available
     out = search_mod.search(conn, "q", mode="raw", k=1)
     page = out["meta"]["page"]
     assert page["returned"] == 1 and page["has_more"] is True
     assert page["next_cursor"] and page["offset"] == 0
-    # second page: offset past the two hits -> nothing more
     out2 = search_mod.search(conn, "q", mode="raw", k=1, offset=1)
     assert out2["meta"]["page"]["has_more"] is False
     assert out2["meta"]["page"]["next_cursor"] is None
@@ -152,7 +144,6 @@ def test_agent_claims_reference_sources_by_handle():
 
 def test_full_mode_wires_synthesis(monkeypatch):
     monkeypatch.setattr(search_mod, "retrieve", lambda *a, **k: [FakeHit(1), FakeHit(2)])
-    # stub every heavy stage so we test orchestration, not the components
     monkeypatch.setattr("app.expand.expand", lambda *a, **k: [])
     monkeypatch.setattr("app.rerank.rerank", lambda conn, q, hits, **k: hits)
     monkeypatch.setattr("app.evidence.claims.extract_claims", lambda *a, **k: [{"id": 7, "text": "c"}])

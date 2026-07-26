@@ -52,8 +52,6 @@ def migrate(db_path: Path | str = DEFAULT_DB_PATH) -> int:
             conn.executescript(f.read_text(encoding="utf-8"))
             conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (f.stem,))
             conn.commit()
-            # logging, never print: stdout belongs to the MCP stdio transport
-            # and to CLIs piping JSON (both were corrupted by prints here)
             log.info("applied %s", f.name)
         if not pending:
             log.debug("no pending migrations")

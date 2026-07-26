@@ -1,7 +1,3 @@
-/* =========================================================================
-   moo search — design system
-   Neutral ink palette + a single refined iris accent. Light & dark.
-   ========================================================================= */
 :root {
   color-scheme: light dark;
 
@@ -110,16 +106,14 @@ button {
   font-family: inherit;
 }
 
-/* =========================================================================
-   Shell
-   ========================================================================= */
+/* shell */
 .shell {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
-/* ---- home (empty) hero -------------------------------------------------- */
+/* home (empty) hero */
 .home {
   flex: 1;
   display: flex;
@@ -172,7 +166,7 @@ button {
   color: var(--accent);
 }
 
-/* ---- results header ----------------------------------------------------- */
+/* results header */
 .topbar {
   position: sticky;
   top: 0;
@@ -208,9 +202,7 @@ button {
   padding: 1.25rem 1.25rem 6rem;
 }
 
-/* =========================================================================
-   Search box
-   ========================================================================= */
+/* search box */
 .searchbox {
   display: flex;
   align-items: center;
@@ -289,9 +281,7 @@ button {
   background: var(--panel-2);
 }
 
-/* =========================================================================
-   Mode tabs
-   ========================================================================= */
+/* mode tabs */
 .tabs {
   display: flex;
   align-items: center;
@@ -356,9 +346,7 @@ button {
   font-size: 0.72rem;
 }
 
-/* =========================================================================
-   Answer block
-   ========================================================================= */
+/* answer block */
 .answer {
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--accent-weak), transparent 120%);
@@ -392,9 +380,7 @@ button {
   color: var(--ink-3);
 }
 
-/* =========================================================================
-   Section labels
-   ========================================================================= */
+/* section labels */
 .section-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -411,9 +397,7 @@ button {
   font-weight: 500;
 }
 
-/* =========================================================================
-   Result rows
-   ========================================================================= */
+/* result rows */
 .results {
   list-style: none;
   margin: 0;
@@ -525,9 +509,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* =========================================================================
-   Claims
-   ========================================================================= */
+/* claims */
 .claims {
   display: flex;
   flex-direction: column;
@@ -704,9 +686,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* =========================================================================
-   States
-   ========================================================================= */
+/* states */
 .error {
   border: 1px solid var(--contradicts);
   background: var(--contradicts-weak);
@@ -767,7 +747,7 @@ button {
   }
 }
 
-/* ---- deep research (SUP-124) ---- */
+/* deep research */
 .toolbar {
   display: flex;
   align-items: center;
@@ -851,7 +831,7 @@ button {
 .open-questions { margin: 0 0 8px; padding-left: 20px; color: var(--ink-2); display: flex; flex-direction: column; gap: 5px; }
 .open-questions li { font-size: 14px; }
 
-/* ---- evidence graph (SUP-95) ---- */
+/* evidence graph */
 .deep-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .graph-status { color: var(--ink-2); font-size: 14px; padding: 32px 0; text-align: center; }
 .graph {

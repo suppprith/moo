@@ -1,4 +1,4 @@
-"""Corroboration-fused ranking (SUP-138)."""
+"""Corroboration-fused ranking."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -19,8 +19,6 @@ def _hit(cid, rrf, trust=None, alternates=(), published=None):
     )
 
 
-# -- recency ------------------------------------------------------------------------
-
 def test_recency_neutral_when_undated():
     assert _recency_factor(None) == 1.0
     assert _recency_factor("not-a-date") == 1.0
@@ -33,10 +31,8 @@ def test_recency_decays_to_floor():
     assert _recency_factor(recent) > 0.99
 
 
-# -- fusion -------------------------------------------------------------------------
-
 def test_neutral_hit_score_unchanged():
-    h = _hit(1, rrf=0.5)  # no trust, no copies, undated -> all factors 1.0
+    h = _hit(1, rrf=0.5)
     fuse(h)
     assert h.score == 0.5
     assert h.rank_signals["trust"] == 1.0
@@ -51,8 +47,6 @@ def test_trusted_corroborated_beats_slightly_better_match():
                 published=(datetime.now(timezone.utc) - timedelta(days=365 * 9)).isoformat())
     fuse(strong)
     fuse(weak)
-    # the stale low-trust page matched slightly better on relevance alone,
-    # but trust + corroboration + recency flip the order
     assert strong.score > weak.score
 
 
@@ -61,7 +55,7 @@ def test_relevance_still_dominates_large_gaps():
     worse = _hit(2, rrf=0.3, trust=1.0, alternates=[5, 6, 7])
     fuse(much_better)
     fuse(worse)
-    assert much_better.score > worse.score  # fusion nudges, never overturns 3x
+    assert much_better.score > worse.score
 
 
 def test_rank_signals_recorded():

@@ -1,4 +1,4 @@
-"""Deep-research HTTP endpoints (SUP-114)."""
+"""Deep-research HTTP endpoints."""
 
 import json
 

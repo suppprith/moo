@@ -1,10 +1,9 @@
-"""Eval flywheel: adapters, scoring, history, regression gate (SUP-141)."""
+"""Eval flywheel: adapters, scoring, history, regression gate."""
 
 import pytest
 
 from app.eval import competitors, flywheel
 
-# -- adapters (stubbed clients, no network) --------------------------------------
 
 class StubResponse:
     def __init__(self, payload, status=200):
@@ -63,8 +62,6 @@ def test_engines_keyless_is_moo_only(monkeypatch):
     assert set(competitors.engines(conn=None)) == {"moo"}
 
 
-# -- scoring -----------------------------------------------------------------------
-
 TASK = {
     "question": "sqlite wal mode",
     "rubric_points": ["wal", "checkpoint", "concurrency"],
@@ -79,7 +76,7 @@ def test_score_engine_output():
         "answer": None,
     }
     s = flywheel.score_engine_output(out, TASK)
-    assert s["coverage"] == pytest.approx(2 / 3, rel=1e-2)  # wal + checkpoint, not concurrency
+    assert s["coverage"] == pytest.approx(2 / 3, rel=1e-2)
     assert s["source_recall"] == 1.0
 
 
@@ -95,8 +92,6 @@ def test_run_flywheel_with_fake_engines():
     assert record["engines"]["flaky"]["errors"] == 1
     assert record["at"] and record["task_set_version"]
 
-
-# -- history + gate ------------------------------------------------------------------
 
 def _record(coverage, recall):
     return {"at": "t", "task_set_version": "1.0",
@@ -133,5 +128,4 @@ def test_gate_fails_on_regression():
 
 
 def test_gate_tolerates_small_noise():
-    # 0.48 vs 0.5 is within the 10% band — noise, not regression
     assert flywheel.check_regression(_record(0.48, 0.5), [_record(0.5, 0.5)]) == []

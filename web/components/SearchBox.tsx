@@ -19,7 +19,7 @@ export function SearchBox({
 
   useEffect(() => setValue(initial), [initial]);
 
-  // "/" focuses the box from anywhere (fuller keyboard model lands in SUP-101)
+  // "/" focuses the box from anywhere
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "/" && document.activeElement !== ref.current) {

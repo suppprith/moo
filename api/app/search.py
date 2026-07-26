@@ -1,11 +1,11 @@
-"""Unified search pipeline + response contract (SUP-92).
+"""Unified search pipeline + response contract.
 
 `search(conn, query, mode=...)` ties the whole pipeline together and returns the
-single contract the web UI, command palette, and CLI all build against:
+single contract every client builds against:
 
     { query, mode, intent, answer, claims[], graph, sources[], citations, meta }
 
-**AI is opt-in via `mode`** (the product's core principle):
+LLM work is opt-in via `mode`:
 
 - ``raw``    (default) pure retrieval — understanding + heuristic fan-out +
              hybrid retrieval. **Zero LLM calls**, target < 1s.
@@ -17,7 +17,7 @@ Cost and latency scale with mode; ``raw`` never touches a model. Each heavier
 stage still degrades to its heuristic fallback when no credentials are present,
 so every mode runs end-to-end without a key (lower quality, same shape).
 
-**Agent shaping (SUP-105).** Independent of mode, ``format`` and ``fields`` shape
+**Agent shaping.** Independent of mode, ``format`` and ``fields`` shape
 the payload for the consumer:
 
 - ``format="full"`` (default) — the UI contract, every top-level key present.
@@ -51,24 +51,16 @@ FORMATS = ("full", "agent")
 CONTRACT_VERSION = "1.1"
 DEFAULT_K = 10
 
-# Live retrieval page caps per mode (SUP-145): fast mode fetches fewer pages to
-# stay fast; deep modes may pull more before the evidence pass.
 LIVE_PAGES = {"raw": 4, "claims": 6, "full": 6}
 
-# Top-level sections `fields` can select; `_ALWAYS` keys are never filtered out.
 _SECTIONS = ("sources", "claims", "graph", "answer", "citations")
 _ALWAYS = ("query", "mode", "intent", "meta")
-# Sections included by default per mode when `fields` is not given.
 _DEFAULT_FIELDS = {
     "raw": {"sources"},
     "claims": {"sources", "claims", "graph"},
     "full": {"sources", "claims", "graph", "answer", "citations"},
 }
 
-
-# ---------------------------------------------------------------------------
-# pagination cursor (opaque base64 of the sources offset)
-# ---------------------------------------------------------------------------
 
 def encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(f"o:{offset}".encode()).decode().rstrip("=")
@@ -78,7 +70,7 @@ def decode_cursor(cursor: str) -> int:
     pad = "=" * (-len(cursor) % 4)
     try:
         raw = base64.urlsafe_b64decode(cursor + pad).decode()
-    except Exception as e:  # noqa: BLE001 - any decode failure is a bad cursor
+    except Exception as e:  # noqa: BLE001
         raise ValueError(f"invalid cursor: {cursor!r}") from e
     if not raw.startswith("o:"):
         raise ValueError(f"invalid cursor: {cursor!r}")
@@ -97,15 +89,11 @@ def _sources(hits: list, version_notes: dict[int, dict] | None = None) -> list[d
             "heading": h.heading,
             "url_anchor": h.url_anchor,
             "score": round(h.score, 6),
-            # freshness (SUP-144): when this copy was fetched from the live web
             "fetched_at": getattr(h, "fetched_at", None),
-            # injection-flagged content (SUP-131): treat as data, not instructions
             "suspicious": bool(getattr(h, "suspicious", False)),
         }
-        # fusion components (SUP-138): why this result ranked where it did
         if getattr(h, "rank_signals", None):
             row["rank_signals"] = h.rank_signals
-        # version awareness (SUP-136): only when the query named a version
         note = (version_notes or {}).get(h.chunk_id)
         if note is not None:
             row["version_match"] = note["match"]
@@ -151,7 +139,6 @@ def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict
             "confidence": c["confidence"], "disputed": bool(c["disputed"]),
             "evidence": by_claim.get(c["id"], []),
         }
-        # temporal validity + supersession (SUP-137)
         if c["valid_product"]:
             row["valid"] = {
                 "product": c["valid_product"],
@@ -164,16 +151,12 @@ def _claims_payload(conn: sqlite3.Connection, claim_ids: list[int]) -> list[dict
     return out
 
 
-# ---------------------------------------------------------------------------
-# agent-shaped payload (compact, handle-addressed, evidence-by-reference)
-# ---------------------------------------------------------------------------
-
 def _agent_sources(sources: list[dict]) -> list[dict]:
     out = []
     for s in sources:
         row = {
             "id": ids.encode(ids.CHUNK, s["chunk_id"]),
-            "url": s["url_anchor"] or s["document_url"],  # url_anchor is the deep link
+            "url": s["url_anchor"] or s["document_url"],
             "source_type": s["source_type"],
             "score": s["score"],
         }
@@ -261,7 +244,7 @@ def search(
     docstring); the default `format="full"` with no `fields` is the unchanged
     v1.0 contract.
 
-    **Live retrieval (SUP-145).** `live=None` (default) auto-refreshes the store
+    **Live retrieval.** `live=None` (default) auto-refreshes the store
     from the live web before searching it, when a search provider is configured
     (`MOO_SEARXNG_URL` / `MOO_BRAVE_API_KEY`); `live=False` forces store-only.
     Live fetch makes **zero LLM calls**, so `mode=raw` + live is still the fast,
@@ -273,22 +256,18 @@ def search(
         raise ValueError(f"format must be one of {FORMATS}, got {format!r}")
     if offset < 0:
         raise ValueError("offset must be >= 0")
-    selected = _resolve_fields(fields, mode)  # validate early, before any work
+    selected = _resolve_fields(fields, mode)
     started = time.perf_counter()
 
-    # typed query operators (SUP-103): strip type:/site:/since:/"phrase"/-word
-    # into filters; the residual text drives retrieval. Invalid operators fail
-    # soft (kept as text, reported in meta.operators.invalid).
     from . import queryops
 
     ops = queryops.parse(query)
-    retrieval_query = ops.text or query  # operator-only query: keep the original
+    retrieval_query = ops.text or query
 
     from .understand import understand
 
     u = understand(retrieval_query, conn)
 
-    # ---- live retrieval: refresh the store before searching it ---------------
     live_report = None
     if live is not False:
         provider = live_provider
@@ -304,19 +283,16 @@ def search(
                     conn, retrieval_query, max_pages=LIVE_PAGES[mode],
                     provider=provider, fetcher=live_fetcher,
                 )
-            except Exception as exc:  # noqa: BLE001 - degrade to the store, never fail
+            except Exception as exc:  # noqa: BLE001
                 log.warning("live fetch failed, serving from store: %s", exc)
 
-    # ---- adaptive routing (SUP-132): pick the retrieval strategy -------------
     from .routing import route
 
     routing = route(retrieval_query, u.intent)
 
-    # ---- retrieval (every mode) --------------------------------------------
     if not routing.fan_out:
-        variants = []  # paragraph query: variants add noise, not recall
+        variants = []
     elif mode == "raw":
-        # pure retrieval: heuristic fan-out only, guaranteed zero LLM calls
         from .expand import heuristic_expand
 
         variants = heuristic_expand(retrieval_query)
@@ -324,9 +300,6 @@ def search(
         from .expand import expand
 
         variants = expand(conn, retrieval_query, use_llm=use_llm)
-    # Over-fetch one past the page so `has_more` is knowable, then slice.
-    # Post-filter operators (site:/"phrase"/-word) discard candidates after
-    # retrieval, so over-fetch harder to keep the page full.
     fetch_k = (offset + k + 1) * (4 if ops.has_post_filters else 1)
     fetched = retrieve(
         conn, retrieval_query, k=fetch_k, queries=variants, source_boost=u.source_boost,
@@ -339,13 +312,11 @@ def search(
             if queryops.matches(ops, text=h.text, url=h.url_anchor or h.document_url)
         ]
 
-    # ---- version awareness (SUP-136): scope to the version the query names ----
     from . import versions as versions_mod
 
     version_constraint = versions_mod.query_constraint(retrieval_query)
     version_notes: dict[int, dict] = {}
     if version_constraint is not None:
-        # boosts matches / demotes older-major-only sources, re-sorts in place
         version_notes = versions_mod.apply_constraint(fetched, version_constraint)
 
     has_more = len(fetched) > offset + k
@@ -377,10 +348,8 @@ def search(
             "product": version_constraint.product,
             "version": version_constraint.version,
         }
-    # typed operators (SUP-103): what was recognized (and what failed soft)
     if ops.active or ops.invalid:
         response["meta"]["operators"] = ops.describe()
-    # routing transparency (SUP-132): why retrieval was weighted the way it was
     response["meta"]["routing"] = {
         "strategy": routing.strategy,
         "vector_weight": routing.vector_weight,
@@ -389,7 +358,6 @@ def search(
         "signals": routing.signals,
     }
     if live_report is not None:
-        # compact summary; the shape is additive (absent when live is off)
         response["meta"]["live"] = {
             "provider": live_report["provider"],
             "out_of_domain": live_report["out_of_domain"],
@@ -410,7 +378,6 @@ def search(
             _attach_highlights(retrieval_query, hits, response["sources"])
         return _finalize(response, started, format, fields, selected)
 
-    # ---- evidence layer (claims + full) ------------------------------------
     from .evidence.claims import extract_claims
     from .evidence.confidence import score_claim
     from .evidence.links import link_claim
@@ -434,8 +401,6 @@ def search(
         )
     conn.commit()
 
-    # temporal pass (SUP-137): version validity + supersession links; an old
-    # claim contradicted by a newer-version one becomes superseded, not disputed
     from .evidence.temporal import process as temporal_process
 
     temporal_process(conn, claims)
@@ -456,7 +421,7 @@ def search(
 
 def _attach_highlights(query: str, hits: list, source_rows: list[dict]) -> None:
     """Enrich source rows with best-span highlights + calibrated relevance
-    (SUP-133). Opt-in via search(highlights=True); /v1/web_search always on."""
+. Opt-in via search(highlights=True); /v1/web_search always on."""
     from .highlights import highlight_hits
 
     for row, hl in zip(source_rows, highlight_hits(query, [h.text for h in hits]), strict=True):
@@ -470,8 +435,6 @@ def _finalize(
     """Stamp elapsed time, then apply format + field selection. `full` format
     with no explicit `fields` is left untouched (the legacy v1.0 shape)."""
     response["meta"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
-    # SUP-131: when injection-flagged content is in the result set, say so
-    # loudly at the top level (per-source rows carry the flag either way).
     if any(s.get("suspicious") for s in response.get("sources", [])):
         from .safety import UNTRUSTED_NOTICE
 

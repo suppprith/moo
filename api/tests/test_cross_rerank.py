@@ -1,5 +1,5 @@
-"""Cross-encoder rerank backend (app.rerank, SUP-139). Model is stubbed —
-these test the wiring/guarantees; ranking quality is SUP-141's benchmark."""
+"""Cross-encoder rerank backend, with the model stubbed: these cover wiring and
+guarantees, not ranking quality."""
 
 import sqlite3
 from dataclasses import dataclass, field
@@ -54,9 +54,9 @@ def test_cross_backend_reorders(conn, monkeypatch):
     monkeypatch.setenv("MOO_RERANKER", "cross")
     monkeypatch.setattr(rerank_mod, "_get_cross_model", lambda: StubCross())
     out = rerank_mod.rerank(conn, "postgres vacuum", _hits())
-    assert out[0].chunk_id == 2                       # the on-topic hit wins
-    assert out[0].rank_signals["cross"] == 1.0        # score surfaced
-    assert {h.chunk_id for h in out} == {1, 2, 3}     # nothing dropped
+    assert out[0].chunk_id == 2
+    assert out[0].rank_signals["cross"] == 1.0
+    assert {h.chunk_id for h in out} == {1, 2, 3}
 
 
 def test_cross_failure_keeps_fused_order(conn, monkeypatch):
@@ -64,7 +64,7 @@ def test_cross_failure_keeps_fused_order(conn, monkeypatch):
     monkeypatch.setattr(rerank_mod, "_get_cross_model", lambda: BoomCross())
     hits = _hits()
     out = rerank_mod.rerank(conn, "postgres vacuum", hits)
-    assert [h.chunk_id for h in out] == [1, 2, 3]     # identity, never breaks
+    assert [h.chunk_id for h in out] == [1, 2, 3]
 
 
 def test_off_backend_is_identity(conn, monkeypatch):
@@ -79,7 +79,7 @@ def test_default_backend_is_llm(conn, monkeypatch):
 
     def fake_llm_order(query, candidates):
         called["llm"] = True
-        return None  # keyless: identity fallback
+        return None
 
     monkeypatch.setattr(rerank_mod, "_llm_order", fake_llm_order)
     out = rerank_mod.rerank(conn, "postgres vacuum", _hits())
@@ -93,7 +93,7 @@ def test_only_top_n_reordered(conn, monkeypatch):
     many = _hits() + [Hit(i, f"filler text {i}") for i in range(10, 40)]
     out = rerank_mod.cross_rerank("postgres vacuum", many, top_n=3)
     assert out[0].chunk_id == 2
-    assert [h.chunk_id for h in out[3:]] == [i for i in range(10, 40)]  # tail untouched
+    assert [h.chunk_id for h in out[3:]] == [i for i in range(10, 40)]
 
 
 def test_single_hit_short_circuits(conn, monkeypatch):

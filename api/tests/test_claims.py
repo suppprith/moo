@@ -10,22 +10,22 @@ def test_sentences_flattens_and_filters():
     )
     sents = _sentences(text)
     assert any("complex joins better" in s for s in sents)
-    assert all("\n" not in s for s in sents)          # flattened
-    assert all(not s.endswith("?") for s in sents)    # questions dropped
-    assert all("SELECT 1" not in s for s in sents)    # code stripped
+    assert all("\n" not in s for s in sents)
+    assert all(not s.endswith("?") for s in sents)
+    assert all("SELECT 1" not in s for s in sents)
 
 
 def test_sentences_length_bounds():
-    assert _sentences("Too short here.") == []                      # < 6 words
+    assert _sentences("Too short here.") == []
     long = " ".join(["word"] * 60) + "."
-    assert _sentences(long) == []                                   # > 40 words
+    assert _sentences(long) == []
 
 
 def test_candidate_score_rewards_assertions_and_entities():
     strong = _candidate_score("Postgres is faster than MySQL for complex joins here.")
     weak = _candidate_score("The meeting is scheduled for next tuesday afternoon today.")
     assert strong > weak
-    assert strong >= 3  # assertion cue (+2) + entity (+1)
+    assert strong >= 3
 
 
 def test_heuristic_extract_links_to_chunk():
@@ -35,7 +35,7 @@ def test_heuristic_extract_links_to_chunk():
     ]
     claims = _heuristic_extract(chunks, max_claims=5)
     assert claims
-    assert claims[0]["chunk_id"] == 1  # the assertion-bearing chunk ranks first
+    assert claims[0]["chunk_id"] == 1
 
 
 def test_normalize():

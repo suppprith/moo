@@ -1,4 +1,4 @@
-"""End-to-end live pipeline over a temp DB (app.live.pipeline, SUP-130).
+"""End-to-end live pipeline over a temp DB.
 
 Provider + fetcher are stubbed (no network); everything downstream — document
 upsert, chunking, embedding, vec/FTS index, hybrid retrieval — is real.
@@ -104,13 +104,10 @@ def test_live_fetch_end_to_end(conn):
     assert len(report["new_docs"]) == 2 and report["new_chunks"] > 0
     assert report["embedded"] == report["new_chunks"]
 
-    # docs landed with policy-derived source types + live marker
     types = {r["source_type"] for r in conn.execute("SELECT source_type FROM document")}
     assert types == {"docs", "so"}
-    # vec + fts indexes were synced
     assert conn.execute("SELECT count(*) FROM chunk_vec").fetchone()[0] == report["new_chunks"]
 
-    # the freshly fetched content is immediately retrievable via the normal path
     hits = retrieve(conn, "when does postgres autovacuum run", k=4)
     assert hits and any("autovacuum" in h.text.lower() for h in hits)
 
@@ -121,7 +118,6 @@ def test_second_run_is_warm(conn):
     requests_after_cold = len(fetcher.requests)
     report2 = live_fetch(conn, "postgres autovacuum",
                          provider=FakeProvider(DEV_CANDS), fetcher=fetcher)
-    # within TTL -> served from the store with ZERO network work
     assert report2["fresh"] == 2 and report2["fetched"] == 0
     assert len(fetcher.requests) == requests_after_cold
     assert report2["new_chunks"] == 0 and report2["embedded"] == 0
@@ -145,11 +141,11 @@ def test_updated_page_is_rechunked(conn):
     fetcher.pages[PG_URL] = PG_HTML.replace(
         "highly recommended feature", "highly recommended background daemon"
     )
-    _expire_ttl(conn)  # past TTL, otherwise the stale copy is served fresh
+    _expire_ttl(conn)
     report = live_fetch(conn, "postgres autovacuum",
                         provider=FakeProvider(DEV_CANDS), fetcher=fetcher)
     assert len(report["updated_docs"]) == 1
-    assert report["new_chunks"] > 0  # updated doc got fresh chunks
+    assert report["new_chunks"] > 0
     text = conn.execute(
         "SELECT group_concat(text) FROM chunk JOIN document d ON d.id = document_id "
         "WHERE d.url = ?", (PG_URL,),
@@ -162,7 +158,7 @@ def test_out_of_domain_skips_fetch(conn):
     report = live_fetch(conn, "best pizza dough recipe",
                         provider=FakeProvider(FOOD_CANDS), fetcher=fetcher)
     assert report["out_of_domain"] is True
-    assert fetcher.requests == []  # nothing fetched
+    assert fetcher.requests == []
     assert conn.execute("SELECT count(*) FROM document").fetchone()[0] == 0
 
 
@@ -171,4 +167,4 @@ def test_failed_pages_degrade_gracefully(conn):
     report = live_fetch(conn, "postgres autovacuum settings",
                         provider=FakeProvider(cands), fetcher=FakeFetcher(PAGES))
     assert report["failed"] == 1
-    assert report["fetched"] == 2  # the good pages still landed
+    assert report["fetched"] == 2

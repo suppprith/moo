@@ -1,4 +1,4 @@
--- SUP-112: persist deep-research runs so they are inspectable, resumable, and
+-- persist deep-research runs so they are inspectable, resumable, and
 -- purgeable. Claims/evidence themselves live in the shared graph (claim,
 -- evidence, claim_chunk); these tables associate a run with the work it did.
 
@@ -7,7 +7,7 @@ CREATE TABLE research_run (
     question    TEXT    NOT NULL,
     status      TEXT    NOT NULL DEFAULT 'running', -- planning | running | done | partial | failed
     intent      TEXT,
-    plan        TEXT,                               -- JSON: the SUP-110 plan
+    plan        TEXT,                               -- JSON: the plan
     coverage    TEXT,                               -- JSON: per-sub-question coverage (final)
     budget      TEXT,                               -- JSON: {max_steps, steps_used, exhausted, ...}
     generator   TEXT,                               -- model | heuristic

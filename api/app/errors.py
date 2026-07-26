@@ -1,4 +1,4 @@
-"""Structured error envelope + taxonomy (SUP-107).
+"""Structured error envelope + taxonomy.
 
 Every API error renders as one machine-parseable shape so an agent can branch on
 ``code`` and retry only when ``retryable`` is true:
@@ -14,16 +14,15 @@ from __future__ import annotations
 
 import uuid
 
-# code -> (http_status, retryable_default)
 CODES: dict[str, tuple[int, bool]] = {
-    "invalid_request": (422, False),   # bad params / handle / cursor
-    "not_found": (404, False),         # unknown handle / row
-    "unauthorized": (401, False),      # missing/invalid API key (SUP-108)
-    "rate_limited": (429, True),       # per-key quota (SUP-108)
-    "budget_exceeded": (429, False),   # research run hit its cost/step budget (SUP-111/114)
-    "timeout": (504, True),            # stage exceeded its deadline
-    "upstream_error": (502, True),     # LLM / external upstream failed
-    "internal": (500, True),           # unexpected
+    "invalid_request": (422, False),
+    "not_found": (404, False),
+    "unauthorized": (401, False),
+    "rate_limited": (429, True),
+    "budget_exceeded": (429, False),
+    "timeout": (504, True),
+    "upstream_error": (502, True),
+    "internal": (500, True),
 }
 
 
@@ -41,11 +40,10 @@ class ApiError(Exception):
         self.message = message
         self.status = status or default_status
         self.retryable = default_retryable if retryable is None else retryable
-        self.retry_after = retry_after  # seconds; sets the Retry-After header
+        self.retry_after = retry_after
         super().__init__(message)
 
 
-# HTTP status -> code, for translating framework-raised HTTPExceptions.
 _STATUS_TO_CODE = {status: code for code, (status, _) in CODES.items()}
 
 

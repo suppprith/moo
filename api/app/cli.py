@@ -1,4 +1,4 @@
-"""``moo`` — search the web from your terminal (SUP-102).
+"""``moo`` — search the web from your terminal.
 
     moo "why do my containers randomly exit"
 
@@ -13,7 +13,6 @@ Prints a cited answer as markdown (mode ``full``), or ranked sources
 - ``-k``, ``--no-live``, ``--mode`` mirror the /search contract
 
 Pipe-friendly: ANSI colors only when stdout is a TTY; ``--json`` is raw JSON.
-Neither Google nor DuckDuckGo ships an official CLI — moo does.
 """
 
 from __future__ import annotations
@@ -24,8 +23,6 @@ import os
 import sys
 import webbrowser
 
-
-# -- rendering (pure: testable without a corpus) --------------------------------
 
 def _c(code: str, s: str, color: bool) -> str:
     return f"\x1b[{code}m{s}\x1b[0m" if color else s
@@ -94,8 +91,6 @@ def _source_urls(response: dict) -> list[str]:
     return out
 
 
-# -- backends --------------------------------------------------------------------
-
 def _search_http(base_url: str, args) -> dict:
     import httpx
 
@@ -139,15 +134,15 @@ def main(argv: list[str] | None = None) -> int:
                         help="running moo instance to query (default: run in-process)")
     args = parser.parse_args(argv)
 
-    if sys.platform == "win32":  # corpus text can exceed cp1252
+    if sys.platform == "win32":
         try:
             sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:  # noqa: BLE001 - cosmetic only
+        except Exception:  # noqa: BLE001
             pass
 
     try:
         response = _search_http(args.url, args) if args.url else _search_inprocess(args)
-    except Exception as exc:  # noqa: BLE001 - a CLI should fail with one clear line
+    except Exception as exc:  # noqa: BLE001
         print(f"moo: search failed: {exc}", file=sys.stderr)
         if args.url:
             print(f"moo: is a moo instance running at {args.url}?", file=sys.stderr)
@@ -157,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(response, indent=2, default=str))
         return 0
 
-    color = sys.stdout.isatty()  # pipe-friendly: no ANSI junk in scripts
+    color = sys.stdout.isatty()
     sys.stdout.write(render(response, color=color))
 
     if args.open:

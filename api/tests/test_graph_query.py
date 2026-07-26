@@ -42,8 +42,8 @@ def _db() -> sqlite3.Connection:
     conn.executemany(
         "INSERT INTO claim (id, text, confidence) VALUES (?, ?, ?)",
         [
-            (1, "PostgreSQL beats MySQL for JSON workloads.", 0.8),  # both endpoints
-            (2, "JSONB is a binary JSON type in Postgres.", 0.9),     # one endpoint
+            (1, "PostgreSQL beats MySQL for JSON workloads.", 0.8),
+            (2, "JSONB is a binary JSON type in Postgres.", 0.9),
         ],
     )
     return conn
@@ -53,13 +53,12 @@ def test_link_claims_matches_aliases_and_is_idempotent():
     conn = _db()
     first = gq.link_claims(conn)
     assert first > 0
-    # claim 1 mentions Postgres + MySQL; claim 2 mentions JSONB + Postgres
     got = {
         (r["claim_id"], r["entity_id"])
         for r in conn.execute("SELECT claim_id, entity_id FROM claim_entity")
     }
     assert (1, 1) in got and (1, 2) in got and (2, 3) in got and (2, 1) in got
-    assert gq.link_claims(conn) == 0  # nothing new the second time
+    assert gq.link_claims(conn) == 0
 
 
 def test_graph_for_query_seeds_and_attaches_edge_claims():
@@ -68,9 +67,7 @@ def test_graph_for_query_seeds_and_attaches_edge_claims():
     g = gq.graph_for_query(conn, "postgres vs mysql")
     assert set(g["seeds"]) == {1, 2}
     edge = next(e for e in g["edges"] if {e["source"], e["target"]} == {1, 2})
-    # claim 1 mentions BOTH endpoints -> it backs the edge
     assert {c["id"] for c in edge["evidence"]["claims"]} == {1}
-    # node claims present, top-level claim list deduped
     node1 = next(n for n in g["nodes"] if n["id"] == 1)
     assert any(c["id"] == 1 for c in node1["claims"])
 
@@ -95,7 +92,7 @@ def test_api_graph_endpoints(monkeypatch):
     fastapi_testclient = pytest.importorskip("fastapi.testclient")
     from app import main
 
-    def fresh_conn():  # the endpoint closes its conn, so hand out a new one each call
+    def fresh_conn():
         conn = _db()
         gq.link_claims(conn)
         return conn

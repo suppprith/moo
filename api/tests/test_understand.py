@@ -1,4 +1,4 @@
-"""Gold-query evaluation for query understanding (SUP-81).
+"""Gold-query evaluation for query understanding.
 
 The 15 gold queries from docs/v1-vertical.md with their expected intents;
 queries the doc labels with dual intents accept either.
@@ -49,5 +49,5 @@ def test_understanding_drives_downstream_behavior():
 
 
 def test_ambiguity_flag():
-    assert understand("db slow").ambiguous          # no entity, tiny query
-    assert not understand("redis slow").ambiguous   # entity anchors it
+    assert understand("db slow").ambiguous
+    assert not understand("redis slow").ambiguous

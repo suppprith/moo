@@ -1,4 +1,4 @@
--- Temporal / versioned evidence graph (SUP-137).
+-- Temporal / versioned evidence graph.
 --
 -- Claims gain version validity ("true as of Postgres 13, removed in 15"), and
 -- a claim-to-claim `supersedes` edge records that a newer-version claim

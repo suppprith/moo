@@ -1,6 +1,6 @@
-"""Live retrieval: per-query discovery + fetch of web pages (SUP-130).
+"""Live retrieval: per-query discovery + fetch of web pages.
 
-moo's pivot from "search a pre-built corpus" to "search the live web":
+Searching the live web rather than a pre-built corpus:
 
 - ``providers``  — pluggable URL discovery via an existing search index
                    (SearXNG self-hosted/keyless, Brave Search API/key).
@@ -14,7 +14,7 @@ moo's pivot from "search a pre-built corpus" to "search the live web":
                    (document -> chunk -> embed -> index). Because live pages
                    land in the same store, ``retrieve()`` and the evidence
                    layer work over "cache + just-fetched" unchanged, and the
-                   store *is* the cache (SUP-144).
+                   store *is* the cache.
 
 CLI:  ``uv run python -m app.live "how does postgres vacuum work"``
 """

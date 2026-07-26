@@ -1,4 +1,4 @@
-"""Token-budget-aware result shaping for agent tools (SUP-117).
+"""Token-budget-aware result shaping for agent tools.
 
 Agents have finite context, so a tool result must fit a caller-supplied budget
 and offer drill-down handles instead of dumping the corpus. Token counts are a

@@ -1,4 +1,4 @@
--- SUP-82: cache for LLM pipeline stages (expansion now; claims/rerank later).
+-- cache for LLM pipeline stages (expansion now; claims/rerank later).
 -- Keyed by stage + normalized input hash so repeat/demo queries cost zero LLM calls.
 
 CREATE TABLE llm_cache (

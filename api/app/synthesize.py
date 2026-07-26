@@ -1,4 +1,4 @@
-"""Answer synthesis with inline citations (SUP-91).
+"""Answer synthesis with inline citations.
 
 `synthesize(conn, query, claims)` turns the evidence layer's claims into a short
 answer where **every sentence cites at least one source** (`[S1]`, `[S2]`…) and
@@ -53,10 +53,6 @@ Claims:
 Sources you may cite: {source_ids}"""
 
 
-# ---------------------------------------------------------------------------
-# gather sources + per-claim citations
-# ---------------------------------------------------------------------------
-
 def _claim_sources(conn: sqlite3.Connection, claim_id: int) -> dict[str, list[int]]:
     """Backing document ids for a claim, split by side. `evidence` edges give
     supports/contradicts/explains; `claim_chunk` provenance counts as support."""
@@ -73,7 +69,7 @@ def _claim_sources(conn: sqlite3.Connection, claim_id: int) -> dict[str, list[in
     support, contra = [], []
     for r in rows:
         (contra if r["relation"] == "contradicts" else support).append(r["doc_id"])
-    if not support:  # fall back to extraction provenance
+    if not support:
         prov = conn.execute(
             """
             SELECT COALESCE(canon.document_id, ch.document_id) AS doc_id
@@ -122,10 +118,6 @@ class _SourceRegistry:
                 out.append(i)
         return out
 
-
-# ---------------------------------------------------------------------------
-# composition
-# ---------------------------------------------------------------------------
 
 def _cited(text: str, indices: list[int]) -> str:
     body = text.rstrip()
@@ -200,7 +192,7 @@ def synthesize(
         supports = registry.cite(sides["supports"])
         contradicts = registry.cite(sides["contradicts"])
         if not supports and not contradicts:
-            continue  # unciteable claim can't appear in the answer
+            continue
         prepared.append({
             "text": c["text"], "confidence": c.get("confidence"),
             "disputed": bool(c.get("disputed")), "supports": supports, "contradicts": contradicts,
@@ -218,7 +210,7 @@ def synthesize(
             answer = _validate(raw, valid_ids)
             if answer:
                 generator = llm.CHEAP_MODEL
-    if not answer:  # no LLM, or nothing survived validation
+    if not answer:
         answer = _template_answer(prepared)
 
     disputed = [c["text"] for c in prepared if c["disputed"] and c["contradicts"]]

@@ -1,4 +1,4 @@
-"""Iterative research loop (app.research.loop, SUP-111)."""
+"""Iterative research loop."""
 
 import sqlite3
 
@@ -43,15 +43,13 @@ def test_runs_each_sub_question_once_when_well_covered(conn, monkeypatch):
     claims = [{"id": 1, "text": "c1", "chunk_ids": [10]}, {"id": 2, "text": "c2", "chunk_ids": [11]}]
     monkeypatch.setattr(loop_mod, "extract_claims", lambda *a, **k: claims)
     out = loop_mod.run_loop(conn, _plan("q one", "q two"), use_llm=False)
-    # two plan steps, no follow-ups (well covered, high conf, no disputes)
     assert [s["reason"] for s in out["steps"]] == ["plan", "plan"]
-    assert {c["id"] for c in out["claims"]} == {1, 2}          # deduped across sub-questions
+    assert {c["id"] for c in out["claims"]} == {1, 2}
     assert all(cov["covered"] for cov in out["coverage"])
     assert out["budget"]["exhausted"] is False
 
 
 def test_thin_coverage_spawns_one_gap_followup(conn, monkeypatch):
-    # sub-question "thin q" yields a single claim -> below MIN_CLAIMS -> gap
     mapping = {
         "thin q": [{"id": 1, "text": "only", "chunk_ids": [1]}],
         "thin q reformulated": [{"id": 2, "text": "more", "chunk_ids": [2]}],
@@ -70,7 +68,6 @@ def test_disputed_claim_triggers_contradiction_chase(conn, monkeypatch):
     out = loop_mod.run_loop(conn, _plan("cmp"), use_llm=False)
     kinds = [s["reason"] for s in out["steps"]]
     assert "contradiction" in kinds
-    # the chase query is the disputed claim's text
     chase = next(s for s in out["steps"] if s["reason"] == "contradiction")
     assert chase["query"] == "A beats B"
     assert out["disputed_claim_ids"] == [5]
@@ -82,7 +79,6 @@ def test_hard_step_budget_stops_and_marks_exhausted(conn, monkeypatch):
     out = loop_mod.run_loop(conn, _plan("a", "b", "c", "d"), max_steps=2, use_llm=False)
     assert out["budget"]["steps_used"] == 2
     assert out["budget"]["exhausted"] is True
-    # sub-questions never reached are uncovered (feeds "open questions" later)
     assert any(not cov["covered"] for cov in out["coverage"])
 
 
@@ -90,10 +86,8 @@ def test_same_query_not_run_twice(conn, monkeypatch):
     calls = []
     def fake(conn, query, *, k=8, use_llm=True):
         calls.append(query)
-        # >= MIN_CLAIMS so no gap follow-up confounds the dedup check
         return [{"id": 1, "text": "c", "chunk_ids": [1]}, {"id": 2, "text": "d", "chunk_ids": [2]}]
     monkeypatch.setattr(loop_mod, "extract_claims", fake)
-    # two identical sub-questions -> second is skipped as a duplicate
     out = loop_mod.run_loop(conn, _plan("dup", "dup"), use_llm=False)
     assert calls == ["dup"]
     assert out["budget"]["steps_used"] == 1
@@ -101,7 +95,7 @@ def test_same_query_not_run_twice(conn, monkeypatch):
 
 def test_too_similar_suppresses_near_dup_only():
     seen = {"how do you fix connection pool exhaustion"}
-    assert loop_mod._too_similar("how do you fix connection pool exhaustion", seen)  # ~identical
+    assert loop_mod._too_similar("how do you fix connection pool exhaustion", seen)
     assert not loop_mod._too_similar("redis persistence tradeoffs", seen)
 
 
@@ -111,4 +105,4 @@ def test_claim_linked_and_scored_once_across_sub_questions(conn, monkeypatch):
     monkeypatch.setattr(loop_mod, "score_claim",
                         lambda conn, cid: scored.append(cid) or {"confidence": 0.7, "disputed": False})
     loop_mod.run_loop(conn, _plan("qa", "qb"), use_llm=False)
-    assert scored == [9]  # scored once despite appearing under both sub-questions
+    assert scored == [9]

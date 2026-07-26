@@ -1,4 +1,4 @@
-"""Version awareness (SUP-136).
+"""Version awareness.
 
 Software answers are version-specific and go stale — "works in Postgres 16,
 deprecated since 14, removed in 15". General search engines are version-blind;
@@ -8,7 +8,7 @@ version context its text carries, so agents can judge applicability.
 
 Runtime-only by design: content arrives via live fetch, so mentions are
 extracted from the retrieved candidates per query — no schema, no staleness.
-(SUP-137's temporal evidence graph adds persistence + supersession edges.)
+
 
 Relations recognized on mentions:
 
@@ -23,9 +23,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# Products whose versions are worth recognizing. Alias -> canonical name.
-# Deliberately generous: unknown products still match the generic vN.N shape
-# when preceded by a capitalized word, but these get clean canonical names.
 PRODUCT_ALIASES: dict[str, str] = {
     "postgresql": "postgresql", "postgres": "postgresql", "pg": "postgresql",
     "mysql": "mysql", "mariadb": "mariadb", "sqlite": "sqlite",
@@ -43,9 +40,7 @@ PRODUCT_ALIASES: dict[str, str] = {
 _PRODUCT_RE = "|".join(sorted(map(re.escape, PRODUCT_ALIASES), key=len, reverse=True))
 _VER = r"v?(\d+(?:\.\d+){0,3})(?:\+|\b)"
 
-# "<product> <version>" and "<product> v1.2" mentions
 _MENTION_RE = re.compile(rf"\b({_PRODUCT_RE})\s+{_VER}", re.I)
-# relation cues looking *forward* to a mention: "deprecated in Python 3.9"
 _RELATION_CUES = [
     ("removed", re.compile(rf"\b(?:removed|dropped|deleted)\s+(?:in|as\s+of|since|from)\s+({_PRODUCT_RE})?\s*{_VER}", re.I)),
     ("deprecated", re.compile(rf"\bdeprecated\s+(?:in|as\s+of|since|from)\s+({_PRODUCT_RE})?\s*{_VER}", re.I)),
@@ -58,7 +53,7 @@ _RELATION_CUES = [
 class Mention:
     product: str | None
     version: str
-    relation: str  # since | deprecated | removed | mentions
+    relation: str
 
 
 def _canon(product: str | None) -> str | None:
@@ -79,7 +74,7 @@ def extract_mentions(text: str, *, limit: int = 12) -> list[Mention]:
         for m in pat.finditer(text):
             product, version = _canon(m.group(1)), m.group(2)
             key = (product, version)
-            if key not in found:  # cue lists are ordered strongest-first
+            if key not in found:
                 found[key] = Mention(product, version, relation)
     for m in _MENTION_RE.finditer(text):
         product, version = _canon(m.group(1)), m.group(2)
@@ -110,8 +105,8 @@ def matches(mention: Mention, constraint: Mention) -> bool:
     return mv[: len(cv)] == cv or cv[: len(mv)] == mv
 
 
-MATCH_BOOST = 1.25       # source speaks about the requested version
-OUTDATED_PENALTY = 0.75  # source only speaks about older major versions
+MATCH_BOOST = 1.25
+OUTDATED_PENALTY = 0.75
 
 
 def apply_constraint(hits: list, constraint: Mention) -> dict[int, dict]:

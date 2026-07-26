@@ -1,4 +1,4 @@
-"""Groundedness / faithfulness guard for research reports (SUP-120).
+"""Groundedness / faithfulness guard for research reports.
 
 The trust guarantee for agent output: nothing in a report is asserted without a
 traceable source. Claims are grounded in their source chunks at *extraction*
@@ -25,7 +25,7 @@ import sqlite3
 from .. import ids
 
 _CITE = re.compile(r"\[S(\d+)\]")
-WELL_SUPPORTED_MIN = 2  # independent backing documents for "strong" support
+WELL_SUPPORTED_MIN = 2
 
 
 def _backing_documents(conn: sqlite3.Connection, claim_id: int) -> set[int]:
@@ -66,7 +66,6 @@ def attach_groundedness(conn: sqlite3.Connection, report: dict) -> dict:
         except (ValueError, KeyError):
             backing = set()
         cited_docs = {idx_to_doc[c] for c in cites}
-        # citation integrity: a cited source must actually back the claim
         f["grounded"] = bool(cites) and bool(cited_docs & backing)
         f["independent_support"] = len(backing)
         if f["grounded"]:

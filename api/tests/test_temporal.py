@@ -1,4 +1,4 @@
-"""Temporal claim validity + supersession (app.evidence.temporal, SUP-137)."""
+"""Temporal claim validity + supersession."""
 
 import pytest
 
@@ -33,8 +33,6 @@ def _mk_claim(conn, text, disputed=0):
     return cur.lastrowid
 
 
-# -- annotation ---------------------------------------------------------------------
-
 def test_annotate_since_sets_valid_from(conn):
     cid = _mk_claim(conn, NEW_TEXT)
     n = temporal.annotate_versions(conn, [{"id": cid, "text": NEW_TEXT}])
@@ -56,10 +54,8 @@ def test_annotate_skips_unversioned(conn):
     assert temporal.annotate_versions(conn, [{"id": cid, "text": UNVERSIONED}]) == 0
 
 
-# -- supersession -------------------------------------------------------------------
-
 def test_version_chain_supersedes_and_undisputes(conn):
-    old_id = _mk_claim(conn, OLD_TEXT, disputed=1)   # falsely "disputed" by the new claim
+    old_id = _mk_claim(conn, OLD_TEXT, disputed=1)
     new_id = _mk_claim(conn, NEW_TEXT, disputed=0)
     claims = [{"id": old_id, "text": OLD_TEXT}, {"id": new_id, "text": NEW_TEXT}]
     result = temporal.process(conn, claims)
@@ -67,20 +63,18 @@ def test_version_chain_supersedes_and_undisputes(conn):
 
     link = conn.execute("SELECT * FROM claim_link WHERE relation='supersedes'").fetchone()
     assert link["claim_id"] == new_id and link["target_claim_id"] == old_id
-    # the old claim is history, not controversy
     assert conn.execute("SELECT disputed FROM claim WHERE id=?", (old_id,)).fetchone()[0] == 0
     assert temporal.superseded_by(conn, [old_id]) == {old_id: new_id}
 
 
 def test_different_subjects_not_linked(conn):
     a = _mk_claim(conn, OLD_TEXT)
-    b = _mk_claim(conn, UNRELATED)  # different product AND different subject
+    b = _mk_claim(conn, UNRELATED)
     temporal.process(conn, [{"id": a, "text": OLD_TEXT}, {"id": b, "text": UNRELATED}])
     assert conn.execute("SELECT count(*) FROM claim_link").fetchone()[0] == 0
 
 
 def test_same_version_era_stays_disputed(conn):
-    # two claims about the same subject AND same version: a live dispute
     t1 = "In PostgreSQL 13 parallel vacuum improves cleanup speed on large tables."
     t2 = "In PostgreSQL 13 parallel vacuum rarely improves cleanup speed on large tables."
     a = _mk_claim(conn, t1, disputed=1)
@@ -89,8 +83,6 @@ def test_same_version_era_stays_disputed(conn):
     assert conn.execute("SELECT count(*) FROM claim_link").fetchone()[0] == 0
     assert conn.execute("SELECT disputed FROM claim WHERE id=?", (a,)).fetchone()[0] == 1
 
-
-# -- payload surfacing ---------------------------------------------------------------
 
 def test_claims_payload_carries_temporal_fields(conn):
     from app.search import _claims_payload

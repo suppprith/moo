@@ -1,4 +1,4 @@
-"""Source trust scoring (SUP-85).
+"""Source trust scoring.
 
 `trust_score(document)` returns a 0..1 score from a documented heuristic rubric:
 
@@ -8,7 +8,7 @@
 Rationale: official docs outrank a maintainer comment, which outranks a
 benchmark/blog, which outranks an accepted SO answer, which outranks a forum
 post. A GitHub author who is a maintainer is weighted up; a 2019 blog post
-about a fast-moving tool decays. The score feeds Phase 4 confidence (SUP-86)
+about a fast-moving tool decays. The score feeds claim confidence
 and is written to `document.trust_score` so it's visible on every source.
 
 Run:  ``uv run python -m app.evidence.trust``  (scores all documents)
@@ -25,30 +25,26 @@ from datetime import UTC, datetime
 
 log = logging.getLogger("moo.trust")
 
-# Base trust tier per source type (0..1). See module docstring for the ordering.
 BASE_TIER: dict[str, float] = {
-    "docs": 0.95,             # official documentation
-    "github_release": 0.85,   # maintainer-cut changelogs
-    "blog": 0.62,             # engineering blogs / benchmarks
-    "github_pr": 0.60,        # proposed changes w/ review
-    "so_answer": 0.48,        # plain SO answer (accepted answers get +ACCEPTED_BONUS)
+    "docs": 0.95,
+    "github_release": 0.85,
+    "blog": 0.62,
+    "github_pr": 0.60,
+    "so_answer": 0.48,
     "github_issue": 0.48,
-    "github_comment": 0.48,   # +ROLE_BONUS lifts maintainer comments above blogs
+    "github_comment": 0.48,
     "hn_story": 0.40,
     "so_question": 0.35,
     "reddit_post": 0.35,
 }
 DEFAULT_TIER = 0.40
 
-# Additive bonus for the GitHub author_association role.
 ROLE_BONUS: dict[str, float] = {
     "maintainer": 0.20,
     "contributor": 0.05,
     "none": 0.0,
 }
 
-# Recency half-life in days per source type: how fast a source's trust decays.
-# Official docs age slowly; forum posts and blogs about fast-moving tools fast.
 HALFLIFE_DAYS: dict[str, float] = {
     "docs": 3650.0,
     "github_release": 1460.0,
@@ -63,8 +59,8 @@ HALFLIFE_DAYS: dict[str, float] = {
 }
 DEFAULT_HALFLIFE = 1460.0
 
-DECAY_FLOOR = 0.40    # a source never decays below this fraction of its base value
-NO_DATE_MULT = 0.85   # mild penalty when the publish date is unknown
+DECAY_FLOOR = 0.40
+NO_DATE_MULT = 0.85
 
 
 def _parse_date(value: str | None) -> datetime | None:
@@ -77,13 +73,12 @@ def _parse_date(value: str | None) -> datetime | None:
         return None
 
 
-ACCEPTED_BONUS = 0.10  # an accepted SO answer outranks a plain one
+ACCEPTED_BONUS = 0.10
 
 
 def recency_multiplier(source_type: str, published_at: str | None, now: datetime) -> float:
     dt = _parse_date(published_at)
     if dt is None:
-        # official docs track "current" — a missing date isn't staleness
         return 1.0 if source_type == "docs" else NO_DATE_MULT
     age_days = max(0.0, (now - dt).total_seconds() / 86400.0)
     halflife = HALFLIFE_DAYS.get(source_type, DEFAULT_HALFLIFE)

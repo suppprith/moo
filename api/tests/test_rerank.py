@@ -27,7 +27,6 @@ def _hits(*ids) -> list[FakeHit]:
 def test_apply_reorders_drops_and_keeps_tail():
     hits = _hits(1, 2, 3, 4)
     out = rerank._apply(hits, order=[3, 1], irrelevant={2})
-    # 3,1 first (model order); 2 dropped; 4 unranked survivor appended
     assert [h.chunk_id for h in out] == [3, 1, 4]
 
 
@@ -58,12 +57,12 @@ def test_uses_cache_and_skips_llm_on_hit(monkeypatch):
 
     out = rerank.rerank(conn, "q", hits, use_llm=True)
     assert [h.chunk_id for h in out] == [3, 2, 1]
-    assert calls["n"] == 0  # cache hit skipped the LLM entirely
+    assert calls["n"] == 0
 
 
 def test_budget_caps_candidates_sent(monkeypatch):
     conn = _db()
-    hits = _hits(*range(1, 31))  # 30 candidates
+    hits = _hits(*range(1, 31))
     captured = {}
     def fake_order(query, candidates):
         captured["n"] = len(candidates)
@@ -71,4 +70,4 @@ def test_budget_caps_candidates_sent(monkeypatch):
     monkeypatch.setattr(rerank, "_llm_order", fake_order)
 
     rerank.rerank(conn, "q", hits, use_llm=True)
-    assert captured["n"] == rerank.MAX_CANDIDATES  # never send more than the budget
+    assert captured["n"] == rerank.MAX_CANDIDATES

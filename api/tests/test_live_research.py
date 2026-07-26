@@ -1,4 +1,4 @@
-"""Deep research over live-fetched pages (SUP-143).
+"""Deep research over live-fetched pages.
 
 run_research with an injected fake provider/fetcher: every loop step live-fetches
 its query first, evidence is extracted from the refreshed store, and the report
@@ -40,7 +40,6 @@ def test_run_research_live_end_to_end(conn):
     assert run["status"] in ("done", "partial")
     assert run["claims"], "live research produced no claims"
 
-    # every claim's backing chunks trace to live-fetched documents
     urls = {
         row["url"]
         for c in run["claims"]
@@ -53,12 +52,11 @@ def test_run_research_live_end_to_end(conn):
     }
     assert urls and urls <= set(PAGES)
 
-    # cost.live reports what live retrieval did, within budget
     live = run["cost"]["live"]
     assert live["provider"] == "fake"
     assert live["steps"] >= 1
-    assert live["pages_fetched"] >= 2                       # first step fetched both pages
-    assert live["pages_left"] >= 0                          # budget never overdrawn
+    assert live["pages_fetched"] >= 2
+    assert live["pages_left"] >= 0
     assert live["pages_budget"] == LIVE_PAGES_TOTAL
     assert fetcher.requests, "no live fetches happened"
 
@@ -71,7 +69,7 @@ def test_live_report_is_grounded(conn):
     report = assemble_report(conn, run, use_llm=False)
     g = report["groundedness"]
     assert g["findings_total"] >= 1
-    assert g["ungrounded"] == []                            # every finding cites a real live source
+    assert g["ungrounded"] == []
     assert report["sources"], "report has no sources"
     assert {s["url"].split("#")[0] for s in report["sources"]} <= set(PAGES)
 
@@ -83,7 +81,7 @@ def test_live_false_disables_fetching(conn):
         live=False, live_provider=FakeProvider(DEV_CANDS), live_fetcher=fetcher,
     )
     assert "live" not in run["cost"]
-    assert fetcher.requests == []                           # provider never consulted
+    assert fetcher.requests == []
 
 
 def test_live_auto_off_without_provider(conn, monkeypatch):
@@ -91,7 +89,7 @@ def test_live_auto_off_without_provider(conn, monkeypatch):
                 "MOO_BRAVE_API_KEY", "MOO_SEARCH_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     run = run_research(conn, QUESTION, use_llm=False, max_steps=2)
-    assert "live" not in run["cost"]                        # store-only, no crash
+    assert "live" not in run["cost"]
 
 
 def test_out_of_domain_steps_are_counted_not_fetched(conn):

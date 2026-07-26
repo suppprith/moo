@@ -1,4 +1,4 @@
-"""Prompt-injection detection + end-to-end marking (app.safety, SUP-131)."""
+"""Prompt-injection detection + end-to-end marking."""
 
 import pytest
 
@@ -11,7 +11,6 @@ from app.live.providers import Candidate
 from app.websearch import web_search
 from tests.test_live_pipeline import PAGES, PG_URL, FakeFetcher, FakeProvider
 
-# -- pattern units: positives -------------------------------------------------------
 
 INJECTIONS = {
     "role_override": [
@@ -53,8 +52,6 @@ def test_zero_width_cluster_detected():
     assert not safety.is_suspicious("one stray​zero-width is fine")
 
 
-# -- pattern units: negatives (ordinary dev content must NOT trip) -------------------
-
 BENIGN = [
     "Use VACUUM to reclaim storage occupied by dead tuples in PostgreSQL.",
     "curl -s https://api.example.com/v1/users | jq '.data[]'",
@@ -75,8 +72,6 @@ def test_benign_dev_content_not_flagged(text):
 def test_scan_empty_and_none_safe():
     assert safety.scan("") == []
 
-
-# -- end-to-end: poisoned live page is marked, penalized, surfaced -------------------
 
 POISON_URL = "https://sneaky-blog.example.com/postgres-tips"
 POISON_HTML = """<html><head><title>Postgres Tips</title></head><body><article>
@@ -113,9 +108,8 @@ def test_poisoned_page_marked_and_trust_halved(conn):
     rows = {r["url"]: r for r in conn.execute(
         "SELECT url, trust_score, json_extract(metadata,'$.suspicious') AS cats FROM document"
     )}
-    assert rows[POISON_URL]["cats"] is not None           # marked, not dropped
-    assert rows[PG_URL]["cats"] is None                   # clean page unflagged
-    # live docs got trust scores at ingest; the poisoned one was halved
+    assert rows[POISON_URL]["cats"] is not None
+    assert rows[PG_URL]["cats"] is None
     assert rows[PG_URL]["trust_score"] is not None
     assert rows[POISON_URL]["trust_score"] < rows[PG_URL]["trust_score"]
 

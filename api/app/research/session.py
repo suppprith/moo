@@ -1,4 +1,4 @@
-"""Research-run persistence (SUP-112).
+"""Research-run persistence.
 
 A deep-research run is stateful and can be long, so it is persisted as it goes:
 ``research_run`` + ``research_step`` + ``research_claim`` (migration 0005). That
@@ -31,9 +31,6 @@ log = logging.getLogger("moo.research.session")
 
 STATUSES = ("planning", "running", "done", "partial", "failed")
 
-# Live-research page budget (SUP-143): shared across ALL steps of one run so a
-# many-step run can't fetch unbounded pages. Per-step cap keeps early steps from
-# eating the whole budget.
 LIVE_PAGES_TOTAL = 18
 LIVE_PAGES_PER_STEP = 6
 
@@ -48,7 +45,7 @@ def _live_pre_step(conn: sqlite3.Connection, provider, fetcher):
 
     def pre_step(query: str) -> None:
         if stats["pages_left"] <= 0:
-            return  # budget spent: later steps run over the store/cache only
+            return
         report = live_fetch(
             conn, query,
             max_pages=min(LIVE_PAGES_PER_STEP, stats["pages_left"]),
@@ -206,13 +203,13 @@ def run_research(
     """Plan -> run the loop (persisting each step) -> finalize. Returns the run
     state including its ``run_id`` and terminal ``status`` (done|partial|failed).
 
-    **Live research (SUP-143):** ``live=None`` (default) auto-enables per-step
+    **Live research:** ``live=None`` (default) auto-enables per-step
     live fetching when a search provider is configured; ``live=False`` forces
     store-only; ``live_provider``/``live_fetcher`` inject backends (tests/DI).
     When live, each loop step first pulls fresh pages for its query under a
     shared page budget (``LIVE_PAGES_TOTAL``), then extracts evidence from the
     refreshed store. ``cost.live`` reports what live retrieval did."""
-    llm.reset_stats()  # measure LLM cost for this run (SUP-122)
+    llm.reset_stats()
     t0 = time.perf_counter()
     plan = make_plan(conn, question, use_llm=use_llm)
     plan_ms = round((time.perf_counter() - t0) * 1000, 1)
@@ -237,7 +234,7 @@ def run_research(
             conn, plan, k=k, max_steps=max_steps, max_seconds=max_seconds,
             use_llm=use_llm, on_step=on_step, pre_step=pre_step,
         )
-    except Exception as exc:  # noqa: BLE001 - persist failure, then re-raise
+    except Exception as exc:  # noqa: BLE001
         set_status(conn, run_id, "failed", error=str(exc))
         raise
     status = "partial" if result["budget"]["exhausted"] else "done"

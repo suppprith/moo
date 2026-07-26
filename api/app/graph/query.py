@@ -1,4 +1,4 @@
-"""Subgraph-for-query assembly (SUP-89) — what the explorer UI renders.
+"""Subgraph-for-query assembly.
 
 `graph_for_query(conn, q)` turns a natural-language query into a bounded,
 renderable graph:
@@ -28,10 +28,6 @@ DEFAULT_CAP = 60
 DEFAULT_DEPTH = 1
 
 
-# ---------------------------------------------------------------------------
-# claim <-> entity association
-# ---------------------------------------------------------------------------
-
 def link_claims(conn: sqlite3.Connection) -> int:
     """Populate `claim_entity` by matching entity aliases against claim text.
     Idempotent (INSERT OR IGNORE). Returns the number of links written."""
@@ -39,7 +35,6 @@ def link_claims(conn: sqlite3.Connection) -> int:
         "SELECT entity_id, alias FROM entity_alias "
         "UNION SELECT id, canonical_name FROM entity"
     ).fetchall()
-    # longest alias first so 'Redis AOF' wins over 'Redis' on the same span
     patterns = sorted(
         ((r[0], re.compile(rf"\b{re.escape(r[1])}\b", re.I)) for r in aliases),
         key=lambda p: -len(p[1].pattern),
@@ -79,10 +74,6 @@ def _claims_by_entity(conn: sqlite3.Connection, ids: list[int]) -> dict[int, lis
     return out
 
 
-# ---------------------------------------------------------------------------
-# assembly
-# ---------------------------------------------------------------------------
-
 def _attach_claims(conn: sqlite3.Connection, graph: dict) -> dict:
     """Fold claims into nodes (per entity) and edges (per relationship)."""
     node_ids = [n["id"] for n in graph["nodes"]]
@@ -96,7 +87,7 @@ def _attach_claims(conn: sqlite3.Connection, graph: dict) -> dict:
     for edge in graph["edges"]:
         src = {c["id"] for c in by_entity.get(edge["source"], [])}
         tgt = {c["id"] for c in by_entity.get(edge["target"], [])}
-        shared = src & tgt  # claims about the relationship, not just an endpoint
+        shared = src & tgt
         edge["evidence"] = {
             "provenance": edge.get("provenance"),
             "claims": [all_claims[cid] for cid in shared],

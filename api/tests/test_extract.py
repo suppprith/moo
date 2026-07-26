@@ -1,4 +1,4 @@
-"""/v1/extract: URL(s) -> clean markdown + optional evidence (app.extract, SUP-147).
+"""/v1/extract: URL(s) -> clean markdown + optional evidence.
 
 Fetcher is stubbed (no network); document upsert, chunking, embedding, and
 indexing are real — reuses the page fixtures from test_live_pipeline so the
@@ -29,8 +29,6 @@ def conn(tmp_path):
     c.close()
 
 
-# ---- validation ---------------------------------------------------------------
-
 def test_bad_depth_raises(conn):
     with pytest.raises(ValueError):
         extract_urls(conn, [PG_URL], depth="everything")
@@ -53,11 +51,9 @@ def test_blocked_and_malformed_urls_fail_per_url(conn):
     blocked, malformed, good = out["results"]
     assert blocked["ok"] is False and blocked["error"]["code"] == "invalid_request"
     assert malformed["ok"] is False and malformed["error"]["code"] == "invalid_request"
-    assert good["ok"] is True  # the batch never fails wholesale
-    assert fetcher.requests == [PG_URL]  # blocked/malformed made zero network calls
+    assert good["ok"] is True
+    assert fetcher.requests == [PG_URL]
 
-
-# ---- markdown + handles ---------------------------------------------------------
 
 def test_extract_end_to_end(conn):
     out = extract_urls(conn, [PG_URL, SO_URL], fetcher=FakeFetcher(PAGES))
@@ -68,11 +64,9 @@ def test_extract_end_to_end(conn):
     assert pg["chunks"] and all(c.startswith("chk_") for c in pg["chunks"])
     assert pg["from_cache"] is False
     assert pg["metadata"]["tier"] == "docs" and pg["metadata"]["source_type"] == "docs"
-    assert pg["metadata"]["trust_score"] is not None  # scored at ingest
-    # untrusted-content notice always present (SUP-131)
+    assert pg["metadata"]["trust_score"] is not None
     assert "untrusted" in out["notice"]
     assert out["cost"] == {**out["cost"], "requested": 2, "fetched": 2, "failed": 0}
-    # write-through: the pages are stored, chunked, and indexed
     assert conn.execute("SELECT count(*) FROM document").fetchone()[0] == 2
     assert conn.execute("SELECT count(*) FROM chunk_vec").fetchone()[0] > 0
 
@@ -83,8 +77,8 @@ def test_second_extract_is_cache_served(conn):
     n_requests = len(fetcher.requests)
     out = extract_urls(conn, [PG_URL], fetcher=fetcher)
     assert out["results"][0]["from_cache"] is True
-    assert out["results"][0]["markdown"]  # still returns the stored markdown
-    assert len(fetcher.requests) == n_requests  # zero network within TTL
+    assert out["results"][0]["markdown"]
+    assert len(fetcher.requests) == n_requests
 
 
 def test_force_bypasses_cache(conn):
@@ -113,8 +107,6 @@ def test_duplicate_url_flagged(conn):
     assert dup["ok"] is False and "duplicate" in dup["error"]["message"]
 
 
-# ---- depth=claims ----------------------------------------------------------------
-
 def test_depth_claims_attaches_evidence(conn):
     out = extract_urls(conn, [PG_URL], depth="claims", use_llm=False, fetcher=FakeFetcher(PAGES))
     entry = out["results"][0]
@@ -123,11 +115,8 @@ def test_depth_claims_attaches_evidence(conn):
     assert claims, "heuristic extraction should find claims in the vacuuming page"
     for c in claims:
         assert c["id"].startswith("clm_")
-    # persisted: the claims are drill-downable rows, not just response text
     assert conn.execute("SELECT count(*) FROM claim").fetchone()[0] >= len(claims)
 
-
-# ---- HTTP endpoint ---------------------------------------------------------------
 
 def test_endpoint_validates_body():
     r = client.post("/v1/extract", json={"urls": []})
@@ -157,8 +146,6 @@ def test_v1_tools_lists_both_defs():
     names = [t["function"]["name"] for t in r.json()["tools"]]
     assert names == ["web_search", "extract"]
 
-
-# ---- MCP tool --------------------------------------------------------------------
 
 def test_mcp_extract_clamps_markdown(monkeypatch):
     monkeypatch.setattr(m, "_search_conn", lambda: _DummyConn())

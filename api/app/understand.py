@@ -1,12 +1,11 @@
-"""Query understanding: intent + entities + ambiguity (SUP-81).
+"""Query understanding: intent + entities + ambiguity.
 
 ``understand(query)`` classifies the query *before* retrieval:
 
 - **intent** — how-to / why / comparison / troubleshooting / definition, via a
-  deterministic rule cascade (the ticket allows "small LLM call or classifier";
-  rules are free, fast, and testable against the gold queries).
+  deterministic rule cascade: free, fast, and testable against the gold queries.
 - **entities** — canonical names matched against the ``entity`` table when
-  populated (Phase 5), falling back to a built-in alias map for the v1 domain.
+  populated, falling back to a built-in alias map.
 - **ambiguous** — too little signal to retrieve confidently.
 
 Intent drives downstream behavior: each intent maps to a ``source_boost``
@@ -27,7 +26,6 @@ from dataclasses import dataclass, field
 
 INTENTS = ("how-to", "why", "comparison", "troubleshooting", "definition")
 
-# v1-domain fallback until the entity table is populated in Phase 5.
 BUILTIN_ALIASES: dict[str, str] = {
     "postgres": "PostgreSQL", "postgresql": "PostgreSQL", "pg": "PostgreSQL",
     "mysql": "MySQL", "mariadb": "MariaDB", "innodb": "MySQL",
@@ -67,16 +65,14 @@ class QueryUnderstanding:
     intent: str
     entities: list[str]
     ambiguous: bool
-    contradiction_view: bool = False           # comparisons surface disagreement
+    contradiction_view: bool = False
     source_boost: dict[str, float] = field(default_factory=dict)
 
 
 def classify_intent(query: str) -> str:
     q = query.strip().lower()
-    # "what ..." and "how does X work" are conceptual lookups, not tasks
     if re.match(r"^what\b", q) or re.match(r"^how (does|do)\b.*\bwork", q):
         return "definition"
-    # first-person how-to before trouble signals: "how do I fix X" is a task
     if re.match(r"^how (do|can|should|would) i\b", q) or re.match(r"^how to\b", q):
         return "how-to"
     if _TROUBLE_SIGNALS.search(q):
@@ -98,7 +94,7 @@ def extract_entities(query: str, conn: sqlite3.Connection | None = None) -> list
             ).fetchall()
             aliases.update({r[0].lower(): r[1] for r in rows})
         except sqlite3.Error:
-            pass  # entity tables absent/empty until Phase 5
+            pass
     found: list[str] = []
     for word in re.findall(r"\w+", query.lower()):
         canon = aliases.get(word)

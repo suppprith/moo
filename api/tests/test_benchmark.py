@@ -1,4 +1,4 @@
-"""Deep-research benchmark scoring + runner (app.eval.benchmark, SUP-121)."""
+"""Deep-research benchmark scoring + runner."""
 
 from app.eval import benchmark as bench
 
@@ -13,7 +13,6 @@ def test_task_set_loads_and_is_versioned():
 def test_score_coverage():
     report = {"executive_answer": "Postgres beats MySQL on joins",
               "findings": [{"text": "use an index"}]}
-    # 4 of 5 rubric points present (no "query")
     cov = bench.score_coverage(report, ["postgres", "mysql", "join", "index", "query"])
     assert cov == 0.8
 
@@ -30,9 +29,7 @@ def test_source_recall():
 def test_contradiction_recall():
     with_dispute = {"disputed_points": [{"text": "sources disagree on performance"}]}
     assert bench.score_contradiction_recall(with_dispute, ["performance"]) == 1.0
-    # hints given but nothing disputed -> 0.0 (a miss, not skipped)
     assert bench.score_contradiction_recall({"disputed_points": []}, ["performance"]) == 0.0
-    # no known dispute for this task -> excluded from scoring
     assert bench.score_contradiction_recall({"disputed_points": []}, []) is None
 
 
@@ -70,6 +67,5 @@ def test_run_benchmark_aggregates(monkeypatch):
     dr = result["summary"]["deep_research"]
     assert dr["coverage"] == 1.0 and dr["citation_accuracy"] == 1.0
     assert dr["source_recall"] == 1.0 and dr["contradiction_recall"] == 1.0
-    # deep_research beats single-shot search on coverage here
     assert result["summary"]["search"]["coverage"] < dr["coverage"]
     assert "deep_research" in bench.format_table(result)

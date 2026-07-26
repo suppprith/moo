@@ -1,4 +1,4 @@
-"""MCP server tools (app.mcp_server, SUP-115)."""
+"""MCP server tools."""
 
 import asyncio
 
@@ -18,14 +18,12 @@ def _no_real_db(monkeypatch):
     monkeypatch.setattr(m, "_plain_conn", lambda: _DummyConn())
 
 
-# ---- registration + schemas -------------------------------------------------
-
 _TOOLS = {"search", "extract", "fetch_source", "get_claim", "list_contradictions",
           "expand_graph", "deep_research", "research_status"}
 
 
 def test_server_smoke_lists_tools():
-    """CI smoke check (SUP-118): the server object builds and exposes its tools,
+    """CI smoke check: the server object builds and exposes its tools,
     and the `moo-mcp` entry point is importable."""
     assert m.mcp.name == "moo"
     assert callable(m.main)
@@ -38,14 +36,12 @@ def test_all_tools_registered_with_schemas():
     by_name = {t.name: t for t in tools}
     assert set(by_name) == _TOOLS
     for t in tools:
-        assert t.description and len(t.description) > 40      # descriptions are load-bearing
+        assert t.description and len(t.description) > 40
         assert "properties" in (t.inputSchema or {})
     assert set(by_name["search"].inputSchema["properties"]) == {
         "query", "mode", "k", "fields", "max_tokens", "live", "highlights",
     }
 
-
-# ---- tool behaviour ---------------------------------------------------------
 
 def test_search_tool_returns_agent_payload(monkeypatch):
     captured = {}
@@ -82,7 +78,7 @@ def test_fetch_source_returns_row(monkeypatch):
 
 def test_get_claim_rejects_wrong_kind():
     with pytest.raises(ValueError):
-        m.get_claim("chk_1")  # not a clm_ handle
+        m.get_claim("chk_1")
 
 
 def test_get_claim_returns_claim(monkeypatch):
@@ -102,7 +98,7 @@ def test_list_contradictions_filters_to_disputed(monkeypatch):
     })
     out = m.list_contradictions("mongodb durability")
     got = {c["id"] for c in out["contradictions"]}
-    assert got == {"clm_1", "clm_3"}  # disputed OR has a contradicting edge
+    assert got == {"clm_1", "clm_3"}
 
 
 def test_expand_graph_decodes_entity_handle(monkeypatch):
@@ -114,9 +110,9 @@ def test_expand_graph_decodes_entity_handle(monkeypatch):
 
     monkeypatch.setattr("app.graph.query.expand_node", fake_expand)
     m.expand_graph("ent_5")
-    assert seen["node"] == "5"       # handle decoded to rowid string
+    assert seen["node"] == "5"
     m.expand_graph("Postgres")
-    assert seen["node"] == "Postgres"  # plain name passed through
+    assert seen["node"] == "Postgres"
 
 
 def test_expand_graph_unknown_entity_raises(monkeypatch):
@@ -124,8 +120,6 @@ def test_expand_graph_unknown_entity_raises(monkeypatch):
     with pytest.raises(ValueError):
         m.expand_graph("Nonexistent")
 
-
-# ---- deep_research + research_status (SUP-116) ------------------------------
 
 def _stub_research(monkeypatch, *, exhausted=True):
     monkeypatch.setattr(m, "make_plan", lambda conn, q, **k: {
@@ -181,7 +175,7 @@ def test_deep_research_shapes_to_budget_keeping_disputes(monkeypatch):
         "findings": [{"text": "f" * 400} for _ in range(30)],
         "sources": [{"handle": f"doc_{i}", "pad": "x" * 400} for i in range(30)]})
     out = asyncio.run(m.deep_research("q", max_tokens=500, ctx=None))
-    assert len(out["disputed_points"]) == 3          # contradictions never dropped
+    assert len(out["disputed_points"]) == 3
     assert "truncation" in out
 
 

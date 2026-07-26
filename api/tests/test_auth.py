@@ -1,4 +1,4 @@
-"""Optional API-key auth + rate limiting (app.auth, SUP-108)."""
+"""Optional API-key auth + rate limiting."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,8 +20,6 @@ def clean(monkeypatch):
     yield
     auth.reset()
 
-
-# ---- unit -------------------------------------------------------------------
 
 def test_disabled_by_default():
     assert auth.enabled() is False
@@ -61,8 +59,6 @@ def test_usage_metering_is_masked(monkeypatch):
     assert "supersecret" not in str(u)
 
 
-# ---- end to end via the app -------------------------------------------------
-
 def test_health_open_even_with_auth_on(monkeypatch):
     monkeypatch.setenv("MOO_API_KEYS", "k")
     client = TestClient(app)
@@ -99,5 +95,5 @@ def test_rate_limit_429_with_retry_after_header(monkeypatch):
 
 
 def test_open_mode_needs_no_key():
-    client = TestClient(app)  # no MOO_API_KEYS
+    client = TestClient(app)
     assert client.get("/usage").status_code == 200

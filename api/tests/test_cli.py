@@ -1,4 +1,4 @@
-"""The moo terminal client (app.cli, SUP-102)."""
+"""The moo terminal client."""
 
 import json
 
@@ -32,13 +32,11 @@ RAW_RESPONSE = {
 }
 
 
-# -- rendering ---------------------------------------------------------------------
-
 def test_render_full_has_answer_and_citations():
     out = cli.render(FULL_RESPONSE)
     assert out.startswith("Autovacuum triggers")
     assert "[S1] https://postgresql.org" in out
-    assert "\x1b[" not in out                      # color=False -> zero ANSI
+    assert "\x1b[" not in out
 
 
 def test_render_color_only_when_asked():
@@ -48,7 +46,7 @@ def test_render_color_only_when_asked():
 def test_render_raw_lists_sources_with_flags():
     out = cli.render(RAW_RESPONSE)
     assert "1. Routine Vacuuming" in out
-    assert "untrusted" in out                      # suspicious flag surfaced
+    assert "untrusted" in out
 
 
 def test_render_live_note():
@@ -59,8 +57,6 @@ def test_render_empty():
     empty = {"query": "q", "mode": "raw", "sources": [], "claims": [], "meta": {}}
     assert "no results" in cli.render(empty)
 
-
-# -- CLI behaviour -------------------------------------------------------------------
 
 @pytest.fixture
 def patched_search(monkeypatch):
@@ -73,7 +69,6 @@ def test_json_flag_pipes_raw_response(patched_search, capsys):
 
 
 def test_plain_output_no_ansi_when_piped(patched_search, capsys):
-    # pytest capture is not a TTY -> pipe-friendly output
     assert cli.main(["postgres autovacuum"]) == 0
     out = capsys.readouterr().out
     assert "\x1b[" not in out and "Sources" in out

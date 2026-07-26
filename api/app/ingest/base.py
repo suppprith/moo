@@ -1,4 +1,4 @@
-"""Connector interface + `document` upsert (SUP-72).
+"""Connector interface + `document` upsert.
 
 A connector yields ``RawDoc``s from ``fetch()``; ``run()`` stores each one,
 catching per-item errors so one failure never aborts the crawl. Upsert is keyed
@@ -41,13 +41,14 @@ class IngestStats:
 
 
 def store(conn: sqlite3.Connection, doc: RawDoc) -> str:
-    """Upsert one doc. Returns 'inserted' | 'updated' | 'unchanged'."""
+    """Upsert one doc. Returns 'inserted' | 'updated' | 'unchanged'.
+
+    ``content_hash`` excludes volatile signals (votes, reactions) so they don't
+    churn the store, but they feed trust scoring, so refresh them regardless.
+    """
     new_hash = doc.content_hash()
     row = conn.execute("SELECT id, content_hash FROM document WHERE url = ?", (doc.url,)).fetchone()
     if row is not None and row["content_hash"] == new_hash:
-        # content_hash deliberately excludes volatile signals (votes, reactions)
-        # so they don't churn the corpus — but they feed trust scoring, so
-        # refresh them even when the content itself is unchanged.
         conn.execute(
             "UPDATE document SET popularity = coalesce(?, popularity), "
             "updated_at = coalesce(?, updated_at), fetched_at = datetime('now') "
@@ -93,7 +94,6 @@ def store(conn: sqlite3.Connection, doc: RawDoc) -> str:
 class Connector(ABC):
     """Base class for all source connectors."""
 
-    #: short id used on the CLI and stored as `document.source_type` prefix
     name: str = "connector"
 
     def __init__(self, conn: sqlite3.Connection, fetcher: Fetcher) -> None:
@@ -117,7 +117,7 @@ class Connector(ABC):
             try:
                 result = store(self.conn, doc)
                 setattr(stats, result, getattr(stats, result) + 1)
-            except Exception as exc:  # noqa: BLE001 - one bad doc must not kill the run
+            except Exception as exc:  # noqa: BLE001
                 stats.errors += 1
                 stats.error_urls.append(doc.url)
                 log.warning("store failed for %s: %s", doc.url, exc)

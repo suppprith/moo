@@ -1,5 +1,3 @@
-// Thin client for the moo search API. Base URL is configurable so the same
-// build works against a local dev API or a self-hosted instance.
 import type {
   Graph,
   Mode,
@@ -58,8 +56,6 @@ export function graphForQuery(
 export function expandNode(node: string, signal?: AbortSignal): Promise<Graph> {
   return getJson<Graph>(`/graph/expand?node=${encodeURIComponent(node)}`, signal);
 }
-
-// ---- deep research: stream POST /research/stream (SSE) ----
 
 export interface ResearchHandlers {
   onPlan?: (p: { intent: string; entities: string[]; sub_questions: SubQuestion[] }) => void;

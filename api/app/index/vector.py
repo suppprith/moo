@@ -1,4 +1,4 @@
-"""Vector index with sqlite-vec (SUP-78).
+"""Vector index with sqlite-vec.
 
 A ``vec0`` virtual table ``chunk_vec`` holds the chunk embeddings and answers
 top-k similarity queries. Metadata filtering (source type / date) is done by
@@ -26,7 +26,6 @@ from ..embed import DEFAULT_MODEL, embed_texts
 
 log = logging.getLogger("moo.index.vector")
 
-# bge models want an instruction prefix on the *query* side only.
 QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
 
@@ -59,14 +58,12 @@ def build(conn: sqlite3.Connection, *, rebuild: bool = False) -> int:
     """
     dims = _dims(conn)
     if rebuild:
-        conn.execute("DROP TABLE IF EXISTS chunk_vec")  # DROP also handles a dims change
+        conn.execute("DROP TABLE IF EXISTS chunk_vec")
     conn.execute(
         f"CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vec USING vec0("
         f"chunk_id INTEGER PRIMARY KEY, embedding float[{dims}])"
     )
-    # orphans: chunk deleted (or whole corpus rechunked and shrunk)
     conn.execute("DELETE FROM chunk_vec WHERE chunk_id NOT IN (SELECT id FROM chunk)")
-    # stale: rowid reused by a different chunk, or chunk re-embedded
     stale = [
         r[0]
         for r in conn.execute(
@@ -115,7 +112,7 @@ def search(
 ) -> list[tuple[int, float]]:
     """Return [(chunk_id, cosine_similarity)] best-first."""
     allowed = _allowed_ids(conn, source_types, since)
-    fetch = k if allowed is None else k * 8  # over-fetch, then filter
+    fetch = k if allowed is None else k * 8
     try:
         rows = conn.execute(
             "SELECT chunk_id, distance FROM chunk_vec "
@@ -124,16 +121,13 @@ def search(
         ).fetchall()
     except sqlite3.OperationalError as exc:
         if "chunk_vec" in str(exc):
-            # fresh store: index not built yet (live-first deployments start
-            # empty; the first live_fetch creates it). No results, not a crash.
             return []
         raise
     out: list[tuple[int, float]] = []
     for chunk_id, dist in rows:
         if allowed is not None and chunk_id not in allowed:
             continue
-        # normalized vectors: L2^2 = 2 - 2cos  ->  cos = 1 - dist^2/2
-        out.append((chunk_id, 1.0 - (dist * dist) / 2.0))
+        out.append((chunk_id, 1.0 - (dist * dist) / 2.0))  # normalized: cos = 1 - L2^2/2
         if len(out) >= k:
             break
     return out
@@ -160,14 +154,14 @@ def brute_search(
     ids = np.array([r["id"] for r in rows])
     mat = np.vstack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
     q = np.frombuffer(query_vec, dtype=np.float32)
-    sims = mat @ q  # both normalized -> cosine
+    sims = mat @ q
     top = np.argsort(-sims)[:k]
     return [(int(ids[i]), float(sims[i])) for i in top]
 
 
 def bench(conn: sqlite3.Connection, queries: list[str], k: int = 10) -> dict[str, float]:
     """Compare sqlite-vec KNN to exact brute force: recall@k + latency."""
-    vecs = [embed_query(q) for q in queries]  # warm + embed once
+    vecs = [embed_query(q) for q in queries]
     recall_sum = ann_ms = brute_ms = 0.0
     for v in vecs:
         t0 = time.perf_counter()

@@ -24,5 +24,4 @@ def test_unrelated_gets_no_edge():
 
 
 def test_contradiction_not_dropped_even_at_low_sim():
-    # a contrast-bearing, still-related chunk must yield an edge, never None
     assert _classify_heuristic("However this is worse than expected.", 0.33) is not None

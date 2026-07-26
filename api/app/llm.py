@@ -1,4 +1,4 @@
-"""Pluggable LLM provider layer — bring your own key (SUP-82, SUP-126).
+"""Pluggable LLM provider layer — bring your own key.
 
 Every LLM stage in the pipeline goes through ``generate_json()`` so the provider
 is swappable and results are cached in ``llm_cache`` by stage + content hash
@@ -36,7 +36,6 @@ log = logging.getLogger("moo.llm")
 
 _API_DIR = Path(__file__).resolve().parent.parent
 
-# per-provider defaults
 _DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
     "openai": "gpt-4o-mini",
@@ -49,7 +48,6 @@ _DEFAULT_BASE_URLS = {
     "ollama": "http://localhost:11434/v1",
     "anthropic": "https://api.anthropic.com/v1",
 }
-# providers that can run without an API key (local servers)
 _KEYLESS_OK = {"ollama", "openai-compatible"}
 
 _FALLBACK_MODEL = _DEFAULT_MODELS["gemini"]
@@ -72,10 +70,6 @@ def _load_dotenv() -> None:
     except OSError:
         pass
 
-
-# ---------------------------------------------------------------------------
-# provider config resolution
-# ---------------------------------------------------------------------------
 
 _config: dict | None = None
 _config_checked = False
@@ -145,16 +139,10 @@ def get_client():
 
 
 def __getattr__(name: str):
-    # `llm.CHEAP_MODEL` resolves to the configured model lazily, so existing
-    # callers keep working across providers.
     if name == "CHEAP_MODEL":
         return model_name()
     raise AttributeError(name)
 
-
-# ---------------------------------------------------------------------------
-# cost counters + cache
-# ---------------------------------------------------------------------------
 
 _STATS = {"calls": 0, "cache_hits": 0, "cache_misses": 0}
 
@@ -205,10 +193,6 @@ def cached_json(conn: sqlite3.Connection, stage: str, key_input: str, prompt: st
     return result
 
 
-# ---------------------------------------------------------------------------
-# provider backends
-# ---------------------------------------------------------------------------
-
 def _gemini_schema(schema: dict) -> dict:
     """Strip JSON-Schema keys Gemini's response_schema rejects."""
     clean = copy.deepcopy(schema)
@@ -257,7 +241,7 @@ def _gemini_json(cfg, prompt, schema, system, model, max_tokens):
     try:
         config = types.GenerateContentConfig(response_schema=_gemini_schema(schema), **base)
         resp = client.models.generate_content(model=model, contents=prompt, config=config)
-    except Exception:  # noqa: BLE001 - retry without schema; mime type still enforces JSON
+    except Exception:  # noqa: BLE001
         config = types.GenerateContentConfig(**base)
         resp = client.models.generate_content(model=model, contents=prompt, config=config)
     return json.loads(resp.text)
@@ -283,7 +267,7 @@ def _openai_json(cfg, prompt, schema, system, model, max_tokens):
     try:
         resp = httpx.post(url, json=body, headers=headers, timeout=60)
         resp.raise_for_status()
-    except httpx.HTTPStatusError:  # some servers reject response_format; retry without it
+    except httpx.HTTPStatusError:
         body.pop("response_format", None)
         resp = httpx.post(url, json=body, headers=headers, timeout=60)
         resp.raise_for_status()
@@ -340,6 +324,6 @@ def generate_json(
     backend = _BACKENDS[cfg["provider"]]
     try:
         return backend(cfg, prompt, schema, system, model or cfg["model"], max_tokens)
-    except Exception as exc:  # noqa: BLE001 - degrade to heuristics, never crash retrieval
+    except Exception as exc:  # noqa: BLE001
         log.warning("LLM call failed (%s); falling back", exc)
         return None

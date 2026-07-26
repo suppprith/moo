@@ -1,4 +1,4 @@
-"""Research planner (app.research.plan, SUP-110)."""
+"""Research planner."""
 
 import sqlite3
 
@@ -15,8 +15,6 @@ def conn():
     return c
 
 
-# ---- heuristic plans --------------------------------------------------------
-
 def test_comparison_plan_splits_by_axes_with_final_choice(conn):
     p = plan_mod.plan(conn, "Postgres vs MySQL for complex joins", use_llm=False)
     assert p["intent"] == "comparison"
@@ -24,7 +22,6 @@ def test_comparison_plan_splits_by_axes_with_final_choice(conn):
     qs = [s["question"] for s in p["sub_questions"]]
     assert any("compare on performance" in q for q in qs)
     assert qs[-1].startswith("When should you choose")
-    # the "which to choose" question depends on the per-axis ones
     assert p["sub_questions"][-1]["depends_on"] == [s["id"] for s in p["sub_questions"][:-1]]
 
 
@@ -44,28 +41,23 @@ def test_plan_is_bounded_and_ordered(conn):
 
 def test_evidence_targets_present(conn):
     p = plan_mod.plan(conn, "what is a write-ahead log", use_llm=False)
-    assert p["evidence_targets"]  # non-empty hint list
+    assert p["evidence_targets"]
 
-
-# ---- caching ----------------------------------------------------------------
 
 def test_plan_is_cached_by_normalized_question(conn):
     p1 = plan_mod.plan(conn, "Postgres  vs   MySQL", use_llm=False)
-    # a re-call must hit the cache: make the LLM path explode if it were taken
     from app import llm
     p2 = plan_mod.plan(conn, "postgres vs mysql", use_llm=True)
     assert p2 == p1
     assert llm.cache_get(conn, llm.cache_key("plan", "postgres vs mysql")) == p1
 
 
-# ---- LLM path ---------------------------------------------------------------
-
 def test_llm_plan_normalizes_ids_and_deps(conn, monkeypatch):
     payload = {
         "sub_questions": [
             {"question": "What is MVCC?", "depends_on": []},
             {"question": "How does VACUUM reclaim rows?", "depends_on": [1]},
-            {"question": "Final synthesis", "depends_on": [1, 2, 9]},  # 9 is a forward/unknown ref
+            {"question": "Final synthesis", "depends_on": [1, 2, 9]},
         ],
         "comparison_axes": [],
         "evidence_targets": ["docs", "github_issue"],
@@ -75,7 +67,7 @@ def test_llm_plan_normalizes_ids_and_deps(conn, monkeypatch):
     assert p["generator"] == plan_mod.llm.CHEAP_MODEL
     assert [s["id"] for s in p["sub_questions"]] == [1, 2, 3]
     assert p["sub_questions"][1]["depends_on"] == [1]
-    assert p["sub_questions"][2]["depends_on"] == [1, 2]  # forward ref 9 dropped
+    assert p["sub_questions"][2]["depends_on"] == [1, 2]
     assert p["evidence_targets"] == ["docs", "github_issue"]
 
 

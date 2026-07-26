@@ -20,7 +20,6 @@ function confClass(c: number | null): "high" | "mid" | "low" {
   return c >= 0.66 ? "high" : c >= 0.4 ? "mid" : "low";
 }
 
-// report sources -> the Citation shape the Answer component renders
 function asCitations(sources: ResearchSource[]): Citation[] {
   return sources.map((s) => ({
     index: s.index,
@@ -32,7 +31,6 @@ function asCitations(sources: ResearchSource[]): Citation[] {
   }));
 }
 
-// report sources -> the Source shape SourceList renders
 function asSources(sources: ResearchSource[]): Source[] {
   return sources.map((s) => ({
     chunk_id: s.index,
@@ -148,7 +146,6 @@ export function ResearchView({ question, onExit }: { question: string; onExit: (
 
       {error && <div className="error">{error}</div>}
 
-      {/* live progress until the report arrives */}
       {!report && !error && (
         <div className="research-progress">
           {plan.length > 0 && (

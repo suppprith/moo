@@ -1,4 +1,4 @@
-"""Competitor search-engine adapters for the eval flywheel (SUP-141).
+"""Competitor search-engine adapters for the eval flywheel.
 
 Each adapter normalizes an external search API to one shape so the flywheel
 can score every engine identically:
@@ -51,7 +51,7 @@ def exa_engine(*, k: int = 8, client=None):
             )
             resp.raise_for_status()
             data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - one engine failure never stops a run
+        except Exception as exc:  # noqa: BLE001
             log.warning("exa failed: %s", exc)
             return None
         return {

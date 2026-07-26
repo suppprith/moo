@@ -1,4 +1,4 @@
-"""Agent demo transcript (app.eval.demo, SUP-123)."""
+"""Agent demo transcript."""
 
 import asyncio
 

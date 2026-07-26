@@ -1,4 +1,4 @@
-"""Community connector: Stack Overflow, Hacker News, Reddit (SUP-75).
+"""Community connector: Stack Overflow, Hacker News, Reddit.
 
 These carry the contrarian / experience-based evidence the evidence layer needs.
 Each source is a method; ``fetch()`` runs the configured ones. Q&A threading is
@@ -47,18 +47,15 @@ class CommunityConnector(Connector):
     ) -> None:
         super().__init__(conn, fetcher)
         self.sources = sources
-        self.max_items = max_items  # per tag/query/subreddit
-        # default to the all-verticals unions; a vertical passes its own subset
+        self.max_items = max_items
         self.tags = tags if tags is not None else STACKOVERFLOW_TAGS
         self.subreddits = subreddits if subreddits is not None else SUBREDDITS
         self.hn_queries = hn_queries if hn_queries is not None else HN_QUERIES
 
     @classmethod
     def default_fetcher(cls) -> Fetcher:
-        # Documented APIs / .json endpoints: skip robots, stay polite.
         return Fetcher(min_interval=1.5, obey_robots=False)
 
-    # -- Stack Overflow ------------------------------------------------------
     def _se_get(self, url: str) -> dict | None:
         """GET a Stack Exchange API URL, honoring the `backoff` field.
 
@@ -128,7 +125,6 @@ class CommunityConnector(Connector):
                 },
             )
 
-    # -- Hacker News (Algolia) ----------------------------------------------
     def _hackernews(self) -> Iterator[RawDoc]:
         for query in self.hn_queries:
             q = query.replace(" ", "+")
@@ -159,7 +155,6 @@ class CommunityConnector(Connector):
                     },
                 )
 
-    # -- Reddit --------------------------------------------------------------
     def _reddit(self) -> Iterator[RawDoc]:
         for sub in self.subreddits:
             url = f"https://www.reddit.com/r/{sub}/top.json?t=year&limit={self.max_items}"
@@ -184,7 +179,6 @@ class CommunityConnector(Connector):
                     metadata={"subreddit": sub, "num_comments": p.get("num_comments")},
                 )
 
-    # -- driver --------------------------------------------------------------
     def fetch(self) -> Iterator[RawDoc]:
         dispatch = {"so": self._stackoverflow, "hn": self._hackernews, "reddit": self._reddit}
         for src in self.sources:

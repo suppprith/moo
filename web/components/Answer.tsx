@@ -1,7 +1,6 @@
 import type { Citation } from "@/lib/types";
 import { Sparkle } from "./icons";
 
-// Render an answer string, turning inline [S#] markers into linked citations.
 export function Answer({
   text,
   citations,

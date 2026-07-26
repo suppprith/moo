@@ -1,4 +1,4 @@
-"""Caller-defined output schemas on deep_research (app.research.structured, SUP-155)."""
+"""Caller-defined output schemas on deep_research."""
 
 import asyncio
 
@@ -39,8 +39,6 @@ SCHEMA = {
 }
 
 
-# ---- schema validation ----------------------------------------------------------
-
 def test_rejects_non_object_schema():
     with pytest.raises(ValueError):
         validate_schema({"type": "array"})
@@ -66,22 +64,17 @@ def test_rejects_too_many_fields():
         validate_schema({"type": "object", "properties": props})
 
 
-# ---- heuristic fill (keyless): grounded by construction ---------------------------
-
 def test_heuristic_fill_populates_from_findings():
     out = structure_report(None, REPORT, SCHEMA, use_llm=False)
     assert out["generator"] == "heuristic"
     s = out["output"]
-    assert s["summary"] == REPORT["executive_answer"]          # summary-ish -> exec answer
-    assert "scale_factor" in s["trigger_condition"]            # best-matching finding
+    assert s["summary"] == REPORT["executive_answer"]
+    assert "scale_factor" in s["trigger_condition"]
     assert s["key_points"] and all(isinstance(p, str) for p in s["key_points"])
-    assert s["rows_per_second"] is None                        # numbers are never guessed
-    # every populated text field is traced to claim handles
+    assert s["rows_per_second"] is None
     assert out["grounding"]["$.trigger_condition"] == ["clm_2"]
     assert not out["ungrounded_fields"]
 
-
-# ---- LLM fill: groundedness guard nulls fabricated fields --------------------------
 
 def test_llm_fill_keeps_grounded_fields(monkeypatch):
     monkeypatch.setattr(st.llm, "cached_json", lambda *a, **k: {
@@ -105,8 +98,8 @@ def test_llm_fabrication_is_nulled(monkeypatch):
         "rows_per_second": 12345,
     })
     out = structure_report(None, REPORT, SCHEMA, use_llm=True)
-    assert out["output"]["summary"] is None                     # untraceable -> null
-    assert out["output"]["rows_per_second"] is None             # number not in any finding
+    assert out["output"]["summary"] is None
+    assert out["output"]["rows_per_second"] is None
     assert "$.summary" in out["ungrounded_fields"]
     assert "$.rows_per_second" in out["ungrounded_fields"]
     assert "not fabricated" in out["note"]
@@ -119,8 +112,6 @@ def test_llm_failure_falls_back_to_heuristic(monkeypatch):
     assert out["output"]["summary"]
 
 
-# ---- HTTP: /research rejects a bad schema before running --------------------------
-
 def test_research_endpoint_rejects_bad_schema():
     r = client.post("/research", json={"question": "q", "output_schema": {"type": "array"}})
     assert r.status_code == 422
@@ -131,8 +122,6 @@ def test_research_stream_rejects_bad_schema():
     r = client.post("/research/stream", json={"question": "q", "output_schema": {"type": "array"}})
     assert r.status_code == 422
 
-
-# ---- MCP: deep_research carries the structured section -----------------------------
 
 class _DummyConn:
     def close(self):
@@ -148,7 +137,7 @@ def _stub_research(monkeypatch):
     monkeypatch.setattr(m, "run_loop", lambda conn, plan, **k: {
         "coverage": [], "claims": [], "budget": {"exhausted": False}})
     monkeypatch.setattr(m, "assemble_report", lambda conn, run, **k: dict(REPORT))
-    monkeypatch.setattr(st.llm, "cached_json", lambda *a, **k: None)  # heuristic fill
+    monkeypatch.setattr(st.llm, "cached_json", lambda *a, **k: None)
 
 
 def test_mcp_deep_research_structured(monkeypatch):

@@ -52,14 +52,14 @@ def test_disputed_claim_renders_both_sides():
     claims = [{"id": 1, "text": "SQLite is production ready", "confidence": 0.5, "disputed": True}]
     out = synthesize.synthesize(conn, "q", claims, use_llm=False)
     assert "disagree" in out["answer"].lower()
-    assert "[S1]" in out["answer"] and "[S2]" in out["answer"]   # both sides cited
+    assert "[S1]" in out["answer"] and "[S2]" in out["answer"]
     assert out["disputed"] == ["SQLite is production ready"]
 
 
 def test_provenance_used_when_no_evidence_edges():
     conn = _db()
     _claim(conn, 1, "claim from provenance", 0.6, 0)
-    conn.execute("INSERT INTO claim_chunk VALUES (1, 1)")  # only provenance, no evidence
+    conn.execute("INSERT INTO claim_chunk VALUES (1, 1)")
     out = synthesize.synthesize(conn, "q", [{"id": 1, "text": "claim from provenance", "confidence": 0.6, "disputed": False}], use_llm=False)
     assert "[S1]" in out["answer"]
 
@@ -83,7 +83,6 @@ def test_llm_answer_falls_back_to_template_when_all_uncited(monkeypatch):
     conn = _db()
     _claim(conn, 1, "Postgres has JSONB", 0.8, 0)
     conn.execute("INSERT INTO evidence (claim_id, chunk_id, relation, strength) VALUES (1, 1, 'supports', 0.9)")
-    # model returns prose with no citations -> validation empties it -> template used
     monkeypatch.setattr(synthesize, "_llm_answer", lambda *a, **k: "A confident but uncited answer.")
     claims = [{"id": 1, "text": "Postgres has JSONB", "confidence": 0.8, "disputed": False}]
     out = synthesize.synthesize(conn, "q", claims, use_llm=True)

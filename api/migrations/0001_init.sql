@@ -1,9 +1,5 @@
--- moo search — core data model (Phase 0, SUP-71)
--- Single SQLite file. FTS5 + sqlite-vec tables are added in Phase 2 (see docs/data-model.md).
-
--- ---------------------------------------------------------------------------
--- Sources
--- ---------------------------------------------------------------------------
+-- Core data model. Single SQLite file; the FTS5 and sqlite-vec tables are built
+-- at runtime (see docs/data-model.md).
 
 CREATE TABLE document (
     id            INTEGER PRIMARY KEY,
@@ -16,7 +12,7 @@ CREATE TABLE document (
     fetched_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     content_hash  TEXT,                    -- dedup + incremental re-fetch
     popularity    INTEGER,                 -- reactions / score / upvotes
-    trust_score   REAL,                    -- Phase 4, NULL until computed
+    trust_score   REAL,                    -- NULL until computed
     metadata      TEXT                     -- JSON blob for source-specific fields
 );
 
@@ -28,22 +24,18 @@ CREATE TABLE chunk (
     text               TEXT    NOT NULL,
     token_count        INTEGER,
     url_anchor         TEXT,                -- deep link to the exact location
-    embedding_model    TEXT,                -- e.g. bge-small-en-v1.5 (Phase 2)
+    embedding_model    TEXT,                -- e.g. bge-small-en-v1.5
     embedding_dims     INTEGER,
     canonical_chunk_id INTEGER REFERENCES chunk(id),  -- near-dup collapse; NULL = canonical
     content_hash       TEXT,
     UNIQUE (document_id, ordinal)
 );
 
--- ---------------------------------------------------------------------------
--- Claims & evidence (the product)
--- ---------------------------------------------------------------------------
-
 CREATE TABLE claim (
     id             INTEGER PRIMARY KEY,
     text           TEXT    NOT NULL,        -- canonical wording
     normalized_key TEXT    UNIQUE,          -- clusters near-identical claims into one
-    confidence     REAL,                    -- 0..1, Phase 4
+    confidence     REAL,                    -- 0..1
     disputed       INTEGER NOT NULL DEFAULT 0,  -- boolean: strong support AND contradiction
     created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
@@ -66,10 +58,6 @@ CREATE TABLE evidence (
     created_at TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE (claim_id, chunk_id, relation)
 );
-
--- ---------------------------------------------------------------------------
--- Knowledge graph (entities & typed relations)
--- ---------------------------------------------------------------------------
 
 CREATE TABLE entity (
     id             INTEGER PRIMARY KEY,
@@ -100,10 +88,6 @@ CREATE TABLE claim_entity (
     entity_id INTEGER NOT NULL REFERENCES entity(id) ON DELETE CASCADE,
     PRIMARY KEY (claim_id, entity_id)
 );
-
--- ---------------------------------------------------------------------------
--- Indexes
--- ---------------------------------------------------------------------------
 
 CREATE INDEX idx_chunk_document     ON chunk (document_id);
 CREATE INDEX idx_claim_chunk_chunk  ON claim_chunk (chunk_id);

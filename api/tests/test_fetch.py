@@ -1,4 +1,4 @@
-"""Unit tests for citation drill-down resolvers (app.fetch, SUP-106)."""
+"""Unit tests for citation drill-down resolvers."""
 
 import sqlite3
 
@@ -35,7 +35,6 @@ def conn():
         "INSERT INTO document VALUES (5,'docs','https://pg/docs','PG Docs',NULL,'maintainer',"
         "'2024-01-01',NULL,'2024-02-01',3,0.95,'full document body text')"
     )
-    # three chunks in order; #75 is the middle one
     c.execute("INSERT INTO chunk VALUES (74,5,0,'Intro','intro text','https://pg/docs#intro',NULL)")
     c.execute("INSERT INTO chunk VALUES (75,5,1,'Joins','joins body text','https://pg/docs#joins',NULL)")
     c.execute("INSERT INTO chunk VALUES (76,5,2,'End','ending text','https://pg/docs#end',NULL)")
@@ -63,7 +62,7 @@ def test_fetch_document_missing_returns_none(conn):
 def test_fetch_chunk_context_and_document_handle(conn):
     out = fetch.fetch_chunk(conn, 75)
     assert out["id"] == "chk_75" and out["document"] == "doc_5"
-    assert out["url"] == "https://pg/docs#joins"  # deep link
+    assert out["url"] == "https://pg/docs#joins"
     assert out["text"] == "joins body text"
     assert out["context"]["prev"]["id"] == "chk_74"
     assert out["context"]["next"]["id"] == "chk_76"
@@ -79,7 +78,6 @@ def test_fetch_chunk_at_document_start_has_no_prev(conn):
 def test_fetch_claim_full_evidence_set(conn):
     out = fetch.fetch_claim(conn, 7)
     assert out["id"] == "clm_7" and out["confidence"] == 0.8
-    # contradictions surfaced first, never buried
     assert out["evidence"][0]["relation"] == "contradicts"
     assert out["evidence"][0]["source"] == "chk_76"
     assert out["evidence"][1]["source"] == "chk_75"
@@ -100,6 +98,6 @@ def test_fetch_handle_unknown_row_returns_none(conn):
 
 def test_fetch_handle_rejects_unresolvable_kind(conn):
     with pytest.raises(ValueError):
-        fetch.fetch_handle(conn, "ent_3")  # entities have no fetch resolver
+        fetch.fetch_handle(conn, "ent_3")
     with pytest.raises(ValueError):
         fetch.fetch_handle(conn, "not-a-handle")

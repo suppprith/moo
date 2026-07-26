@@ -1,4 +1,4 @@
-"""Claim confidence scoring (SUP-86).
+"""Claim confidence scoring.
 
 `score_claim(conn, claim_id)` combines evidence into a 0..1 confidence:
 
@@ -7,7 +7,7 @@
     confidence    = support_mass / (support_mass + contradiction_mass + SMOOTH)
 
 Independence matters: three chunks of the same blog post, or near-duplicate
-reposts (collapsed via canonical_chunk_id in SUP-80), count as **one** voice —
+reposts, count as **one** voice —
 otherwise a single loud source fakes consensus. A claim with strong support AND
 strong contradiction is flagged **disputed**, not scored as a middling average.
 Writes claim.confidence + claim.disputed and returns a breakdown.
@@ -25,9 +25,9 @@ log = logging.getLogger("moo.confidence")
 
 DEFAULT_TRUST = 0.40
 DEFAULT_STRENGTH = 0.50
-EXPLAIN_WEIGHT = 0.30   # 'explains' lends mechanism, weaker than direct support
-SMOOTH = 0.50           # keeps a single weak source off 1.0
-DISPUTE_MIN = 0.40      # both sides must clear this for "disputed"
+EXPLAIN_WEIGHT = 0.30
+SMOOTH = 0.50
+DISPUTE_MIN = 0.40
 
 
 def _independent_mass(rows: list[sqlite3.Row], relation: str, weight: float = 1.0) -> float:
@@ -68,7 +68,6 @@ def score_claim(conn: sqlite3.Connection, claim_id: int) -> dict:
     confidence = round(support / (support + contradiction + SMOOTH), 4) if rows else 0.0
     disputed = support >= DISPUTE_MIN and contradiction >= DISPUTE_MIN
 
-    # independent-source counts for the breakdown
     def _sources(rel: str) -> int:
         return len({r["doc_key"] for r in rows if r["relation"] == rel})
 

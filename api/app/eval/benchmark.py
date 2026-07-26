@@ -1,11 +1,11 @@
-"""Deep-research benchmark (SUP-121).
+"""Deep-research benchmark.
 
 Scores the deep-research engine on a versioned task set
 (``deep_research_tasks.json``) and compares single-shot ``search`` against
 ``deep_research``:
 
 - **coverage** — fraction of a task's rubric points that appear in the output
-- **citation_accuracy** — fraction of findings that are grounded (SUP-120)
+- **citation_accuracy** — fraction of findings that are grounded
 - **source_recall** — fraction of the task's expected source domains cited
 - **contradiction_recall** — did it surface the task's known disputes?
 - **tokens** / **steps** / **elapsed_ms** — cost per task
@@ -34,10 +34,6 @@ _TASKS_PATH = Path(__file__).resolve().parent / "deep_research_tasks.json"
 def load_tasks(path: Path | str = _TASKS_PATH) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
-
-# ---------------------------------------------------------------------------
-# pure scoring (over a report-shaped dict)
-# ---------------------------------------------------------------------------
 
 def _text_blob(report: dict) -> str:
     parts = [report.get("executive_answer") or ""]
@@ -91,13 +87,9 @@ def _search_as_report(sr: dict) -> dict:
         "findings": [{"text": c.get("text", "")} for c in sr.get("claims", [])],
         "sources": sr.get("sources", []),
         "disputed_points": [{"text": c.get("text", "")} for c in sr.get("claims", []) if c.get("disputed")],
-        "groundedness": {},  # search has no report-level groundedness
+        "groundedness": {},
     }
 
-
-# ---------------------------------------------------------------------------
-# runner
-# ---------------------------------------------------------------------------
 
 def _avg(values: list) -> float | None:
     nums = [v for v in values if isinstance(v, (int, float))]
@@ -120,7 +112,7 @@ def run_benchmark(conn, tasks: list[dict], *, k: int = 5, max_steps: int = 4,
         dr = score_report(report, task)
         dr.update(steps=run["budget"]["steps_used"], elapsed_ms=run["budget"]["elapsed_ms"],
                   status=run["status"])
-        delete_run(conn, run["run_id"])  # benchmark runs are ephemeral
+        delete_run(conn, run["run_id"])
 
         sr = search(conn, task["question"], mode="claims", k=k, format="full", use_llm=use_llm)
         ss = score_report(_search_as_report(sr), task)

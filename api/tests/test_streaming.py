@@ -1,4 +1,4 @@
-"""SSE streaming endpoint + helpers (SUP-107)."""
+"""SSE streaming endpoint + helpers."""
 
 import json
 
@@ -62,7 +62,7 @@ def test_stream_reports_error_in_band(monkeypatch):
     monkeypatch.setattr(main, "search", boom)
     client = TestClient(main.app)
     r = client.get("/search/stream", params={"q": "x"})
-    assert r.status_code == 200  # status already committed; error is in-band
+    assert r.status_code == 200
     events = parse_sse(r.text)
     assert events[-1][0] == "error"
     assert events[-1][1]["error"]["code"] == "invalid_request"

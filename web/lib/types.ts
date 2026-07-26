@@ -1,5 +1,3 @@
-// Mirror of the api /search response contract (SUP-92, CONTRACT_VERSION "1.0").
-
 export type Mode = "raw" | "claims" | "full";
 export type Relation = "supports" | "contradicts" | "explains";
 
@@ -65,8 +63,6 @@ export interface Citation {
   source_type: string | null;
   trust_score: number | null;
 }
-
-// ---- deep research (POST /research/stream) ----
 
 export interface SubQuestion {
   id: number;

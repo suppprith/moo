@@ -1,4 +1,4 @@
-"""Cited report assembler (app.research.report, SUP-113)."""
+"""Cited report assembler."""
 
 import sqlite3
 
@@ -20,22 +20,17 @@ def conn():
         CREATE TABLE evidence (id INTEGER PRIMARY KEY, claim_id INTEGER, chunk_id INTEGER, relation TEXT, strength REAL);
         """
     )
-    # docs D1 (official, high trust), D2 (blog, low trust)
     c.execute("INSERT INTO document VALUES (1,'https://pg/docs','PG Docs','docs',0.95)")
     c.execute("INSERT INTO document VALUES (2,'https://blog/x','A Blog','blog',0.4)")
     c.execute("INSERT INTO chunk VALUES (10,1,NULL)")
-    c.execute("INSERT INTO chunk VALUES (11,1,NULL)")  # second chunk in D1
+    c.execute("INSERT INTO chunk VALUES (11,1,NULL)")
     c.execute("INSERT INTO chunk VALUES (20,2,NULL)")
-    # claim 1: well-supported by D1
     c.execute("INSERT INTO claim VALUES (1,'Postgres handles joins well',0.8,0)")
     c.execute("INSERT INTO evidence VALUES (1,1,10,'supports',0.9)")
-    # claim 2: disputed - supported by D1, contradicted by D2
     c.execute("INSERT INTO claim VALUES (2,'X is always faster',0.5,1)")
     c.execute("INSERT INTO evidence VALUES (2,2,10,'supports',0.7)")
     c.execute("INSERT INTO evidence VALUES (3,2,20,'contradicts',0.7)")
-    # claim 3: uncited (no evidence, no provenance) -> must be dropped
     c.execute("INSERT INTO claim VALUES (3,'Unsupported assertion',0.6,0)")
-    # claim 4: "disputed" but both sides are the SAME document D1 -> not two-sided
     c.execute("INSERT INTO claim VALUES (4,'Self-contradicting in one doc',0.5,1)")
     c.execute("INSERT INTO evidence VALUES (4,4,10,'supports',0.7)")
     c.execute("INSERT INTO evidence VALUES (5,4,11,'contradicts',0.7)")
@@ -67,9 +62,8 @@ def test_report_shape(conn):
 def test_uncited_claim_excluded_from_findings(conn):
     r = report_mod.assemble_report(conn, _run(), use_llm=False)
     texts = {f["text"] for f in r["findings"]}
-    assert "Unsupported assertion" not in texts          # faithfulness
+    assert "Unsupported assertion" not in texts
     assert "Postgres handles joins well" in texts
-    # every finding carries at least one citation
     assert all(f["citations"] for f in r["findings"])
 
 
@@ -78,15 +72,14 @@ def test_disputed_point_is_two_sided(conn):
     assert len(r["disputed_points"]) == 1
     dp = r["disputed_points"][0]
     assert dp["text"] == "X is always faster"
-    assert dp["supports"] and dp["contradicts"]           # both sides present
+    assert dp["supports"] and dp["contradicts"]
     assert set(dp["supports"]).isdisjoint(dp["contradicts"])
 
 
 def test_same_document_dispute_is_not_two_sided(conn):
     r = report_mod.assemble_report(conn, _run(), use_llm=False)
     dp_texts = {dp["text"] for dp in r["disputed_points"]}
-    assert "Self-contradicting in one doc" not in dp_texts     # same S# both sides
-    # it still appears as a normal finding, just not flagged disputed
+    assert "Self-contradicting in one doc" not in dp_texts
     finding = next(f for f in r["findings"] if f["text"] == "Self-contradicting in one doc")
     assert finding["disputed"] is False
 
@@ -101,13 +94,12 @@ def test_sources_have_trust_tier_and_handle(conn):
     by_doc = {s["document_id"]: s for s in r["sources"]}
     assert by_doc[1]["trust_tier"] == "high" and by_doc[1]["handle"] == "doc_1"
     assert by_doc[2]["trust_tier"] == "low"
-    # deduped by document: each document appears once despite backing many claims
     assert len(r["sources"]) == len({s["document_id"] for s in r["sources"]})
 
 
 def test_executive_answer_is_grounded_and_cited(conn):
     r = report_mod.assemble_report(conn, _run(), use_llm=False)
-    assert "[S" in r["executive_answer"]                  # template cites sources
+    assert "[S" in r["executive_answer"]
     assert r["generator"] == "template"
 
 

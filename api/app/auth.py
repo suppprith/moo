@@ -1,4 +1,4 @@
-"""Optional API-key auth + per-key rate limiting & usage metering (SUP-108).
+"""Optional API-key auth + per-key rate limiting & usage metering.
 
 Off by default: with no keys configured, moo runs fully open — the local /
 self-hosted mode. Set ``MOO_API_KEYS`` (comma-separated) to require a key on the
@@ -7,7 +7,7 @@ data endpoints; ``MOO_RATE_LIMIT_PER_MIN`` sets the per-key request limit
 ``X-API-Key``.
 
 Metering counts requests per key (for later inspection via ``/usage``); no query
-*content* is ever stored — the privacy principle holds.
+*content* is ever stored.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def check(request) -> str:
     rate_limited) otherwise."""
     keys = _keys()
     if keys is None:
-        return "local"  # open mode
+        return "local"
     key = _extract_key(request)
     if not key or key not in keys:
         raise ApiError("unauthorized", "missing or invalid API key")

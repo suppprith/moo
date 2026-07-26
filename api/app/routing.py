@@ -1,4 +1,4 @@
-"""Adaptive query routing (SUP-132).
+"""Adaptive query routing.
 
 One fixed retrieval pipeline treats "PG::DeadlockDetected error" and "why do
 databases use write-ahead logging" identically — but the first is won by exact
@@ -19,14 +19,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# code identifiers: snake_case, CamelCase, dotted.paths, ::, (), UPPER_CONSTS
 _IDENTIFIER_RES = [
-    re.compile(r"\b[a-z0-9]+_[a-z0-9_]+\b"),            # snake_case
-    re.compile(r"\b[a-z]+[A-Z][A-Za-z]+\b"),            # camelCase / mixedCase
-    re.compile(r"\b[A-Z][a-z]+[A-Z][A-Za-z]+\b"),       # CamelCase
-    re.compile(r"\b\w+\.\w+\.\w+\b"),                   # dotted.mod.path
-    re.compile(r"::|->\w|\w\(\)"),                      # ::, ->x, call()
-    re.compile(r"\b[A-Z][A-Z0-9]+_[A-Z0-9_]+\b"),       # UPPER_SNAKE consts
+    re.compile(r"\b[a-z0-9]+_[a-z0-9_]+\b"),
+    re.compile(r"\b[a-z]+[A-Z][A-Za-z]+\b"),
+    re.compile(r"\b[A-Z][a-z]+[A-Z][A-Za-z]+\b"),
+    re.compile(r"\b\w+\.\w+\.\w+\b"),
+    re.compile(r"::|->\w|\w\(\)"),
+    re.compile(r"\b[A-Z][A-Z0-9]+_[A-Z0-9_]+\b"),
 ]
 _ERROR_RE = re.compile(
     r"\b(?:error|exception|traceback|panic|fatal|segfault|stack\s*trace|errno|"
@@ -35,10 +34,9 @@ _ERROR_RE = re.compile(
 )
 _QUOTED_RE = re.compile(r"\"[^\"]{4,}\"|'[^']{4,}'")
 
-SEMANTIC_MIN_WORDS = 10   # long prose with no identifiers reads as conceptual
-PARAGRAPH_WORDS = 30      # pasted-context queries: skip fan-out entirely
+SEMANTIC_MIN_WORDS = 10
+PARAGRAPH_WORDS = 30
 
-# (vector_weight, keyword_weight) per strategy — RRF vote multipliers
 WEIGHTS = {
     "exact": (0.9, 1.6),
     "semantic": (1.3, 0.8),
@@ -48,11 +46,11 @@ WEIGHTS = {
 
 @dataclass
 class Routing:
-    strategy: str          # exact | semantic | balanced
+    strategy: str
     vector_weight: float
     keyword_weight: float
-    fan_out: bool          # expand into query variants?
-    signals: list[str]     # why this strategy was chosen
+    fan_out: bool
+    signals: list[str]
 
 
 def _has_identifier(query: str) -> bool:
@@ -73,7 +71,7 @@ def route(query: str, intent: str | None = None) -> Routing:
     if _QUOTED_RE.search(query):
         signals.append("quoted")
 
-    if signals:  # exact tokens present: BM25 is the precision instrument
+    if signals:
         strategy = "exact"
     elif words >= SEMANTIC_MIN_WORDS or intent in ("definition", "why", "comparison"):
         strategy = "semantic"
@@ -82,8 +80,6 @@ def route(query: str, intent: str | None = None) -> Routing:
         strategy = "balanced"
 
     if intent == "troubleshooting" and strategy != "exact":
-        # troubleshooting phrasing without literal tokens still benefits from
-        # keyword parity — error text tends to be quoted verbatim in sources
         strategy = "balanced"
         signals.append("troubleshooting")
 

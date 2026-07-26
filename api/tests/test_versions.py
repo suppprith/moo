@@ -1,4 +1,4 @@
-"""Version awareness (app.versions, SUP-136)."""
+"""Version awareness."""
 
 import sqlite3
 from dataclasses import dataclass, field
@@ -8,7 +8,6 @@ import pytest
 from app import search as search_mod
 from app import versions as V
 
-# -- extraction ---------------------------------------------------------------------
 
 def _by_key(text):
     return {(m.product, m.version): m.relation for m in V.extract_mentions(text)}
@@ -55,8 +54,6 @@ def test_no_versions_no_mentions():
     assert V.extract_mentions("Indexes speed up query performance considerably.") == []
 
 
-# -- query constraint ---------------------------------------------------------------
-
 def test_query_constraint_parsed():
     c = V.query_constraint("how does json work in redis 7")
     assert c.product == "redis" and c.version == "7"
@@ -65,8 +62,6 @@ def test_query_constraint_parsed():
 def test_query_without_version_is_none():
     assert V.query_constraint("why is my query slow") is None
 
-
-# -- matching -----------------------------------------------------------------------
 
 def test_minor_satisfies_major():
     c = V.Mention("postgresql", "16", "mentions")
@@ -84,8 +79,6 @@ def test_annotate_outdated_only_older_majors():
     unrelated = [V.Mention("redis", "7", "mentions")]
     assert V.annotate(c, unrelated) == {"match": False, "outdated": False}
 
-
-# -- retrieval boost end-to-end (patched retrieve) ------------------------------------
 
 @dataclass
 class Hit:
@@ -118,13 +111,11 @@ def conn():
 
 
 def test_version_query_reorders_and_annotates(conn, monkeypatch):
-    # RRF order puts the outdated 9.4 source FIRST (it scored higher)
     monkeypatch.setattr(
         search_mod, "retrieve",
         lambda *a, **k: [Hit(**OLD_HIT.__dict__), Hit(**NEW_HIT.__dict__)],
     )
     out = search_mod.search(conn, "postgres 16 parallel vacuum", mode="raw", live=False)
-    # the 16-matching source outranks the higher-RRF 9.4 source
     assert [s["chunk_id"] for s in out["sources"]] == [1, 2]
     by_id = {s["chunk_id"]: s for s in out["sources"]}
     assert by_id[1]["version_match"] is True
@@ -139,7 +130,6 @@ def test_no_constraint_no_version_fields(conn, monkeypatch):
         lambda *a, **k: [Hit(**OLD_HIT.__dict__), Hit(**NEW_HIT.__dict__)],
     )
     out = search_mod.search(conn, "how does vacuum work", mode="raw", live=False)
-    # RRF order untouched, no version keys anywhere
     assert [s["chunk_id"] for s in out["sources"]] == [2, 1]
     assert all("version_match" not in s for s in out["sources"])
     assert "version_constraint" not in out["meta"]

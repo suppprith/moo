@@ -1,4 +1,4 @@
-"""Fast vs deep mode over live retrieval (SUP-145).
+"""Fast vs deep mode over live retrieval.
 
 fast = mode raw + live: fetch fresh pages, return snippets, ZERO LLM calls.
 deep = mode claims/full + live: same fetch, then the evidence pass.
@@ -48,13 +48,13 @@ def test_fast_mode_live_snippets_zero_llm(conn, llm_calls):
         conn, QUERY, mode="raw",
         live_provider=FakeProvider(DEV_CANDS), live_fetcher=FakeFetcher(PAGES),
     )
-    assert llm_calls["n"] == 0                       # fast mode stays model-free
+    assert llm_calls["n"] == 0
     assert out["sources"], "live fast mode returned nothing"
     assert out["meta"]["live"]["fetched"] == 2
     assert out["meta"]["live"]["provider"] == "fake"
     assert out["meta"]["live"]["out_of_domain"] is False
     urls = {s["document_url"] for s in out["sources"]}
-    assert urls <= set(PAGES)                        # everything came from the live fetch
+    assert urls <= set(PAGES)
 
 
 def test_deep_mode_live_evidence(conn):
@@ -72,7 +72,7 @@ def test_live_false_serves_store_only(conn, llm_calls):
         conn, QUERY, mode="raw", live=False,
         live_provider=FakeProvider(DEV_CANDS), live_fetcher=fetcher,
     )
-    assert "live" not in out["meta"]                 # legacy shape untouched
+    assert "live" not in out["meta"]
     assert fetcher.requests == []
 
 
@@ -90,7 +90,7 @@ def test_out_of_domain_flagged(conn):
         live_provider=FakeProvider(FOOD_CANDS), live_fetcher=FakeFetcher({}),
     )
     assert out["meta"]["live"]["out_of_domain"] is True
-    assert out["sources"] == []                      # nothing junk was ingested
+    assert out["sources"] == []
 
 
 def test_agent_format_carries_live_meta(conn):

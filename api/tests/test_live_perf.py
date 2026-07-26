@@ -1,4 +1,4 @@
-"""Live-fetch concurrency, deadline and cost accounting (SUP-146)."""
+"""Live-fetch concurrency, deadline and cost accounting."""
 
 import threading
 import time
@@ -55,7 +55,6 @@ def conn(tmp_path):
     c.close()
 
 
-# four pages on four different hosts -> fetchable in parallel
 MULTI_HOST_PAGES = {
     "https://docs.python.org/3/vacuum.html": _page("A"),
     "https://www.postgresql.org/docs/16/vacuum.html": _page("B"),
@@ -64,7 +63,6 @@ MULTI_HOST_PAGES = {
 }
 MULTI_HOST_CANDS = [Candidate(u, rank=i) for i, u in enumerate(MULTI_HOST_PAGES)]
 
-# four pages on ONE host -> must stay serial (politeness)
 SAME_HOST_PAGES = {
     f"https://docs.python.org/3/page{i}.html": _page(f"P{i}") for i in range(4)
 }
@@ -79,35 +77,30 @@ def test_hosts_fetch_concurrently(conn):
                         provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
     fetch_elapsed = report["timings_ms"]["fetch"] / 1000
     assert report["fetched"] == 4 and report["timed_out"] == 0
-    # serial would be >= 4 * delay = 1.0s; concurrent across 4 hosts ~= delay
     assert fetch_elapsed < 3 * delay, f"fetch not concurrent: {fetch_elapsed:.2f}s"
-    assert time.monotonic() - t0 < 30  # sanity
+    assert time.monotonic() - t0 < 30
 
 
 def test_same_host_stays_serial(conn):
     fetcher = SlowFetcher(SAME_HOST_PAGES, 0.05)
     live_fetch(conn, "python docs pages",
                provider=FakeProvider(SAME_HOST_CANDS), fetcher=fetcher)
-    # the politeness invariant: no two requests to the same host may overlap
-    # in time (serialized by a per-host lock; thread identity is irrelevant)
     spans = sorted((s, e) for _, s, e, _ in fetcher.log)
     for (s1, e1), (s2, e2) in zip(spans, spans[1:], strict=False):
         assert e1 <= s2 + 1e-6, "same-host fetches overlapped"
-    assert len(fetcher.log) == 4  # all pages fetched
+    assert len(fetcher.log) == 4
 
 
 def test_deadline_returns_partial_results(conn):
     delay = 0.4
-    fetcher = SlowFetcher(SAME_HOST_PAGES, delay)  # one host: serial, ~1.6s total
+    fetcher = SlowFetcher(SAME_HOST_PAGES, delay)
     t0 = time.monotonic()
     report = live_fetch(conn, "python docs pages", max_seconds=0.6,
                         provider=FakeProvider(SAME_HOST_CANDS), fetcher=fetcher)
     elapsed = time.monotonic() - t0
-    assert report["timed_out"] > 0                       # some pages abandoned
-    assert report["fetched"] >= 1                        # but partial results landed
+    assert report["timed_out"] > 0
+    assert report["fetched"] >= 1
     assert report["fetched"] + report["timed_out"] + report["failed"] == 4
-    # returned promptly after the deadline, not after all 4 * 0.4s fetches
-    # (one straggler request may still finish; embedding of partials adds time)
     assert elapsed < 4 * delay + 8
 
 
@@ -115,7 +108,7 @@ def test_cost_block_accounts_provider_and_pages(conn):
     fetcher = SlowFetcher(MULTI_HOST_PAGES, 0.0)
     report = live_fetch(conn, "postgres vacuum",
                         provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
-    assert report["cost"]["provider_calls"] == 0          # FakeProvider bypasses metering
+    assert report["cost"]["provider_calls"] == 0
     assert report["cost"]["pages_attempted"] == 4
     assert report["cost"]["max_seconds"] > 0
 
@@ -127,8 +120,7 @@ def test_warm_repeat_is_faster_than_cold(conn):
                       provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
     warm = live_fetch(conn, "postgres vacuum",
                       provider=FakeProvider(MULTI_HOST_CANDS), fetcher=fetcher)
-    # warm: everything within TTL -> zero network, no chunk/embed/index stages
     assert warm["fresh"] == 4 and warm["new_chunks"] == 0
-    assert len(fetcher.log) == 4  # not a single extra request on the warm run
+    assert len(fetcher.log) == 4
     assert "embed" not in warm["timings_ms"]
     assert cold["new_chunks"] > 0

@@ -1,4 +1,4 @@
-"""Docs & engineering-blog connector (SUP-74).
+"""Docs & engineering-blog connector.
 
 Discovers pages (explicit seeds or a sitemap), fetches them through the shared
 Fetcher (robots-respecting), and extracts clean main content as **markdown**
@@ -48,10 +48,8 @@ class DocsConnector(Connector):
 
     @classmethod
     def default_fetcher(cls) -> Fetcher:
-        # Real crawling: respect robots, be polite.
         return Fetcher(min_interval=1.0, obey_robots=True)
 
-    # -- url discovery -------------------------------------------------------
     def _sitemap_urls(self, sitemap_url: str, site: DocsSite) -> list[str]:
         res = self.fetcher.get(sitemap_url)
         if not res.ok:
@@ -63,7 +61,6 @@ class DocsConnector(Connector):
             log.warning("sitemap parse failed %s: %s", sitemap_url, exc)
             return []
         locs = [el.text.strip() for el in root.iter() if el.tag.endswith("loc") and el.text]
-        # nested sitemap index -> pull a few child sitemaps
         if root.tag.endswith("sitemapindex"):
             urls: list[str] = []
             for child in locs[:3]:
@@ -82,7 +79,6 @@ class DocsConnector(Connector):
             return self._sitemap_urls(site.sitemap, site)
         return []
 
-    # -- extraction ----------------------------------------------------------
     def _extract(self, site: DocsSite, url: str, html: str) -> RawDoc | None:
         md = trafilatura.extract(
             html, output_format="markdown", include_formatting=True, favor_recall=True
@@ -99,7 +95,7 @@ class DocsConnector(Connector):
                 title = getattr(meta, "title", None) or url
                 published = getattr(meta, "date", None)
                 author = getattr(meta, "author", None)
-        except Exception as exc:  # noqa: BLE001 - metadata is best-effort
+        except Exception as exc:  # noqa: BLE001
             log.debug("metadata extraction failed for %s: %s", url, exc)
 
         langs = _code_langs(html)

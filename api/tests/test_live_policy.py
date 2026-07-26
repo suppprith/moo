@@ -1,4 +1,4 @@
-"""Software-domain source policy (app.live.policy, SUP-130)."""
+"""Software-domain source policy."""
 
 from app.live.policy import (
     OFF_DOMAIN_THRESHOLD,
@@ -9,7 +9,6 @@ from app.live.policy import (
 )
 from app.live.providers import Candidate
 
-# -- classify ---------------------------------------------------------------------
 
 def test_official_docs_top_tier():
     d = classify("https://docs.python.org/3/library/asyncio.html")
@@ -45,8 +44,6 @@ def test_blocked_hosts():
     assert classify("https://x.com/someone/status/1").tier == "blocked"
 
 
-# -- ranking ----------------------------------------------------------------------
-
 def test_rank_prefers_docs_over_unknown_despite_provider_rank():
     cands = [
         Candidate("https://seo-spam.example.com/postgres", rank=0),
@@ -56,15 +53,13 @@ def test_rank_prefers_docs_over_unknown_despite_provider_rank():
     ranked = rank_candidates(cands, max_pages=5)
     urls = [c.url for c, _ in ranked]
     assert urls[0].startswith("https://www.postgresql.org")
-    assert all("youtube" not in u for u in urls)  # blocked dropped entirely
+    assert all("youtube" not in u for u in urls)
 
 
 def test_rank_caps_at_max_pages():
     cands = [Candidate(f"https://docs.python.org/3/{i}", rank=i) for i in range(10)]
     assert len(rank_candidates(cands, max_pages=3)) == 3
 
-
-# -- domain confidence -------------------------------------------------------------
 
 DEV_CANDS = [
     Candidate("https://stackoverflow.com/questions/1", rank=0),

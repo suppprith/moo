@@ -1,4 +1,4 @@
-"""URL(s) -> clean markdown, with optional on-demand evidence (SUP-147).
+"""URL(s) -> clean markdown, with optional on-demand evidence.
 
 The second product surface: "give moo a URL, get clean markdown back" —
 Firecrawl's core product, Tavily's ``/extract``, Exa's ``/contents``. moo
@@ -39,8 +39,6 @@ from .live.providers import Candidate
 MAX_URLS = 10
 DEPTHS = ("raw", "claims")
 
-# OpenAI function-tool definition, served alongside web_search on /v1/tools;
-# execute calls against POST /v1/extract.
 OPENAI_TOOL = {
     "type": "function",
     "function": {
@@ -74,7 +72,7 @@ OPENAI_TOOL = {
 
 
 def _error(code: str, message: str, retryable: bool = False) -> dict:
-    """Per-URL error in the API envelope's inner shape (SUP-107 taxonomy)."""
+    """Per-URL error in the API envelope's inner shape."""
     return {"code": code, "message": message, "retryable": retryable}
 
 
@@ -119,7 +117,6 @@ def _document_entry(conn: sqlite3.Connection, url: str, *, from_cache: bool) -> 
             "trust_score": doc.get("trust_score"),
         },
     }
-    # injection-flagged content (SUP-131): the caller must treat it as data
     import json as _json
 
     try:
@@ -189,8 +186,8 @@ def extract_urls(
     if len(urls) > MAX_URLS:
         raise ValueError(f"at most {MAX_URLS} urls per request, got {len(urls)}")
 
-    entries: dict[int, dict] = {}  # input index -> result entry
-    seen: dict[str, int] = {}      # url -> first input index (dedup, same result)
+    entries: dict[int, dict] = {}
+    seen: dict[str, int] = {}
     to_fetch: list[tuple[Candidate, policy.DomainInfo]] = []
     cached: list[int] = []
 
@@ -206,14 +203,13 @@ def extract_urls(
             continue
         info = policy.classify(url)
         if not force and pipeline._is_fresh(conn, url, info.tier):
-            cached.append(i)  # within TTL: serve from the store, zero network
+            cached.append(i)
         else:
             to_fetch.append((Candidate(url, rank=i), info))
 
-    # -- fetch + extract (shared live path: concurrent, per-host serial) --------
     started = time.perf_counter()
     fetched_docs: list[int] = []
-    outcomes: dict[str, int] = {}  # store outcome -> count
+    outcomes: dict[str, int] = {}
     if to_fetch:
         fetcher = fetcher or pipeline._default_fetcher()
         deadline = time.monotonic() + max_seconds
@@ -232,7 +228,7 @@ def extract_urls(
                 continue
             try:
                 outcome = store(conn, doc)
-            except Exception:  # noqa: BLE001 - one bad page never fails the batch
+            except Exception:  # noqa: BLE001
                 entries[cand.rank] = {"url": cand.url, "ok": False,
                                       "error": _error("internal", "failed to store document", True)}
                 continue
@@ -245,14 +241,12 @@ def extract_urls(
         pipeline._score_trust(conn, fetched_docs)
         conn.commit()
 
-    # -- chunk -> embed -> index (incremental; skipped when fully cache-served) --
     if fetched_docs:
         rechunk(conn, only_new=True)
         embed_corpus(conn)
         vector.build(conn)
         keyword.build(conn)
 
-    # -- assemble per-URL payloads ----------------------------------------------
     n_cached = len(cached)
     n_failed = 0
     for i, url in enumerate(urls):
@@ -278,12 +272,10 @@ def extract_urls(
     n_failed = sum(1 for e in ordered if not e["ok"])
     return {
         "results": ordered,
-        # page content is untrusted third-party data, always say so (SUP-131)
         "notice": safety.UNTRUSTED_NOTICE,
         "cost": {
             "requested": len(urls),
             "fetched": len(fetched_docs),
-            # re-fetched past TTL but content-hash identical: no re-index work
             "unchanged": outcomes.get("unchanged", 0),
             "from_cache": n_cached,
             "failed": n_failed,

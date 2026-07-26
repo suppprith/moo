@@ -1,4 +1,4 @@
-"""Span highlights + calibrated relevance (SUP-133).
+"""Span highlights + calibrated relevance.
 
 A whole ~450-token chunk is a lot of context for an agent to budget; the
 tightest relevant span is usually what it actually needs. For each returned
@@ -68,7 +68,7 @@ def highlight_hits(query: str, texts: list[str], *, top: int = DEFAULT_TOP) -> l
 
     qv = embed_texts([QUERY_PREFIX + query])[0]
     span_vecs = embed_texts(flat)
-    sims = span_vecs @ qv  # normalized -> cosine
+    sims = span_vecs @ qv
 
     results = [{"highlights": [], "relevance": 0.0} for _ in texts]
     by_owner: dict[int, list[tuple[int, float, str]]] = {}
@@ -76,7 +76,7 @@ def highlight_hits(query: str, texts: list[str], *, top: int = DEFAULT_TOP) -> l
         by_owner.setdefault(i, []).append((j, float(sim), flat[j]))
     for i, scored in by_owner.items():
         best = sorted(scored, key=lambda t: -t[1])[:top]
-        best.sort(key=lambda t: t[0])  # restore document order for readability
+        best.sort(key=lambda t: t[0])
         results[i] = {
             "highlights": [s for _, _, s in best],
             "relevance": round(max(0.0, max(sim for _, sim, _ in best)), 4),

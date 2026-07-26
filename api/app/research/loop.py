@@ -1,6 +1,6 @@
-"""Iterative multi-hop research loop (SUP-111).
+"""Iterative multi-hop research loop.
 
-Executes a plan (SUP-110): runs each sub-question through the evidence pipeline
+Executes a plan: runs each sub-question through the evidence pipeline
 (retrieve -> extract_claims -> link_claim -> score_claim), accumulating claims
 across steps, then decides what to retrieve next:
 
@@ -17,7 +17,7 @@ cap. Every step is logged with the query and *why* it was spawned
 Claims dedup naturally: ``extract_claims`` persists by ``normalized_key``, so the
 same claim surfaced by two sub-questions is one row (linked/scored once).
 
-**Live research (SUP-143).** The loop itself is source-agnostic: an optional
+**Live research.** The loop itself is source-agnostic: an optional
 ``pre_step(query)`` hook runs before each step's evidence pass. When live
 retrieval is configured, ``session.run_research`` wires that hook to
 ``live.pipeline.live_fetch`` under a shared page budget, so every step —
@@ -41,10 +41,10 @@ from ..expand import expand, normalize_query
 
 log = logging.getLogger("moo.research.loop")
 
-MAX_STEPS = 8            # hard cap on retrieve+extract cycles
-MAX_SECONDS = 30.0       # wall-clock cap
-MIN_CLAIMS = 2           # fewer than this for a sub-question => a gap
-LOW_CONFIDENCE = 0.45    # best claim below this => a gap
+MAX_STEPS = 8
+MAX_SECONDS = 30.0
+MIN_CLAIMS = 2
+LOW_CONFIDENCE = 0.45
 MAX_CONTRADICTION_CHASES = 3
 
 
@@ -89,18 +89,17 @@ def run_loop(
     per-sub-question coverage, budget).
 
     ``on_step(step_record, [(claim_id, sub_question_id), ...])`` is invoked after
-    each step so a caller can persist progress incrementally (SUP-112).
+    each step so a caller can persist progress incrementally.
     ``pre_step(query)`` is invoked before each step's evidence pass — the live
-    retrieval hook (SUP-143); its failures are logged, never fatal."""
+    retrieval hook; its failures are logged, never fatal."""
     started = time.perf_counter()
     deadline = started + max_seconds
 
-    # work queue seeded from the plan; each item carries why it was spawned
     queue: deque[tuple[int, str, str]] = deque(
         (s["id"], s["question"], "plan") for s in plan["sub_questions"]
     )
 
-    seen: dict[int, dict] = {}              # claim_id -> record (linked/scored once)
+    seen: dict[int, dict] = {}
     per_subq: dict[int, set[int]] = {s["id"]: set() for s in plan["sub_questions"]}
     steps: list[dict] = []
     run_queries: set[str] = set()
@@ -113,9 +112,6 @@ def run_loop(
     while queue and budget_left():
         sub_id, query, reason = queue.popleft()
         nq = normalize_query(query)
-        # exact dedup for any query; near-dup suppression only for spawned
-        # follow-ups (plan sub-questions are intentionally similar — the axes of a
-        # comparison share most tokens — and must always run).
         if nq in run_queries or (reason != "plan" and _too_similar(nq, run_queries)):
             continue
         run_queries.add(nq)
@@ -123,7 +119,7 @@ def run_loop(
         if pre_step is not None:
             try:
                 pre_step(query)
-            except Exception as exc:  # noqa: BLE001 - live fetch must never kill research
+            except Exception as exc:  # noqa: BLE001
                 log.warning("pre_step failed for step %d: %s", len(steps) + 1, exc)
 
         step_claims = extract_claims(conn, query, k=k, use_llm=use_llm)
@@ -152,15 +148,12 @@ def run_loop(
                 new_disputed.append(c["id"])
         conn.commit()
 
-        # temporal pass (SUP-137): version-separated conflicts become
-        # supersession chains instead of live disputes
         if step_claims:
             from ..evidence.temporal import process as temporal_process
 
             try:
                 result = temporal_process(conn, step_claims)
                 if result["superseded"]:
-                    # some disputed flags may have been cleared: refresh
                     for cid in list(new_disputed):
                         row = conn.execute(
                             "SELECT disputed FROM claim WHERE id = ?", (cid,)
@@ -168,7 +161,7 @@ def run_loop(
                         if row and not row["disputed"]:
                             new_disputed.remove(cid)
                             seen[cid]["disputed"] = False
-            except Exception as exc:  # noqa: BLE001 - temporal pass is best-effort
+            except Exception as exc:  # noqa: BLE001
                 log.warning("temporal pass failed: %s", exc)
 
         step_record = {
@@ -184,7 +177,6 @@ def run_loop(
         if on_step is not None:
             on_step(step_record, [(c["id"], sub_id) for c in step_claims])
 
-        # gap detection: one follow-up per original sub-question, budget permitting
         if reason == "plan" and sub_id not in gaps_spawned and budget_left():
             subq_claims = [seen[cid] for cid in per_subq.get(sub_id, set()) if cid in seen]
             if len(step_claims) < MIN_CLAIMS or _max_conf(subq_claims) < LOW_CONFIDENCE:
@@ -193,7 +185,6 @@ def run_loop(
                     gaps_spawned.add(sub_id)
                     queue.append((sub_id, follow, "gap"))
 
-        # contradiction chasing: pull more on each newly disputed claim
         for cid in new_disputed:
             if len(chased) >= MAX_CONTRADICTION_CHASES:
                 break

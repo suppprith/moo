@@ -1,4 +1,4 @@
-"""Entity & relation extraction (SUP-87) — build the knowledge graph nodes/edges.
+"""Entity & relation extraction — build the knowledge graph nodes/edges.
 
 `build_graph(conn)` populates the `entity` / `entity_alias` / `relation` tables
 from the corpus:
@@ -34,8 +34,6 @@ log = logging.getLogger("moo.graph.entities")
 ENTITY_TYPES = ("tool", "library", "concept", "algorithm")
 RELATION_TYPES = ("alternative-to", "built-with", "used-by", "part-of", "replaces")
 
-# v1-domain seed: canonical name -> (type, extra description). Aliases come from
-# inverting BUILTIN_ALIASES below, so the map stays the single source of truth.
 SEED_TYPES: dict[str, str] = {
     "PostgreSQL": "tool", "MySQL": "tool", "MariaDB": "tool", "SQLite": "tool",
     "Redis": "tool", "PgBouncer": "tool",
@@ -43,8 +41,6 @@ SEED_TYPES: dict[str, str] = {
     "Redis RDB": "concept", "Redis AOF": "concept",
 }
 
-# Definitional part-of edges lexically implied by the domain (a Postgres feature,
-# a Redis persistence mode). Corpus extraction adds the comparative edges on top.
 SEED_RELATIONS: list[tuple[str, str, str]] = [
     ("JSONB", "part-of", "PostgreSQL"),
     ("MVCC", "part-of", "PostgreSQL"),
@@ -113,10 +109,6 @@ Title: {title}
 Text:
 {text}"""
 
-
-# ---------------------------------------------------------------------------
-# persistence with dedup
-# ---------------------------------------------------------------------------
 
 def _alias_index(conn: sqlite3.Connection) -> dict[str, int]:
     """Map every known alias/canonical (lowercased) -> entity id, for dedup."""
@@ -188,7 +180,7 @@ def add_relation(
         "VALUES (?, ?, ?, ?, ?)",
         (subject_id, obj_id, rtype, strength, document_id),
     )
-    if cur.rowcount == 0:  # edge existed — upgrade strength / provenance
+    if cur.rowcount == 0:
         conn.execute(
             "UPDATE relation SET strength = MAX(COALESCE(strength, 0), COALESCE(?, 0)), "
             "document_id = COALESCE(document_id, ?) "
@@ -198,10 +190,6 @@ def add_relation(
         return False
     return True
 
-
-# ---------------------------------------------------------------------------
-# seeding
-# ---------------------------------------------------------------------------
 
 def _canonical_aliases() -> dict[str, list[str]]:
     """Invert BUILTIN_ALIASES: canonical name -> [alias, ...]."""
@@ -226,10 +214,6 @@ def seed_domain(conn: sqlite3.Connection, idx: dict[str, int]) -> int:
     conn.commit()
     return edges
 
-
-# ---------------------------------------------------------------------------
-# extraction
-# ---------------------------------------------------------------------------
 
 def _documents(conn: sqlite3.Connection, limit: int | None) -> list[sqlite3.Row]:
     sql = (

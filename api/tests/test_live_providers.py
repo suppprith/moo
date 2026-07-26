@@ -1,4 +1,4 @@
-"""URL-discovery providers (app.live.providers, SUP-130). No network."""
+"""URL-discovery providers. No network."""
 
 import httpx
 import pytest
@@ -35,8 +35,6 @@ class StubClient:
         return self._resp
 
 
-# -- searxng ----------------------------------------------------------------------
-
 SEARX_PAYLOAD = {
     "results": [
         {"url": "https://docs.python.org/3/library/gc.html", "title": "gc", "content": "docs"},
@@ -67,8 +65,6 @@ def test_searxng_respects_count():
     assert len(p.discover("q", count=1)) == 1
 
 
-# -- brave ------------------------------------------------------------------------
-
 BRAVE_PAYLOAD = {
     "web": {
         "results": [
@@ -89,7 +85,6 @@ def test_brave_parses():
         "https://redis.io/docs/persistence/",
         "https://news.ycombinator.com/item?id=1",
     ]
-    # key travels in the header, not the URL
     _, kw = client.calls[0]
     assert kw["headers"]["X-Subscription-Token"] == "key123"
 
@@ -106,8 +101,6 @@ def test_call_stats_metered():
     stats = get_stats()
     assert stats["calls"] == 2 and stats["errors"] == 1
 
-
-# -- resolve_provider from env -------------------------------------------------------
 
 CFG_VARS = [
     "MOO_SEARCH_PROVIDER", "MOO_SEARXNG_URL", "MOO_SEARCH_URL",
@@ -150,5 +143,5 @@ def test_explicit_off_disables(monkeypatch):
 
 
 def test_explicit_provider_missing_credential_is_none(monkeypatch):
-    monkeypatch.setenv("MOO_SEARCH_PROVIDER", "brave")  # no key set
+    monkeypatch.setenv("MOO_SEARCH_PROVIDER", "brave")
     assert resolve_provider() is None

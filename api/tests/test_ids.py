@@ -1,4 +1,4 @@
-"""Unit tests for opaque handles (app.ids, SUP-105)."""
+"""Unit tests for opaque handles."""
 
 import pytest
 

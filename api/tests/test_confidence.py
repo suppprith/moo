@@ -51,12 +51,10 @@ def test_strong_both_sides_is_disputed():
 
 def test_independence_same_document_counts_once():
     conn = _db()
-    # three chunks from the SAME document must not triple-count
     _add(conn, 10, 100, 0.8, "supports", 0.9)
     _add(conn, 11, 100, 0.8, "supports", 0.9)
     _add(conn, 12, 100, 0.8, "supports", 0.9)
     one = score_claim(conn, 1)
-    # a second, genuinely independent document should raise the mass
     _add(conn, 20, 200, 0.8, "supports", 0.9)
     two = score_claim(conn, 1)
     assert two["support_mass"] > one["support_mass"]
@@ -65,11 +63,10 @@ def test_independence_same_document_counts_once():
 
 def test_near_dup_repost_counts_once():
     conn = _db()
-    # chunk 11 is a near-dup of chunk 10 (canonical points at 10's document)
     _add(conn, 10, 100, 0.8, "supports", 0.9)
     _add(conn, 11, 200, 0.8, "supports", 0.9, canonical=10)
     r = score_claim(conn, 1)
-    assert r["breakdown"]["supporting_sources"] == 1  # repost collapsed
+    assert r["breakdown"]["supporting_sources"] == 1
 
 
 def test_no_evidence_zero_confidence():

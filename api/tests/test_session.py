@@ -1,4 +1,4 @@
-"""Research-run persistence (app.research.session, SUP-112)."""
+"""Research-run persistence."""
 
 import sqlite3
 
@@ -70,7 +70,7 @@ def test_record_step_is_idempotent(conn):
     step = {"step": 1, "sub_question_id": 1, "query": "sq1", "reason": "plan",
             "claims": 1, "new_claims": 1, "disputed": 0}
     sess.record_step(conn, rid, step, [(1, 1)])
-    sess.record_step(conn, rid, step, [(1, 1)])  # replay -> no duplicate rows
+    sess.record_step(conn, rid, step, [(1, 1)])
     run = sess.get_run(conn, rid)
     assert len(run["steps"]) == 1 and len(run["claims"]) == 1
 
@@ -82,9 +82,8 @@ def test_delete_run_purges_but_keeps_claims(conn):
     assert sess.delete_run(conn, rid) is True
     assert sess.get_run(conn, rid) is None
     assert conn.execute("SELECT COUNT(*) FROM research_step").fetchone()[0] == 0
-    # the shared claim survives the purge
     assert conn.execute("SELECT COUNT(*) FROM claim").fetchone()[0] == 2
-    assert sess.delete_run(conn, rid) is False  # already gone
+    assert sess.delete_run(conn, rid) is False
 
 
 def test_list_runs(conn):
@@ -93,8 +92,6 @@ def test_list_runs(conn):
     runs = {r["run_id"] for r in sess.list_runs(conn)}
     assert {a, b} <= runs
 
-
-# ---- orchestrator ----------------------------------------------------------
 
 def test_run_research_persists_and_finalizes(conn, monkeypatch):
     monkeypatch.setattr(sess, "make_plan", lambda conn, q, **k: _PLAN)
@@ -107,8 +104,8 @@ def test_run_research_persists_and_finalizes(conn, monkeypatch):
 
     monkeypatch.setattr(sess, "run_loop", fake_loop)
     out = sess.run_research(conn, "q", use_llm=False)
-    assert out["status"] == "partial"          # exhausted -> partial
-    assert "cost" in out and out["cost"]["llm_calls"] == 0   # faked/keyless: no LLM calls
+    assert out["status"] == "partial"
+    assert "cost" in out and out["cost"]["llm_calls"] == 0
     persisted = sess.get_run(conn, out["run_id"])
     assert persisted["status"] == "partial"
     assert len(persisted["steps"]) == 1
@@ -124,7 +121,6 @@ def test_run_research_marks_failed_on_error(conn, monkeypatch):
     monkeypatch.setattr(sess, "run_loop", boom)
     with pytest.raises(RuntimeError):
         sess.run_research(conn, "q", use_llm=False)
-    # the run was created and marked failed before the error propagated
     runs = sess.list_runs(conn)
     assert runs and runs[0]["status"] == "failed"
     assert sess.get_run(conn, runs[0]["run_id"])["error"] == "retrieval blew up"

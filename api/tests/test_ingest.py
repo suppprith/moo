@@ -4,7 +4,6 @@ from app.ingest.fetcher import FetchResult
 from app.ingest.github import _role
 from app.ingest.models import RawDoc
 
-# -- FetchResult header handling (regression: Link pagination bug) --------------
 
 def test_headers_normalized_to_lowercase():
     r = FetchResult("http://x", 200, "", {"Link": "<http://n>; rel=\"next\"", "ETag": "e"})
@@ -25,8 +24,6 @@ def test_json_property():
     assert FetchResult("http://x", 200, "", {}).json is None
 
 
-# -- RawDoc.content_hash ---------------------------------------------------------
-
 def test_content_hash_stable_and_content_sensitive():
     a = RawDoc(source_type="docs", url="u", title="t", text="body")
     b = RawDoc(source_type="docs", url="u", title="t", text="body")
@@ -38,10 +35,8 @@ def test_content_hash_stable_and_content_sensitive():
 def test_content_hash_ignores_volatile_fields():
     a = RawDoc(source_type="so_answer", url="u", title="t", text="body", popularity=5)
     b = RawDoc(source_type="so_answer", url="u", title="t", text="body", popularity=999)
-    assert a.content_hash() == b.content_hash()  # votes don't churn the corpus
+    assert a.content_hash() == b.content_hash()
 
-
-# -- GitHub author_association mapping -------------------------------------------
 
 def test_role_mapping():
     assert _role("OWNER") == "maintainer"

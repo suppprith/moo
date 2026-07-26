@@ -1,4 +1,4 @@
-"""Machine-readable contract: OpenAPI + /contract descriptor (SUP-109)."""
+"""Machine-readable contract: OpenAPI + /contract descriptor."""
 
 import json
 
@@ -40,5 +40,4 @@ def test_contract_descriptor_exposes_version_and_tool_schemas():
     assert body["handle_formats"]["claim"] == "clm_<id>"
     names = {t["name"] for t in body["mcp_tools"]}
     assert {"search", "deep_research", "fetch_source"} <= names
-    # every tool carries an input schema (drives auto-generation)
     assert all("input_schema" in t for t in body["mcp_tools"])

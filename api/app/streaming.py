@@ -1,12 +1,11 @@
-"""Server-Sent Events helpers + event schema (SUP-107).
+"""Server-Sent Events helpers + event schema.
 
 Long endpoints stream newline-delimited SSE frames::
 
     event: <type>\\n
     data: <json>\\n\\n
 
-Event types (the documented streaming contract, reused by the deep-research
-endpoint in SUP-114):
+Event types:
 
 - ``progress`` — ``{stage, ...}`` a work-in-progress signal (no payload rows yet)
 - ``source``   — one agent-shaped source row, emitted progressively

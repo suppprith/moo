@@ -1,4 +1,4 @@
-"""Agent demo: drive moo's MCP tools end to end (SUP-123).
+"""Agent demo: drive moo's MCP tools end to end.
 
 Runs the exact flow a coding agent follows — ``deep_research`` to get a grounded
 cited report, then drill into the evidence with ``get_claim`` / ``fetch_source``,
@@ -27,7 +27,7 @@ async def run_demo(question: str, *, k: int = 5, max_steps: int = 4) -> str:
     from ..index.vector import connect
     from ..retrieve import retrieve
 
-    retrieve(connect(), "warm", k=2)  # warm the embedding model
+    retrieve(connect(), "warm", k=2)
 
     out: list[str] = ["# moo agent demo", "", f"**Question:** {question}", ""]
 
@@ -57,7 +57,6 @@ async def run_demo(question: str, *, k: int = 5, max_steps: int = 4) -> str:
         out += ["", "**Open questions (what it could not cover):**"]
         out += [f"- {q}" for q in report["open_questions"][:3]]
 
-    # drill into the evidence, the way an agent verifies a citation
     if report["findings"]:
         handle = report["findings"][0]["claim"]
         out += ["", f"## 2. get_claim({handle!r}) — verify a finding's evidence"]
@@ -99,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         from pathlib import Path
 
         Path(args.save).write_text(transcript + "\n", encoding="utf-8")
-    try:  # Windows consoles are cp1252; corpus text may contain other glyphs
+    try:
         import sys
 
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

@@ -1,4 +1,4 @@
-"""Drop-in web_search adapter (app.websearch, SUP-119)."""
+"""Drop-in web_search adapter."""
 
 import sqlite3
 
@@ -39,19 +39,16 @@ def test_web_search_shape_has_title_url_snippet(conn, monkeypatch):
     out = websearch.web_search(conn, "postgres vs mysql", k=2)
     assert out["query"] == "postgres vs mysql"
     r0 = out["results"][0]
-    # the universal web-search fields
     assert r0["title"] == "Joins"
-    assert r0["url"] == "https://d/1#joins"                 # deep link preferred
-    assert r0["snippet"] == "Postgres handles complex joins well in practice"  # whitespace collapsed
-    # moo extras ride along
+    assert r0["url"] == "https://d/1#joins"
+    assert r0["snippet"] == "Postgres handles complex joins well in practice"
     assert r0["id"] == "chk_75" and r0["source_type"] == "docs"
-    assert "evidence" not in out                              # raw depth: no evidence layer
+    assert "evidence" not in out
 
 
 def test_title_falls_back_to_host(conn, monkeypatch):
     monkeypatch.setattr(websearch, "run_search", lambda *a, **k: _fake_full_response())
     out = websearch.web_search(conn, "q", k=2)
-    # second source has no title and no anchor -> host of document_url
     assert out["results"][1]["url"] == "https://news.ycombinator.com/item?id=1"
     assert out["results"][1]["title"] == "news.ycombinator.com"
 
@@ -66,7 +63,6 @@ def test_depth_claims_attaches_evidence(conn, monkeypatch):
     monkeypatch.setattr(websearch, "run_search", lambda *a, **k: resp)
     out = websearch.web_search(conn, "q", k=2, depth="claims")
     assert out["evidence"]["answer"] == "Postgres wins on joins [S1]"
-    # claims rendered with handles (reusing search._agent_claims)
     assert out["evidence"]["claims"][0]["id"] == "clm_7"
     assert out["evidence"]["claims"][0]["evidence"][0]["source"] == "chk_75"
 

@@ -1,4 +1,4 @@
-"""Pluggable URL-discovery providers (SUP-130).
+"""Pluggable URL-discovery providers.
 
 Given a query, a provider returns candidate URLs from an existing web index.
 This is the honest shape of solo "live crawl": we don't index the web, we
@@ -32,8 +32,6 @@ log = logging.getLogger("moo.live.providers")
 
 DEFAULT_TIMEOUT = 10.0
 
-# provider-call metering (SUP-146 formalizes cost tracking; counters live here
-# so every discover() is counted from day one). Never records query content.
 _STATS = {"calls": 0, "errors": 0}
 
 
@@ -53,7 +51,7 @@ class Candidate:
     url: str
     title: str = ""
     snippet: str = ""
-    rank: int = 0  # provider-side rank (0 = top)
+    rank: int = 0
 
 
 class Provider(ABC):
@@ -103,7 +101,7 @@ class SearxngProvider(Provider):
             )
             resp.raise_for_status()
             results = (resp.json() or {}).get("results", [])
-        except Exception as exc:  # noqa: BLE001 - discovery must never crash a query
+        except Exception as exc:  # noqa: BLE001
             _STATS["errors"] += 1
             log.warning("searxng discovery failed: %s", exc)
             return []
@@ -170,7 +168,6 @@ def resolve_provider() -> Provider | None:
     if name:
         log.warning("unknown MOO_SEARCH_PROVIDER %r; live search disabled", name)
         return None
-    # no explicit choice: infer from whichever credential is present
     if key:
         return BraveProvider(key)
     if url:

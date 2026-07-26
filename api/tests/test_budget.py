@@ -1,4 +1,4 @@
-"""Token-budget result shaping (app.budget, SUP-117)."""
+"""Token-budget result shaping."""
 
 from app import budget
 
@@ -10,8 +10,8 @@ def test_estimate_tokens_scales_with_size():
 
 
 def test_clamp_text_truncates_and_marks():
-    text = "word " * 500  # ~2500 chars
-    out, truncated, total = budget.clamp_text(text, max_tokens=50)  # ~200 char budget
+    text = "word " * 500
+    out, truncated, total = budget.clamp_text(text, max_tokens=50)
     assert truncated and total == len(text)
     assert len(out) < len(text) and out.endswith("…")
     same, tr, _ = budget.clamp_text("short", 1000)
@@ -19,7 +19,7 @@ def test_clamp_text_truncates_and_marks():
 
 
 def test_pack_keeps_within_budget_and_counts_omitted():
-    items = [{"i": i, "pad": "x" * 400} for i in range(10)]  # ~100 tokens each
+    items = [{"i": i, "pad": "x" * 400} for i in range(10)]
     kept, omitted = budget.pack(items, max_tokens=250)
     assert 1 <= len(kept) < 10
     assert omitted == 10 - len(kept)
@@ -50,9 +50,7 @@ def test_shape_report_keeps_disputed_points_in_full():
         "sources": [{"handle": f"doc_{i}", "pad": "x" * 400} for i in range(30)],
     }
     shaped = budget.shape_report(report, max_tokens=500)
-    # contradictions never dropped
     assert len(shaped["disputed_points"]) == 5
-    # supporting findings/sources are budgeted
     assert len(shaped["findings"]) < 30 or len(shaped["sources"]) < 30
     assert "truncation" in shaped
 

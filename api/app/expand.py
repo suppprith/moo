@@ -1,4 +1,4 @@
-"""Query expansion + multi-query fan-out (SUP-82).
+"""Query expansion + multi-query fan-out.
 
 ``expand(conn, query)`` returns 3-5 reformulations — synonyms, the "why"
 behind a "what", the error-message phrasing of a symptom — cached in
@@ -34,7 +34,6 @@ _SCAFFOLD = re.compile(
     re.I,
 )
 
-# domain synonym swaps for one heuristic variant
 _SYNONYMS = {
     "slow": "performance",
     "fast": "performance",
@@ -80,7 +79,6 @@ def heuristic_expand(query: str, n: int = MAX_EXPANSIONS) -> list[str]:
     core = _core(query)
     out: list[str] = [core] if core != normalize_query(query) else []
 
-    # synonym swap variant
     swapped = core
     for word, syn in _SYNONYMS.items():
         swapped = re.sub(rf"\b{word}\b", syn, swapped)
