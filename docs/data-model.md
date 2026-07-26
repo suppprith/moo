@@ -1,4 +1,4 @@
-# Data model (SUP-71)
+# Data model
 
 Single SQLite file (`api/data/moo.sqlite`). Stdlib `sqlite3`, no ORM. Schema lives in
 [`api/migrations/0001_init.sql`](../api/migrations/0001_init.sql); apply with
@@ -10,7 +10,7 @@ Single SQLite file (`api/data/moo.sqlite`). Stdlib `sqlite3`, no ORM. Schema liv
 | -------------- | ------------------------------------------------------------------------ |
 | `document`     | One ingested source (issue, PR, docs page, blog, SO/HN/Reddit post). Trust inputs: `author_role`, `popularity`, `published_at`. |
 | `chunk`        | Heading-aware slice of a document (~300–500 tokens). Carries deep-link anchor + embedding metadata; `canonical_chunk_id` collapses near-dups. |
-| `claim`        | A canonical declarative statement. `normalized_key` clusters near-identical claims; `confidence` + `disputed` set in Phase 4. |
+| `claim`        | A canonical declarative statement. `normalized_key` clusters near-identical claims; `confidence` + `disputed` are set by the evidence layer. |
 | `evidence`     | **The typed edge** `claim → chunk`, `relation ∈ {supports, contradicts, explains}` with a `strength`. Contradictions are first-class, never averaged away. |
 | `claim_chunk`  | Provenance: which chunks a claim was *extracted* from (distinct from evidence). |
 | `entity`       | Domain thing (tool / library / concept / algorithm); `entity_alias` holds Postgres/PostgreSQL/pg. |
@@ -36,18 +36,18 @@ Single SQLite file (`api/data/moo.sqlite`). Stdlib `sqlite3`, no ORM. Schema liv
                     └─ explains   ──▶ chunk
 ```
 
-## Planned in Phase 2 (not created yet)
+## Built at runtime (not in a migration)
 
-Indexing tables are added by a later migration so Phase 0 stays dependency-free:
+The indexing tables need their extensions loaded at connect time, so code builds them:
 
 - **FTS5** — `chunk_fts` virtual table (`external content` on `chunk`) over `text` + `heading`
-  + document `title`, field-weighted for BM25 (SUP-79).
+  + document `title`, field-weighted for BM25.
 - **sqlite-vec** — `chunk_vec` `vec0` virtual table holding chunk embeddings for top-k
-  similarity (SUP-78). Requires loading the `sqlite-vec` extension at connect time.
+  similarity. Requires loading the `sqlite-vec` extension at connect time.
 
 Both are derived from `chunk`, so they are rebuildable from the tables above.
 
-## Search contract — agent shaping (SUP-105, v1.1)
+## Search contract — agent shaping
 
 `/search` (and `app.search.search`) returns a versioned contract
 (`meta.contract_version`). Two axes shape the payload for the consumer,
@@ -66,10 +66,10 @@ independent of `mode`:
 **Opaque handles** ([`app/ids.py`](../api/app/ids.py)) address rows across the
 agent surface: `chk_<id>` (chunk / a search "source"), `clm_<id>` (claim),
 `doc_<id>` (document), `ent_<id>` (entity). Handles are stable (rowid-backed) and
-routable — the fetch/drill-down endpoints (SUP-106) decode the prefix. Callers
+routable — the fetch/drill-down endpoints decode the prefix. Callers
 treat them as opaque.
 
-## Typed query operators (SUP-103)
+## Typed query operators
 
 Parsed out of the query string before retrieval ([`app/queryops.py`](../api/app/queryops.py)),
 so the same syntax works everywhere a query enters moo — web UI, `moo` CLI,
@@ -91,7 +91,7 @@ result page. `meta.operators` echoes everything that was recognized.
 Post-filter operators (`site:`, phrases, exclusions) over-fetch 4× before
 filtering so pages stay full.
 
-## Serving contract — errors & streaming (SUP-107)
+## Serving contract — errors & streaming
 
 **Structured errors.** Every API error renders as one shape so an agent can
 branch on `code` and retry only when `retryable` is true:
@@ -116,9 +116,9 @@ document handle + prev/next context, a claim its full evidence set
 ([`app/streaming.py`](../api/app/streaming.py)): a `progress` event, then one
 `source`/`claim` event per row, then a terminal `done` — or a terminal `error`
 event if it fails mid-stream (the 200 status is already committed). The
-deep-research endpoint (SUP-114) reuses this event schema.
+deep-research endpoint reuses this event schema.
 
-## Deep research (SUP-110–114)
+## Deep research
 
 The deep-research engine (`app/research/`) wraps the pipeline in
 planner -> iterative multi-hop loop -> persisted run -> cited report:
@@ -132,8 +132,7 @@ planner -> iterative multi-hop loop -> persisted run -> cited report:
   plan/gap/contradiction) -> terminal `report` + `done`, or `error`.
 - **`GET /research/{run_id}`** re-fetches a persisted run's status + report for
   polling/resume (report reassembled deterministically, no LLM).
-- **`output_schema`** (SUP-155, on `POST /research`, `/research/stream`, and the
-  `deep_research` MCP tool): a caller-supplied JSON schema adds a `structured`
+- **`output_schema`**: a caller-supplied JSON schema adds a `structured`
   section — `output` in the caller's shape, `grounding` mapping each field path
   to the `clm_` handles backing it, and `ungrounded_fields` for anything that
   couldn't be traced to a finding (set to null, never fabricated). LLM
@@ -144,7 +143,7 @@ Runs persist to `research_run` / `research_step` / `research_claim` (migration
 0005); they associate with the shared claim/evidence graph rather than owning it,
 so a run is purgeable without harming the graph.
 
-**Cost & caching (SUP-122).** Every LLM stage (expand, plan, claims, links,
+**Cost & caching.** Every LLM stage (expand, plan, claims, links,
 rerank, synthesize) is cached in `llm_cache` by content hash via
 `llm.cached_json`, so a repeated identical run makes ~zero API calls (plan/expand
 cache their heuristic results too, so repeats hit the cache even keyless).
@@ -155,7 +154,7 @@ near-duplicate spawned follow-ups (token-Jaccard) so it does not re-retrieve
 covered ground. Measured warm on the dev box: a 3-step run ≈ 0.8s loop + ~1ms
 plan; retrieval-only path is well under 1s (post the near-dup simhash fix).
 
-## Live retrieval — fast vs deep mode (SUP-130/143/145)
+## Live retrieval — fast vs deep mode
 
 moo searches the **live web**, not a frozen index. With a search provider
 configured (`MOO_SEARXNG_URL` keyless self-hosted, or `MOO_BRAVE_API_KEY`;
@@ -192,7 +191,7 @@ each result's copy is.
 - `PRAGMA foreign_keys = ON` and `journal_mode = WAL` on every connection (`app.db.get_connection`).
 - Migrations are immutable, numbered `NNNN_name.sql`, tracked in `schema_migrations`.
 
-## Decision note — vector store: sqlite-vec vs Qdrant (SUP-78)
+## Decision note — vector store: sqlite-vec vs Qdrant
 
 **Choice: sqlite-vec, revisit at ~500k–1M vectors.** Keeping vectors in the same SQLite file
 means one file to ship, back up, and self-host — no separate service, which matters for the

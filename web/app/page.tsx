@@ -87,14 +87,13 @@ export default function Home() {
     setGraph(null);
   };
 
-  // ---- home (pre-search) hero ----
   if (!searched) {
     return (
       <div className="shell">
         <div className="home">
           <h1 className="wordmark">moo</h1>
           <p className="tagline">
-            CS/coding evidence search. Claims backed by typed evidence — supports,
+            Live search with an evidence layer. Claims backed by typed evidence — supports,
             contradicts, explains — with confidence and source trust, not ten blue links.
           </p>
           <SearchBox loading={loading} size="lg" onSearch={onSearch} />
@@ -110,7 +109,6 @@ export default function Home() {
     );
   }
 
-  // ---- results ----
   return (
     <div className="shell">
       <header className="topbar">

@@ -34,9 +34,9 @@ from .websearch import OPENAI_TOOL, to_anthropic_results, web_search
 app = FastAPI(
     title="moo",
     version="0.1.0",
-    summary="CS/coding evidence search for AI agents",
+    summary="Search infrastructure for AI agents",
     description=(
-        "CS/coding-specialized search backend for AI agents. Endpoints: `/search` "
+        "Live search, evidence and deep research for AI agents. Endpoints: `/search` "
         "(ranked evidence), `/v1/web_search` (drop-in web_search shape), `/research` "
         "(deep research), fetch/drill-down (`/source|/chunk|/claim/{id}`), `/graph`. "
         "Opaque handles: `chk_`/`doc_`/`clm_`/`ent_`. Errors use a structured "
@@ -49,13 +49,11 @@ app = FastAPI(
 
 @app.on_event("startup")
 def _startup() -> None:
-    # zero-setup first run (SUP-159): create/migrate the DB + log config hints
     from .bootstrap import ensure_ready
 
     ensure_ready()
 
-# Let the web/ dev server (and a self-hosted UI) call the API from the browser.
-# Override the allowed origins with MOO_CORS_ORIGINS (comma-separated) in prod.
+
 _origins = os.environ.get(
     "MOO_CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100",
@@ -69,10 +67,6 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# Request IDs + structured error envelope (SUP-107)
-# ---------------------------------------------------------------------------
-
 _AUTH_EXEMPT = {"/", "/health", "/contract", "/v1/tools", "/openapi.json", "/docs", "/redoc"}
 
 
@@ -80,7 +74,7 @@ _AUTH_EXEMPT = {"/", "/health", "/contract", "/v1/tools", "/openapi.json", "/doc
 async def request_id_middleware(request: Request, call_next):
     """Tag every request with an id echoed in the response header and in any
     error envelope, so a failing call is traceable end to end. Also enforces
-    optional API-key auth + per-key rate limiting (SUP-108)."""
+    optional API-key auth + per-key rate limiting."""
     request.state.request_id = new_request_id()
     path = request.url.path
     if auth.enabled() and path not in _AUTH_EXEMPT and not path.startswith(("/docs", "/openapi")):
@@ -150,10 +144,6 @@ async def _handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-# ---------------------------------------------------------------------------
-# /search response contract (versioned, documented via OpenAPI)
-# ---------------------------------------------------------------------------
-
 class Source(BaseModel):
     chunk_id: int
     document_url: str
@@ -181,10 +171,9 @@ class Claim(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    """The ``format=full`` contract (the UI shape). ``format=agent`` returns a
-    compact projection with opaque handles instead — its strict schema is
-    formalized in SUP-109, so the endpoint returns a plain dict rather than
-    pinning one response_model across both shapes."""
+    """The ``format=full`` contract. ``format=agent`` returns a compact
+    projection with opaque handles instead, so the endpoint returns a plain
+    dict rather than pinning one response_model across both shapes."""
 
     query: str
     mode: Literal["raw", "claims", "full"]
@@ -275,7 +264,7 @@ def search_endpoint(
     try:
         return search(conn, q, mode=mode, k=k, format=format, fields=fields, offset=offset,
                       live=live, highlights=highlights)
-    except ValueError as e:  # bad fields/format/offset
+    except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     finally:
         conn.close()
@@ -306,7 +295,7 @@ def search_stream_endpoint(
             if result.get("answer"):
                 done["answer"] = result["answer"]
             yield sse_event("done", done)
-        except Exception as exc:  # noqa: BLE001 - headers already sent; report in-band
+        except Exception as exc:  # noqa: BLE001
             rid = new_request_id()
             if isinstance(exc, ApiError):
                 env = envelope(exc.code, exc.message, exc.retryable, rid)
@@ -328,10 +317,6 @@ def get_connection_for_search():
 
     return connect()
 
-
-# ---------------------------------------------------------------------------
-# Drop-in web_search adapter for coding agents (SUP-119)
-# ---------------------------------------------------------------------------
 
 class WebSearchRequest(BaseModel):
     query: str
@@ -386,10 +371,6 @@ def web_search_tools() -> dict:
     return {"tools": [OPENAI_TOOL, EXTRACT_TOOL]}
 
 
-# ---------------------------------------------------------------------------
-# /v1/extract: URL(s) -> clean markdown + optional evidence (SUP-147)
-# ---------------------------------------------------------------------------
-
 class ExtractRequest(BaseModel):
     urls: list[str] = Field(..., min_length=1, max_length=EXTRACT_MAX_URLS)
     depth: Literal["raw", "claims"] = "raw"
@@ -412,10 +393,6 @@ def extract_post(req: ExtractRequest) -> dict:
     finally:
         conn.close()
 
-
-# ---------------------------------------------------------------------------
-# Fetch / drill-down: resolve a citation handle to the underlying row (SUP-106)
-# ---------------------------------------------------------------------------
 
 def _rowid(id: str, expected_kind: str) -> int:
     """Accept either an opaque handle (``chk_75``) — validated against the
@@ -478,10 +455,6 @@ def claim_endpoint(id: str) -> dict:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Deep research: plan -> iterative loop -> cited report (SUP-114)
-# ---------------------------------------------------------------------------
-
 class ResearchRequest(BaseModel):
     question: str
     k: int = Field(6, ge=1, le=20, description="retrieval depth per sub-question")
@@ -504,7 +477,6 @@ def _report_for_run(conn, run: dict, *, use_llm: bool, output_schema: dict | Non
     report["coverage"] = run.get("coverage", [])
     report["budget"] = run.get("budget")
     if output_schema is not None:
-        # caller-shaped output with per-field claim grounding (SUP-155)
         report["structured"] = structure_report(conn, report, output_schema, use_llm=use_llm)
     return report
 
@@ -518,7 +490,7 @@ def research_post(req: ResearchRequest) -> dict:
     get a caller-shaped `structured` section with per-field claim grounding."""
     if req.output_schema is not None:
         try:
-            validate_schema(req.output_schema)  # reject before spending the budget
+            validate_schema(req.output_schema)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
     conn = get_connection_for_search()
@@ -539,7 +511,7 @@ def research_stream(req: ResearchRequest):
     Reuses the app.streaming event contract."""
     if req.output_schema is not None:
         try:
-            validate_schema(req.output_schema)  # reject before the stream opens
+            validate_schema(req.output_schema)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
@@ -573,12 +545,12 @@ def research_stream(req: ResearchRequest):
                 events.put(("report", _report_for_run(
                     conn, result, use_llm=req.use_llm, output_schema=req.output_schema)))
                 events.put(("done", {"run_id": run_id, "status": status}))
-            except Exception:  # noqa: BLE001 - report in-band, stream already 200
+            except Exception:  # noqa: BLE001
                 events.put(("error", envelope("internal", "research failed", True, new_request_id())))
             finally:
                 if conn is not None:
                     conn.close()
-                events.put(None)  # sentinel
+                events.put(None)
 
         threading.Thread(target=worker, daemon=True).start()
         while True:

@@ -1,8 +1,8 @@
-"""MCP server exposing moo as tools for AI agents (SUP-115).
+"""MCP server exposing moo as tools for AI agents.
 
 ``moo-mcp`` lets a coding agent (Claude Code / Claude Desktop / any MCP client)
-call moo's CS/coding evidence search directly — the tool an agent routes its
-``web_search`` to for software-engineering questions. Tools return the compact
+call moo directly — the tool an agent routes its ``web_search`` to for
+software questions. Tools return the compact
 agent-shaped payload (opaque ``chk_``/``clm_`` handles, evidence referenced by
 handle) so results stay small and drill-downable rather than dumping the corpus.
 
@@ -175,7 +175,7 @@ def get_claim(handle: str) -> dict:
     with the backing source handles."""
     conn = _plain_conn()
     try:
-        kind, rowid = ids.decode(handle)  # raises on a malformed handle
+        kind, rowid = ids.decode(handle)
         if kind != ids.CLAIM:
             raise ValueError(f"expected a clm_ handle, got {handle!r}")
         result = fetch_mod.fetch_claim(conn, rowid)
@@ -229,7 +229,7 @@ def expand_graph(node: str) -> dict:
         if kind == ids.ENTITY:
             target = str(rowid)
     except ValueError:
-        pass  # not a handle -> treat as an entity name
+        pass
     conn = _plain_conn()
     try:
         from .graph import query as graph_query
@@ -273,7 +273,7 @@ async def deep_research(
     run later with `research_status(run_id)`.
     """
     if output_schema is not None:
-        validate_schema(output_schema)  # fail fast, before spending the budget
+        validate_schema(output_schema)
     events: queue.Queue = queue.Queue()
     holder: dict = {}
 
@@ -299,7 +299,7 @@ async def deep_research(
             if output_schema is not None:
                 report["structured"] = structure_report(conn, report, output_schema, use_llm=True)
             holder["report"] = report
-        except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
+        except Exception as exc:  # noqa: BLE001
             holder["error"] = str(exc)
         finally:
             conn.close()
@@ -313,7 +313,7 @@ async def deep_research(
             break
         kind, data = item
         if ctx is not None:
-            try:  # progress reporting must never break the run
+            try:
                 if kind == "plan":
                     await ctx.info(f"planned {data['sub_questions']} sub-questions ({data['intent']})")
                 elif kind == "progress":
@@ -357,8 +357,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8000, help="HTTP bind port (with --http)")
     args = parser.parse_args(argv)
 
-    # zero-setup first run (SUP-159): create/migrate the DB, hint at optional
-    # config via stderr logging — stdout stays clean for the stdio transport
     from .bootstrap import ensure_ready
 
     ensure_ready()

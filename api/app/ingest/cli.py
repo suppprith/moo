@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("connector", choices=sorted(CONNECTORS))
     parser.add_argument(
         "--vertical", choices=seeds.list_verticals(),
-        help="ingest only this CS/coding vertical's seeds (default: all)",
+        help="ingest only this vertical's seeds (default: all)",
     )
     parser.add_argument("--repo", help="github: single owner/repo instead of all seeds")
     parser.add_argument("--limit", type=int, default=None, help="max documents to store")

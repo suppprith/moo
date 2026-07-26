@@ -1,4 +1,4 @@
-"""Seed sources, organized by CS/coding vertical (SUP-125).
+"""Seed sources, organized by software vertical.
 
 v1 goes deep on **databases**; further verticals (languages, web frameworks,
 build tooling, cloud/infra, systems) start shallower and deepen over time — the
@@ -20,10 +20,10 @@ from dataclasses import dataclass, field
 @dataclass
 class DocsSite:
     name: str
-    source_type: str            # docs | blog
-    sitemap: str | None = None  # sitemap.xml to discover pages from
-    pages: list[str] = field(default_factory=list)  # explicit seed pages
-    allow_prefix: str | None = None  # only keep sitemap URLs under this prefix
+    source_type: str
+    sitemap: str | None = None
+    pages: list[str] = field(default_factory=list)
+    allow_prefix: str | None = None
 
 
 @dataclass
@@ -38,7 +38,6 @@ class Vertical:
 
 
 VERTICALS: dict[str, Vertical] = {
-    # -- v1: deep end-to-end proof -------------------------------------------
     "databases": Vertical(
         name="databases",
         github_repos=[
@@ -68,7 +67,6 @@ VERTICALS: dict[str, Vertical] = {
             "vacuum", "replication", "b-tree", "jsonb", "wal",
         ],
     ),
-    # -- shallow-start verticals ---------------------------------------------
     "languages": Vertical(
         name="languages",
         github_repos=["python/cpython", "nodejs/node"],
@@ -129,7 +127,7 @@ VERTICALS: dict[str, Vertical] = {
     ),
     "systems": Vertical(
         name="systems",
-        github_repos=[],  # kernel-scale repos are out of scope; docs/community only
+        github_repos=[],
         docs_sites=[],
         stackoverflow_tags=["linux", "operating-system", "memory-management"],
         subreddits=[],
@@ -159,7 +157,6 @@ def _union(attr: str) -> list:
     return out
 
 
-# Module-level unions across all verticals (connectors default to these).
 GITHUB_REPOS: list[str] = _union("github_repos")
 DOCS_SITES: list[DocsSite] = [d for v in VERTICALS.values() for d in v.docs_sites]
 STACKOVERFLOW_TAGS: list[str] = _union("stackoverflow_tags")
@@ -169,7 +166,7 @@ DOMAIN_KEYWORDS: list[str] = _union("keywords")
 
 
 def is_domain_relevant(*texts: str | None) -> bool:
-    """True if any CS/coding keyword (across all verticals) appears in the texts.
+    """True if any software keyword (across all verticals) appears in the texts.
     Keeps off-topic community noise out while spanning every vertical."""
     blob = " ".join(t for t in texts if t).lower()
     return any(kw in blob for kw in DOMAIN_KEYWORDS)

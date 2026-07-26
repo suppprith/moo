@@ -196,12 +196,12 @@
     }
   },
   "info": {
-    "description": "CS/coding-specialized search backend for AI agents. Endpoints: `/search` (ranked evidence), `/v1/web_search` (drop-in web_search shape), `/research` (deep research), fetch/drill-down (`/source|/chunk|/claim/{id}`), `/graph`. Opaque handles: `chk_`/`doc_`/`clm_`/`ent_`. Errors use a structured envelope with a stable `code`. See `/contract` for the machine-readable descriptor and the MCP tool schemas.",
+    "description": "Live search, evidence and deep research for AI agents. Endpoints: `/search` (ranked evidence), `/v1/web_search` (drop-in web_search shape), `/research` (deep research), fetch/drill-down (`/source|/chunk|/claim/{id}`), `/graph`. Opaque handles: `chk_`/`doc_`/`clm_`/`ent_`. Errors use a structured envelope with a stable `code`. See `/contract` for the machine-readable descriptor and the MCP tool schemas.",
     "license": {
       "name": "MIT",
       "url": "https://github.com/suppprith/moo/blob/main/LICENSE"
     },
-    "summary": "CS/coding evidence search for AI agents",
+    "summary": "Search infrastructure for AI agents",
     "title": "moo",
     "version": "0.1.0"
   },

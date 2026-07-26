@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "moo",
-  description: "CS/coding evidence search for AI agents",
+  description: "Search infrastructure for AI agents",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

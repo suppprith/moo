@@ -1,59 +1,71 @@
 # moo
 
-A CS/coding-specialized search backend for AI agents — the tool a coding agent
-routes its `web_search` to for software-engineering questions. Instead of ranked
-links or one unverifiable paragraph, moo returns **claims** backed by typed
-**evidence** (supports / contradicts / explains), each source scored for
-**trust** and each claim for **confidence**, with stable handles to drill from a
-citation down to the exact source.
+Search infrastructure for AI agents.
 
-It runs on your own hardware: a single SQLite file, local embeddings, no query
-logging, no per-query cost, and no API key required to run (the LLM stages fall
-back to deterministic heuristics without one).
+An agent asks a question. moo goes out to the live web, reads the pages it finds,
+pulls out the claims those pages actually make, checks the claims against each
+other, and hands back an answer where every sentence points at a source. When two
+sources disagree, it says so instead of quietly picking a side. When a page has
+been superseded by a newer version of the thing it describes, it says that too.
 
-## Why moo
+It runs on your own hardware: one SQLite file, local embeddings, no query logging,
+no per-query bill, and no API key needed to boot.
 
-| Capability | Exa / Tavily | Perplexity / built-in web_search | moo |
-| --- | --- | --- | --- |
-| Returns ranked snippets/content | ✅ | ✅ | ✅ |
-| Synthesized answer + citations | partial | ✅ | ✅ (`full` mode) |
-| Claims with per-claim confidence | ❌ | ❌ | ✅ |
-| Surfaces contradictions instead of averaging them | ❌ | ❌ | ✅ (`list_contradictions`, disputed flags) |
-| Typed evidence edges (supports/contradicts/explains) | ❌ | ❌ | ✅ |
-| Per-source trust rubric (maintainer > forum, recency decay) | ❌ | ❌ | ✅ |
-| Stable drill-down handles (citation → span → doc) | contents API | ❌ | ✅ (`fetch_source`) |
-| CS "dark knowledge" (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ specialist |
-| Self-hosted, private, keyless, zero per-query cost | ❌ paid API | ❌ paid API | ✅ |
+## Setup
 
-moo is deliberately not a general web search: it indexes GitHub issues/PRs,
-release notes, official docs, engineering blogs, and Stack Overflow — the sources
-that hold the real answer to a coding problem but that general search ranks
-poorly. Coverage and freshness are traded for a specialist, verifiable evidence
-layer.
+You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
-## Two ways in
+```bash
+git clone https://github.com/suppprith/moo.git
+cd moo/api
+uv sync
+```
 
-1. **Primitive tools** — the agent drives its own loop: `search`, `fetch_source`,
-   `get_claim`, `list_contradictions`, `expand_graph`.
-2. **Deep research** — hand off a whole question: `deep_research` runs
-   plan → iterative multi-hop retrieval → a cited, confidence-scored report;
-   `research_status` polls/resumes it.
+That is the whole install. The database is created and migrated on first run, so
+there is no init step to forget.
 
-Both are exposed over **MCP**; `search` is also available as a drop-in
-**`web_search`** HTTP adapter. Full tool reference and workflow:
-[docs/agents.md](docs/agents.md).
+Two optional pieces make moo better. Neither is required to run it.
+
+**A discovery provider** switches on live retrieval. Without one, moo answers out
+of whatever it has already fetched and cached.
+
+```bash
+# self-hosted SearXNG, no key (enable `json` under search.formats in settings.yml)
+docker run -d -p 8888:8080 searxng/searxng
+export MOO_SEARXNG_URL=http://localhost:8888
+
+# or the Brave Search API, which has a free tier
+export MOO_BRAVE_API_KEY=BSA...
+```
+
+**An LLM key** sharpens query expansion, claim extraction, evidence linking and
+the written answer. Bring whichever you already have: Gemini, OpenAI, Anthropic,
+Ollama, or any OpenAI-compatible server. Copy `api/.env.example` to `api/.env` and
+fill in one block. With no key at all, every LLM stage falls back to a
+deterministic heuristic, so the pipeline still runs end to end; it just reasons
+less well.
+
+Check that it works:
+
+```bash
+uv run pytest
+uv run moo "how does sqlite wal mode work"
+```
 
 ## Connect an agent (MCP)
 
 ```bash
-cd api && uv sync
-uv run python -m app.mcp_server         # stdio server (no install needed)
-# or install it: uv tool install .  ->  moo-mcp [--http]
+uv run python -m app.mcp_server          # stdio, zero install
+uv tool install .                        # or install it, then: moo-mcp [--http]
 ```
 
-**Claude Code** — `claude mcp add moo -- uv run --directory "/abs/path/to/moo/api" python -m app.mcp_server`
+**Claude Code**
 
-**Claude Desktop** — in `claude_desktop_config.json`:
+```bash
+claude mcp add moo -- uv run --directory "/abs/path/to/moo/api" python -m app.mcp_server
+```
+
+**Claude Desktop**, in `claude_desktop_config.json`:
 
 ```json
 {
@@ -66,39 +78,77 @@ uv run python -m app.mcp_server         # stdio server (no install needed)
 }
 ```
 
-Runs keyless locally. First `search` warms the embedding model (a few seconds);
-after that a typical flow is `search` → `fetch_source(chk_…)` for the evidence,
-or `deep_research` for a full report.
+The first `search` warms the embedding model, which takes a few seconds. After
+that, the agent has eight tools:
 
-## Drop-in web_search
+| Tool | What it does |
+| --- | --- |
+| `search` | Ranked sources for a query. `mode=raw` is fast and makes zero LLM calls, `claims` adds the evidence layer, `full` adds a cited answer. |
+| `extract` | Hand it URLs, get clean markdown back, optionally with claims run over each page. |
+| `fetch_source` | Turn a citation handle into the thing it cites: chunk text with context, the whole document, or a claim with its evidence. |
+| `get_claim` | One claim: confidence, disputed flag, full evidence set with contradictions listed first. |
+| `list_contradictions` | Only the claims where sources disagree. |
+| `expand_graph` | The entity neighbourhood around a tool or concept, with typed relations. |
+| `deep_research` | Hand off a whole question. Plans it, runs multi-hop retrieval, returns a cited report, streams progress. |
+| `research_status` | Poll or re-read a research run by id. |
 
-For agents that don't speak MCP, moo serves the universal web-search shape
-(`{title, url, snippet}`):
+The tools that can return a lot (`search`, `extract`, `fetch_source`,
+`deep_research`, `research_status`) take a `max_tokens` budget and shape the
+payload to fit, with an explicit truncation marker instead of a silent cut.
+Contradictions are never the thing that gets dropped.
+
+Full tool reference and the workflow an agent follows: [docs/agents.md](docs/agents.md).
+
+## Drop in as `web_search`
+
+For agents that do not speak MCP, moo serves the universal web-search shape
+(`{title, url, snippet}`), so existing `web_search` wiring can point at it
+unchanged.
 
 ```bash
 uv run fastapi dev app/main.py
-curl -s localhost:8000/v1/tools           # OpenAI web_search function-tool definition
+curl -s localhost:8000/v1/tools           # OpenAI function-tool definitions
 curl -s -X POST localhost:8000/v1/web_search \
      -H 'content-type: application/json' -d '{"query":"why is my Postgres query slow"}'
 ```
 
-Register the definition from `/v1/tools` (named `web_search`) and execute calls
+Register the definition named `web_search` from `/v1/tools` and execute calls
 against `POST /v1/web_search`. Pass `"shape":"anthropic"` for `web_search_result`
-blocks. `depth=claims` attaches the evidence layer as an optional field.
+blocks. Results always carry highlighted spans and a relevance score that is
+comparable across queries; `depth=claims` attaches the evidence layer as an
+optional field.
 
 ## Deep research
 
-`deep_research(question)` (MCP) or `POST /research` / `POST /research/stream`
-(HTTP) returns `{executive_answer, findings[] (confidence + citations),
-disputed_points[], open_questions[], sources[], groundedness}`. It decomposes the
-question, iterates retrieval to fill gaps and chase contradictions under a
-budget, and every finding traces to a source — uncited claims never ship.
+`deep_research(question)` over MCP, or `POST /research` and `POST /research/stream`
+over HTTP, returns `{executive_answer, findings[], disputed_points[],
+open_questions[], sources[], groundedness}`. It splits the question into
+sub-questions, iterates retrieval to fill gaps and chase contradictions under a
+hard step and wall-clock budget, and drops any finding it cannot cite. Runs are
+persisted, so a long one can be polled or resumed by `run_id`.
 
-Reproducible demo: `uv run python -m app.eval.demo` ([recorded transcript](docs/agent-demo.md)).
+Pass an `output_schema` and you also get a `structured` section shaped to your
+schema, where `structured.grounding` traces every populated field back to the
+claims behind it. Fields that cannot be traced come back `null` and are listed in
+`ungrounded_fields`, never invented.
 
-## Search from your terminal
+Reproducible demo: `uv run python -m app.eval.demo`
+([recorded transcript](docs/agent-demo.md)).
 
-Neither Google nor DuckDuckGo ships an official CLI — moo does:
+## Give it URLs instead of a query
+
+```bash
+curl -s -X POST localhost:8000/v1/extract \
+     -H 'content-type: application/json' \
+     -d '{"urls":["https://www.sqlite.org/wal.html"],"depth":"raw"}'
+```
+
+Clean markdown per page, plus `doc_` and `chk_` handles, because the page is
+stored and indexed on the way through. `depth=claims` runs the evidence layer over
+each page. Failures are reported per URL, and pages still inside their cache TTL
+are served without touching the network.
+
+## From your terminal
 
 ```bash
 moo "why do my containers randomly exit"        # cited answer as markdown
@@ -107,77 +157,121 @@ moo "redis persistence" --json | jq '.claims'   # pipe the full response
 moo "sqlite wal mode" --open 1                  # open the top source
 ```
 
-Install with `uv tool install ./api` (or `pipx install ./api`), or zero-install
-`uv run moo "..."` from `api/`. Runs the engine **in-process** by default —
-no server needed, self-initializing on first run; point it at a running
-instance with `--url http://host:8000` or `MOO_URL`. Output is pipe-friendly
-(no ANSI codes when stdout isn't a TTY).
+Install with `uv tool install ./api` or `pipx install ./api`, or skip installing
+and run `uv run moo "..."` from `api/`. It runs the engine in-process by default,
+so no server is involved; point it at a running instance with `--url` or `MOO_URL`.
+Output is pipe-friendly, with no ANSI codes when stdout is not a TTY.
 
-## Architecture
+## What happens to a query
 
 ```
-connectors (GitHub · docs · blogs · SO/HN/Reddit)
-        → fetch → clean → chunk
-        → index: FTS5 (BM25) + sqlite-vec (embeddings)   [one SQLite file]
-query   → understanding → expansion → hybrid retrieval (RRF)
-        → claim extraction → evidence linking → confidence + source trust
-        → knowledge graph → rerank → cited synthesis
-agents  ← MCP tools · /v1/web_search · /search · /research
+query  -> operators + routing -> live discovery -> fetch -> clean -> chunk -> embed
+       -> index: FTS5 (BM25) + sqlite-vec            [one SQLite file]
+       -> hybrid retrieval (RRF) -> fusion -> rerank -> highlights
+       -> claims -> evidence edges -> confidence -> versions + graph
+       -> cited answer
+agents <- MCP tools · /v1/web_search · /v1/extract · /search · /research
 ```
 
-Semantic search is treated as infrastructure; the evidence + reasoning layer on
-top is the product.
+A few links in that chain are worth calling out.
 
-## Layout
+**Typed operators** are parsed before anything else runs: `type:docs,so`,
+`site:host.com`, `since:2024`, `"exact phrase"`, `-exclude`. Anything unrecognised
+stays as plain search text and is reported back rather than throwing.
 
-| Path | Stack | Purpose |
-| --- | --- | --- |
-| `api/` | Python · FastAPI · uv · SQLite | Ingestion, retrieval, evidence, research engine, MCP server, HTTP API |
-| `web/` | Next.js · TypeScript | Optional human search UI |
-| `docs/` | Markdown | Data model, agent guide, domain scope |
+**Routing** looks at the query first. Literal identifiers and error strings lean
+the fusion toward BM25, conceptual prose leans it toward embeddings, and a pasted
+paragraph skips query fan-out entirely.
 
-## Develop
+**Live fetching** ranks candidate URLs with a source policy that puts official
+docs, repos, release notes and Q&A ahead of unknown sites, fetches concurrently
+across hosts while staying serial within a host, and stops at a wall-clock
+deadline with partial results rather than blocking on stragglers. Fetched pages go
+through the same store the rest of moo searches, so the store doubles as the
+cache: anything inside its tier's TTL costs no network at all, and eviction never
+touches a document whose chunks back a claim.
 
-```bash
-cd api
-uv sync
-uv run python -m app.db          # apply migrations
-uv run fastapi dev app/main.py   # http://127.0.0.1:8000
-uv run pytest
-uv run ruff check .
-```
+**Ranking** is not relevance alone. Trust, corroboration across independent copies,
+and recency multiply into the score, and every component is reported on the result
+so you can see why something landed where it did. Reranking is a swappable last
+step: a listwise LLM call, a local cross-encoder that needs no key, or off.
 
-The LLM stages (query expansion, claim/evidence extraction, synthesis) are
-**bring-your-own-key**: Gemini, OpenAI, Anthropic, or any OpenAI-compatible /
-local server (Ollama, vLLM, LM Studio). Configure via `MOO_LLM_PROVIDER` /
-`MOO_LLM_API_KEY` / `MOO_LLM_MODEL` / `MOO_LLM_BASE_URL` in `api/.env` (gitignored;
-see `api/.env.example`). Without any key the stages run deterministic heuristics —
-the pipeline works end to end, quality is just better with a model. Run a local
-model and nothing leaves the machine.
+**Versions** are read out of the query. Ask about Redis 7 and sources speaking
+about Redis 7 get boosted, while older-major-only ones get demoted and flagged.
 
-## Serving
+**The evidence layer** extracts claims from the retrieved text, links each one to
+supporting, contradicting and explaining chunks, then scores confidence from the
+balance of evidence, counting near-duplicate copies of one source as a single
+voice. A claim with real support on both sides is marked disputed rather than
+averaged into false confidence. Trust follows a documented rubric: official docs
+over maintainer comments over blogs over forum posts, adjusted for author role and
+decayed by age at a rate that depends on the source type.
 
-Runs fully open locally. To gate it when exposed, set API keys and a per-key
-rate limit:
+**Time** is modelled explicitly. Claims carry validity windows read from phrases
+like "deprecated in 3.9", and a newer-version claim about the same subject
+supersedes the older one instead of fighting it, so historical change stops
+looking like live controversy.
+
+**Retrieved pages are untrusted input.** Every page is scanned for prompt-injection
+patterns. Matches are marked rather than dropped, the flag travels with the source
+all the way to the caller, and the source loses half its trust. Every web-search
+response carries a notice that page content is data, not instructions.
+
+## Running it as a service
+
+Open by default. To gate it when exposed, set keys and a per-key limit:
 
 ```bash
 MOO_API_KEYS=key1,key2 MOO_RATE_LIMIT_PER_MIN=60 uv run fastapi dev app/main.py
 ```
 
-Clients pass `Authorization: Bearer <key>` or `X-API-Key`. `/health` and
-`/v1/tools` stay open; over-limit requests get a `429` with `Retry-After`.
-`GET /usage` reports masked per-key request counts. No query content is logged.
+Clients pass `Authorization: Bearer <key>` or `X-API-Key`. `/health`, `/contract`
+and `/v1/tools` stay open. Over-limit requests get a `429` with `Retry-After`, and
+`GET /usage` reports masked per-key counts. No query content is ever logged.
 
-## Benchmarks
+Errors come back in one envelope with a stable `code`, a `retryable` flag, and a
+request id echoed in the `X-Request-ID` header, so an agent can branch on the
+failure instead of parsing prose. `/search/stream` and `/research/stream` are SSE.
+`/contract` is the machine-readable descriptor: contract version, handle formats,
+error taxonomy, and the MCP tool schemas. The OpenAPI spec is committed at
+[`api/openapi.json`](api/openapi.json), and a test fails if it drifts.
 
-`uv run python -m app.eval.benchmark` scores the engine on a versioned task set
-(coverage, citation accuracy, source recall, contradiction recall, token cost)
-and compares single-shot search vs. `deep_research`. Baseline in
-[`api/app/eval/baseline.json`](api/app/eval/baseline.json).
+## Evals
 
-Data model: [docs/data-model.md](docs/data-model.md). Domain scope and gold
-queries: [docs/v1-vertical.md](docs/v1-vertical.md).
+```bash
+uv run python -m app.eval.benchmark        # coverage, citation accuracy, source
+                                           # and contradiction recall, token cost
+uv run python -m app.eval.flywheel         # score every configured engine, log history
+uv run python -m app.eval.flywheel --gate  # exit 1 if moo regressed against itself
+```
+
+The benchmark compares single-shot search against `deep_research` on a versioned
+task set, with a recorded baseline in
+[`api/app/eval/baseline.json`](api/app/eval/baseline.json). The flywheel is the
+standing version: it scores moo on every run, adds Exa and Tavily as columns when
+their keys are set, and the gate fails a commit that drops moo below its own last
+numbers.
+
+## Layout
+
+| Path | Stack | Purpose |
+| --- | --- | --- |
+| `api/` | Python, FastAPI, uv, SQLite | Retrieval, evidence, research engine, MCP server, HTTP API, CLI |
+| `web/` | Next.js, TypeScript | Optional human search UI |
+| `docs/` | Markdown | Agent guide, data model, domain scope |
+
+Day-to-day work happens in `api/`:
+
+```bash
+uv run fastapi dev app/main.py   # http://127.0.0.1:8000
+uv run python -m app.db          # apply migrations by hand
+uv run pytest
+uv run ruff check .
+```
+
+Data model: [docs/data-model.md](docs/data-model.md). Agent guide:
+[docs/agents.md](docs/agents.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

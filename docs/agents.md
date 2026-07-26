@@ -1,8 +1,8 @@
 # moo for AI agents
 
-moo is a **CS/coding-specialized search backend for AI agents** — the tool a
-coding agent routes its `web_search` to for software-engineering questions
-(databases, languages, frameworks, build tooling, errors, systems). It returns
+moo is **search infrastructure for AI agents** — the tool an agent routes its
+`web_search` to for software questions (databases, languages, frameworks, build
+tooling, errors, systems). It returns
 grounded, structured evidence — claims with confidence, supports/contradicts
 edges, source trust, and stable handles to drill into — not ten blue links or one
 unverifiable paragraph.
@@ -18,7 +18,7 @@ unverifiable paragraph.
 | Typed evidence edges (supports/contradicts/explains) | ❌ | ❌ | ✅ |
 | Per-source trust rubric (maintainer > forum, recency decay) | ❌ | ❌ | ✅ |
 | Stable drill-down handles (citation → span → doc) | contents API | ❌ | ✅ (`fetch_source`) |
-| CS "dark knowledge" (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ specialist |
+| Source-aware software corpus (GitHub issues/PRs/release notes, author role) | generalist | generalist | ✅ |
 | Self-hosted, private, keyless, zero per-query cost | ❌ paid API | ❌ paid API | ✅ |
 
 moo pairs a specialist, verifiable evidence layer with **live retrieval**: with
@@ -43,7 +43,7 @@ can check, not links or one paragraph.
 Both are exposed over **MCP** (`app/mcp_server.py`) and, for `search` and
 `extract`, over drop-in HTTP endpoints (`/v1/web_search`, `/v1/extract`;
 OpenAI-style tool defs at `/v1/tools`). See the
-[2-minute quickstart](../README.md#connect-an-agent-mcp-in-2-minutes).
+[quickstart](../README.md#connect-an-agent-mcp).
 
 ## Tool reference (MCP)
 

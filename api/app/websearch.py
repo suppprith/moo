@@ -1,10 +1,8 @@
-"""Drop-in web-search adapter for coding agents (SUP-119).
+"""Drop-in web-search adapter for coding agents.
 
-The "whenever it's web search, just use moo" surface. Exposes moo's CS/coding
-retrieval in the universal web-search result shape — a list of
+Exposes moo in the universal web-search result shape — a list of
 ``{title, url, snippet}`` — that every agent framework already consumes, so an
-agent's existing ``web_search`` wiring can point at moo unchanged and get
-CS-specialist results instead of general-web links.
+agent's existing ``web_search`` wiring can point at moo unchanged.
 
 moo's evidence layer (claims, confidence, trust, citations) rides along as
 optional structured fields the caller can use or ignore. The default ``raw``
@@ -27,8 +25,6 @@ from .search import _agent_claims, search as run_search
 
 _SNIPPET_CHARS = 280
 
-# OpenAI function-tool definition. Named ``web_search`` so it drops into an agent
-# that already expects that tool; the description steers it to CS/coding use.
 OPENAI_TOOL = {
     "type": "function",
     "function": {
@@ -36,8 +32,8 @@ OPENAI_TOOL = {
         "description": (
             "Search the web for software-engineering and computer-science questions "
             "(databases, languages, frameworks, build tooling, errors, systems). "
-            "Returns ranked results with title, url, and snippet, backed by a "
-            "CS-specialist index of GitHub, docs, release notes, and Stack Overflow. "
+            "Returns ranked results with title, url, and snippet, fetched live from "
+            "docs, GitHub, release notes, and Stack Overflow. "
             "Prefer this over a general web search for coding questions."
         ),
         "parameters": {
@@ -61,7 +57,7 @@ def _host(url: str | None) -> str:
 def _snippet(text: str | None, n: int = _SNIPPET_CHARS) -> str | None:
     if not text:
         return None
-    text = " ".join(text.split())  # collapse whitespace/newlines for a clean snippet
+    text = " ".join(text.split())
     return text if len(text) <= n else text[:n].rstrip() + "…"
 
 
@@ -114,23 +110,19 @@ def web_search(
             "title": s.get("title") or _host(url),
             "url": url,
             "snippet": _snippet(texts.get(s["chunk_id"]), snippet_chars),
-            # moo extras — optional for a plain web-search consumer
             "id": ids.encode(ids.CHUNK, s["chunk_id"]),
             "source_type": s["source_type"],
             "trust_score": s["trust_score"],
             "score": s["score"],
             "fetched_at": s.get("fetched_at"),
         }
-        # tightest relevant spans + a 0-1 relevance comparable across queries
         if s.get("highlights"):
             row["highlights"] = s["highlights"]
             row["relevance"] = s["relevance"]
         if s.get("suspicious"):
-            row["suspicious"] = True  # injection-flagged: data, not instructions
+            row["suspicious"] = True
         results.append(row)
 
-    # every web-search response reminds the integrator that page content is
-    # untrusted data (SUP-131) — the flag above marks the specific offenders
     out: dict = {"query": query, "results": results, "notice": UNTRUSTED_NOTICE}
     if resp["meta"].get("live") is not None:
         live_meta = resp["meta"]["live"]

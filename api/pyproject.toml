@@ -1,7 +1,7 @@
 [project]
 name = "moo-api"
 version = "0.1.0"
-description = "moo search API — evidence-graph search engine"
+description = "moo API: search infrastructure for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,13 +14,8 @@ dependencies = [
     "trafilatura>=2.1.0",
 ]
 
-# `moo-mcp` MCP server entry point (SUP-118). Installable with
-# `uv tool install .` / `pipx install .`; runs stdio by default, `--http` for
-# streamable HTTP. Zero-install alternative: `uv run python -m app.mcp_server`.
 [project.scripts]
 moo-mcp = "app.mcp_server:main"
-# `moo "query"` terminal client (SUP-102): cited answers in your terminal.
-# Runs in-process by default (no server needed); --url/MOO_URL for a remote.
 moo = "app.cli:main"
 
 [build-system]

@@ -38,7 +38,7 @@ This is where sources genuinely disagree — the sweet spot for an evidence grap
 
 ## Seed sources (16)
 
-Enumerated across the source types the connectors ingest. Trust tiers are the Phase 4 rubric
+Enumerated across the source types the connectors ingest. Trust tiers are the trust rubric
 (official docs > maintainer > benchmark/academic > eng blog > accepted SO > forum).
 
 ### Official docs (highest trust)
@@ -72,7 +72,7 @@ Enumerated across the source types the connectors ingest. Trust tiers are the Ph
 
 ## Gold queries (15)
 
-Drive the Phase 8 eval (P/R/nDCG + claim accuracy). Mix of **why / comparison / troubleshooting /
+Drive the eval (P/R/nDCG + claim accuracy). Mix of **why / comparison / troubleshooting /
 how-to / definition**. "Expected" = the substance a correct evidence-backed answer must contain;
 several are deliberately **disputed** to exercise the contradiction path.
 
@@ -98,10 +98,10 @@ several are deliberately **disputed** to exercise the contradiction path.
 
 - Queries **2, 3, 7, 8** are the primary **disputed** cases — the evidence layer must show
   contradiction, not collapse to one side.
-- Relevance judgments (which chunks are relevant per query) are authored in Phase 8 against the
+- Relevance judgments (which chunks are relevant per query) are authored against the
   ingested corpus and versioned in-repo.
 
-## Multi-domain expansion (SUP-125)
+## Multi-domain expansion
 
 v1 stays the deep, end-to-end proof (**databases**). Further CS/coding verticals
 start shallower and deepen over time — the gate to moo being a coding agent's

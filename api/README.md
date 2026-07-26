@@ -1,6 +1,6 @@
 # moo-api
 
-FastAPI backend for **moo search**, managed with [uv](https://docs.astral.sh/uv/).
+FastAPI backend for **moo**, managed with [uv](https://docs.astral.sh/uv/).
 
 ## Develop
 
@@ -30,7 +30,7 @@ moo-mcp [--http] [--host H] [--port P]
 
 Tools: `search`, `fetch_source`, `get_claim`, `list_contradictions`, `expand_graph`,
 `deep_research`, `research_status`.
-Client config + the 2-minute quickstart are in the [root README](../README.md#connect-an-agent-mcp-in-2-minutes).
+Client config and the quickstart are in the [root README](../README.md#connect-an-agent-mcp).
 
 ## Benchmarks
 
@@ -42,5 +42,5 @@ uv run python -m app.eval.benchmark [--max-steps N] [--no-llm] [--save baseline.
 ```
 
 A recorded baseline lives in [`app/eval/baseline.json`](app/eval/baseline.json);
-every engine change should show a before/after. (Numbers are heuristic-gated until
-a `GEMINI_API_KEY` is set — contradiction recall in particular needs the LLM.)
+every engine change should show a before/after. (Numbers are heuristic-gated until an LLM key is set; contradiction recall in
+particular needs the model.)
