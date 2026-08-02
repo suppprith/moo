@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { Source } from "@/lib/types";
 import type { PanelTarget } from "./SourcePanel";
 import { glyphChar, glyphColor, hostOf, sourceLabel, trustColor } from "@/lib/sources";
@@ -19,20 +20,31 @@ function TrustMeter({ score }: { score: number | null }) {
 export function SourceList({
   sources,
   onOpen,
+  selected = -1,
 }: {
   sources: Source[];
   onOpen?: (target: PanelTarget) => void;
+  /** Index moved by j/k; -1 when the keyboard is not driving. */
+  selected?: number;
 }) {
+  const listRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (selected < 0) return;
+    const row = listRef.current?.querySelector<HTMLElement>("[data-selected='true']");
+    row?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
+
   if (sources.length === 0)
     return <p className="empty">No results in the corpus for this query.</p>;
 
   return (
-    <ul className="results">
-      {sources.map((s) => {
+    <ul className="results" ref={listRef}>
+      {sources.map((s, i) => {
         const host = hostOf(s.document_url);
         const excerpt = s.highlights?.[0];
         return (
-          <li className="result" key={s.chunk_id}>
+          <li className="result" data-selected={i === selected} key={s.chunk_id}>
             <span className="glyph" style={{ background: glyphColor(s.source_type) }} aria-hidden>
               {glyphChar(s.source_type, host)}
             </span>

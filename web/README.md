@@ -32,6 +32,21 @@ neighbouring sections, and a link to the exact anchor rather than the top of the
 page. Which span gets marked is decided by `lib/highlight.ts`, which is plain
 functions over offsets so it can be tested without a browser.
 
+The results view is keyboard-first. `Ctrl`/`Cmd` + `K` opens the command
+palette, `?` lists every binding, and the decisions that are easy to get wrong
+(never stealing a key while someone is typing, leaving browser chords alone,
+where `j` stops at the end of a list) live in `lib/shortcuts.ts` with tests.
+
+| Key | Does |
+| --- | --- |
+| `/` | focus the search box |
+| `Ctrl`+`K` | command palette |
+| `j` / `k` | move down and up the results |
+| `Enter` / `o` | open the selected source in the panel / in a new tab |
+| `1` `2` `3` | raw, claims, full |
+| `d` / `g` | deep research / evidence graph |
+| `?` / `Esc` | shortcuts / close whatever is open |
+
 ## Configuration
 
 | Variable | Effect |

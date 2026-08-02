@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { isTypingTarget } from "@/lib/shortcuts";
 import { SearchIcon } from "./icons";
 
 export function SearchBox({
@@ -22,7 +23,7 @@ export function SearchBox({
   // "/" focuses the box from anywhere
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "/" && document.activeElement !== ref.current) {
+      if (e.key === "/" && !isTypingTarget(e.target)) {
         e.preventDefault();
         ref.current?.focus();
       }
