@@ -21,9 +21,16 @@ through, to a sibling docs route where one exists and to GitHub otherwise.
 npm install
 npm run dev      # http://localhost:3000
 npm run build    # also prerenders every docs page
+npm test         # node --test over the pure logic in lib/
 npm run lint     # eslint (next/core-web-vitals + next/typescript)
 npm run format   # prettier --check
 ```
+
+Clicking a result or an evidence chip opens the source panel: the chunk's own
+text with the cited span marked, its trust tier, author role and date, the
+neighbouring sections, and a link to the exact anchor rather than the top of the
+page. Which span gets marked is decided by `lib/highlight.ts`, which is plain
+functions over offsets so it can be tested without a browser.
 
 ## Configuration
 

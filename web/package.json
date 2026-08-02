@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "next": "^15.1.6",

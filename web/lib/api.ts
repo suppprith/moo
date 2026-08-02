@@ -1,4 +1,5 @@
 import type {
+  ChunkDetail,
   Graph,
   Mode,
   ResearchReport,
@@ -36,11 +37,17 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 export function search(
   q: string,
   mode: Mode = "raw",
-  opts: { k?: number; signal?: AbortSignal } = {},
+  opts: { k?: number; highlights?: boolean; signal?: AbortSignal } = {},
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ q, mode });
   if (opts.k) params.set("k", String(opts.k));
+  if (opts.highlights !== false) params.set("highlights", "true");
   return getJson<SearchResponse>(`/search?${params}`, opts.signal);
+}
+
+/** The chunk behind a citation: full text, neighbours, and its deep link. */
+export function fetchChunk(handle: string | number, signal?: AbortSignal): Promise<ChunkDetail> {
+  return getJson<ChunkDetail>(`/chunk/${encodeURIComponent(String(handle))}`, signal);
 }
 
 export function graphForQuery(

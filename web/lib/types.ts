@@ -10,6 +10,37 @@ export interface Source {
   heading: string | null;
   url_anchor: string;
   score: number;
+  highlights?: string[];
+  relevance?: number;
+  fetched_at?: string | null;
+  suspicious?: boolean;
+  version_outdated?: boolean;
+}
+
+/** One chunk with everything needed to show where a citation came from. */
+export interface ChunkDetail {
+  id: string;
+  document: string;
+  url: string | null;
+  title: string | null;
+  source_type: string;
+  trust_score: number | null;
+  author_role: string | null;
+  published_at: string | null;
+  heading: string | null;
+  ordinal: number;
+  text: string;
+  context: {
+    prev: ChunkNeighbour | null;
+    next: ChunkNeighbour | null;
+  };
+  canonical?: string;
+}
+
+export interface ChunkNeighbour {
+  id: string;
+  heading: string | null;
+  preview: string;
 }
 
 export interface Evidence {

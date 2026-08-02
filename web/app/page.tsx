@@ -11,6 +11,8 @@ import { ModeBar } from "@/components/ModeBar";
 import { ResearchView } from "@/components/ResearchView";
 import { SearchBox } from "@/components/SearchBox";
 import { SourceList } from "@/components/SourceList";
+import { SourcePanel } from "@/components/SourcePanel";
+import type { PanelTarget } from "@/components/SourcePanel";
 
 /** A public playground says so: the visitor is on someone else's quota. */
 const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
@@ -48,6 +50,7 @@ export default function Home() {
   const [searched, setSearched] = useState(false);
   const [research, setResearch] = useState<string | null>(null);
   const [graph, setGraph] = useState<string | null>(null);
+  const [panel, setPanel] = useState<PanelTarget | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async (q: string, m: Mode) => {
@@ -189,14 +192,14 @@ export default function Home() {
                 <div className="section-label">
                   Claims <span className="count">{data.claims.length}</span>
                 </div>
-                <ClaimList claims={data.claims} sources={data.sources} />
+                <ClaimList claims={data.claims} sources={data.sources} onOpen={setPanel} />
               </>
             )}
 
             <div className="section-label">
               Sources <span className="count">{data.sources.length}</span>
             </div>
-            <SourceList sources={data.sources} />
+            <SourceList sources={data.sources} onOpen={setPanel} />
           </>
         )}
         </>
@@ -204,6 +207,10 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {panel && (
+        <SourcePanel target={panel} onClose={() => setPanel(null)} onNavigate={setPanel} />
+      )}
     </div>
   );
 }
