@@ -207,6 +207,27 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/account/usage": {
+      "get": {
+        "description": "Credits and per-endpoint usage for the presented key. Requires the key\nitself, so one key can never see another's usage.",
+        "operationId": "account_usage_account_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Account Usage Account Usage Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Account Usage"
+      }
+    },
     "/chunk/{id}": {
       "get": {
         "description": "A chunk with full text, its document handle, and surrounding-chunk context.\nAccepts a `chk_<id>` handle (as emitted in agent-format sources) or bare rowid.",

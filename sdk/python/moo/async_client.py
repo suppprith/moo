@@ -111,6 +111,10 @@ class AsyncMoo:
         """Masked per-key request counts."""
         return await self._call(ops.usage())
 
+    async def account_usage(self) -> dict[str, Any]:
+        """Credits and per-endpoint usage for this key."""
+        return await self._call(ops.account_usage())
+
     async def contract(self) -> dict[str, Any]:
         """Machine-readable descriptor: contract version, handle formats, error
         envelope, and the MCP tool schemas."""

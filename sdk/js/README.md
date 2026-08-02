@@ -64,6 +64,7 @@ for await (const { event, data } of moo.researchStream('why is my connection poo
 | `getResearch(runId)` | `GET /research/{id}` | poll or resume a run |
 | `source/chunk/claim(handle)` | `GET /source\|/chunk\|/claim/{id}` | drill into any handle a result gave you |
 | `graph(q)` / `expandGraph(node)` | `GET /graph`, `/graph/expand` | the entity subgraph behind a query |
+| `accountUsage()` | `GET /account/usage` | credits left, reset date, per-endpoint spend |
 | `contract()` / `tools()` / `health()` / `usage()` | | introspection |
 
 ## Configuration

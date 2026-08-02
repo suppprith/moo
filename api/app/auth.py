@@ -23,6 +23,7 @@ import os
 import time
 from collections import defaultdict, deque
 
+from . import credits
 from . import keys as key_store
 from .errors import ApiError
 
@@ -76,6 +77,11 @@ def _extract_key(request) -> str | None:
     return request.headers.get("x-api-key")
 
 
+def presented_key(request) -> str | None:
+    """The key on this request, however it was sent."""
+    return _extract_key(request)
+
+
 def _enforce_window(identity: str, limit: int) -> None:
     now = time.monotonic()
     window = _windows[identity]
@@ -87,13 +93,16 @@ def _enforce_window(identity: str, limit: int) -> None:
     window.append(now)
 
 
-def check(request) -> str:
-    """Verify the request's key and enforce its rate limit and quota. Returns the
-    identity used for metering ("local" when auth is disabled). Raises ApiError
-    (unauthorized / rate_limited / budget_exceeded) otherwise."""
+def authenticate(request) -> dict:
+    """Verify the request's key and enforce its rate limit, quota and credits.
+
+    Returns ``{identity, key_id, row}``; ``identity`` is what metering is keyed
+    on ("local" when auth is disabled) and ``key_id`` is set only for an issued
+    key, so the caller can charge it. Raises ApiError (unauthorized /
+    rate_limited / budget_exceeded) otherwise."""
     env_keys = _keys()
     if env_keys is None and _issued_keys() == 0:
-        return "local"
+        return {"identity": "local", "key_id": None, "row": None}
 
     key = _extract_key(request)
     if not key:
@@ -102,7 +111,7 @@ def check(request) -> str:
     if env_keys and key in env_keys:
         _enforce_window(key, _rate_limit())
         _usage[key]["requests"] += 1
-        return key
+        return {"identity": key, "key_id": None, "row": None}
 
     conn = _connect()
     try:
@@ -111,13 +120,37 @@ def check(request) -> str:
             raise ApiError("unauthorized", "missing or invalid API key")
         if row["quota"] is not None and row["requests"] >= row["quota"]:
             raise ApiError("budget_exceeded", f"key quota of {row['quota']} requests exhausted")
+        row = credits.roll_period(conn, row)
+        if credits.exhausted(row):
+            raise ApiError(
+                "budget_exceeded",
+                f"monthly credits exhausted ({row['credits_included']} used); "
+                f"they reset on {credits.period_end(row['period_start'])}",
+            )
         identity = row["prefix"]
         _enforce_window(identity, row["rate_limit_per_min"] or _rate_limit())
         key_store.record_use(conn, row["id"])
     finally:
         conn.close()
     _usage[identity]["requests"] += 1
-    return identity
+    return {"identity": identity, "key_id": row["id"], "row": row}
+
+
+def check(request) -> str:
+    """Authenticate and return just the metering identity."""
+    return authenticate(request)["identity"]
+
+
+def charge(key_id: int | None, endpoint: str, units: int) -> None:
+    """Deduct a call's credits after it ran. No-op for env keys and open mode,
+    which have no allowance to spend."""
+    if key_id is None:
+        return
+    conn = _connect()
+    try:
+        credits.charge(conn, key_id, endpoint, units)
+    finally:
+        conn.close()
 
 
 def usage() -> dict:

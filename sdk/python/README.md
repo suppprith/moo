@@ -60,6 +60,7 @@ for event, data in client.research_stream("why is my connection pool exhausted")
 | `get_research(run_id)` | `GET /research/{id}` | poll or resume a run |
 | `source/chunk/claim(handle)` | `GET /source|/chunk|/claim/{id}` | drill into any handle a result gave you |
 | `graph(q)` / `expand_graph(node)` | `GET /graph`, `/graph/expand` | the entity subgraph behind a query |
+| `account_usage()` | `GET /account/usage` | credits left, reset date, per-endpoint spend |
 | `contract()` / `tools()` / `health()` / `usage()` | | introspection |
 
 Async is the same surface, awaited:

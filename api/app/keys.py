@@ -16,11 +16,13 @@ import argparse
 import hashlib
 import secrets
 import sqlite3
+from datetime import UTC, datetime
 
 KEY_PREFIX = "moo_sk_"
 PREFIX_CHARS = len(KEY_PREFIX) + 6
 ROW_FIELDS = ("id", "prefix", "label", "rate_limit_per_min", "quota", "requests",
-              "created_at", "last_used_at", "revoked_at")
+              "created_at", "last_used_at", "revoked_at", "account_id",
+              "credits_included", "credits_used", "period_start")
 
 
 def generate_key() -> str:
@@ -41,14 +43,20 @@ def create_key(
     label: str | None = None,
     rate_limit_per_min: int | None = None,
     quota: int | None = None,
+    account_id: int | None = None,
+    credits_included: int | None = None,
 ) -> tuple[str, dict]:
     """Issue a key. Returns the plaintext key, which is never recoverable after
-    this call, alongside its row."""
+    this call, alongside its row. ``credits_included`` starts a metered window
+    now; leave it None for an unmetered key, which is what self-hosting wants."""
     key = generate_key()
+    period_start = (datetime.now(UTC).isoformat(timespec="seconds")
+                    if credits_included is not None else None)
     cursor = conn.execute(
-        "INSERT INTO api_key (key_hash, prefix, label, rate_limit_per_min, quota) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (key_hash(key), key[:PREFIX_CHARS], label, rate_limit_per_min, quota),
+        "INSERT INTO api_key (key_hash, prefix, label, rate_limit_per_min, quota, "
+        "account_id, credits_included, period_start) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (key_hash(key), key[:PREFIX_CHARS], label, rate_limit_per_min, quota,
+         account_id, credits_included, period_start),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM api_key WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -124,6 +132,8 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--label", help="who or what this key is for")
     create.add_argument("--rate-limit", type=int, help="per-minute limit for this key")
     create.add_argument("--quota", type=int, help="total requests allowed")
+    create.add_argument("--credits", type=int,
+                        help="monthly credit allowance (omit for an unmetered key)")
 
     listing = sub.add_parser("list", help="list keys")
     listing.add_argument("--all", action="store_true", help="include revoked keys")
@@ -138,10 +148,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "create":
             key, row = create_key(conn, label=args.label, rate_limit_per_min=args.rate_limit,
-                                  quota=args.quota)
+                                  quota=args.quota, credits_included=args.credits)
             print(key)
             print(f"prefix {row['prefix']}  label {row['label'] or '-'}  "
-                  f"quota {row['quota'] or 'unmetered'}")
+                  f"credits {row['credits_included'] or 'unmetered'}")
             print("Store it now. Only its hash is kept.")
         elif args.command == "list":
             rows = list_keys(conn, include_revoked=args.all)

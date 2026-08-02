@@ -132,6 +132,43 @@ Rate-limit windows are per process. Several workers each get the configured
 limit, so divide it accordingly or run one worker per machine, which is the
 default here anyway.
 
+## Self-serve signup and credits
+
+Off unless you configure it, because an open key-minting endpoint is an abuse
+vector and a self-hosted moo needs no signup at all. With
+`MOO_GITHUB_CLIENT_ID`, `MOO_GITHUB_CLIENT_SECRET` and `MOO_PUBLIC_URL` set,
+`/signup` becomes the whole flow: sign in with GitHub, get a key shown once, call
+the API. GitHub is identity only, with no scopes requested, the account id, login
+and public email stored, and no token kept after the exchange. Without those
+variables, `/signup` says how to issue a key by hand instead.
+
+Calls are weighted rather than counted, because a deep-research run is not a
+snippet search:
+
+| Call | Credits |
+| --- | --- |
+| `/search`, `/v1/web_search` | 1 |
+| `/v1/extract` | 1 per URL |
+| `/research` | 10, plus 5 per step past the default, capped at 25 |
+| `/source`, `/chunk`, `/claim`, `/graph`, re-reading a run | 0 |
+
+Drill-down being free is deliberate. Charging to follow a citation would tax the
+one thing that makes moo worth using.
+
+New keys get `MOO_FREE_CREDITS` (default 1000) per rolling 30-day window, reset
+lazily on the first call after the window closes, so there is no scheduler. A key
+with no allowance is unmetered, which is what `python -m app.keys create` issues
+and what self-hosting wants. Running out returns `budget_exceeded` with the reset
+date; a 5xx is never billed.
+
+`/account` is a dashboard: paste a key, see credits and a per-endpoint
+breakdown. The key is held in the tab, never stored and never put in a URL. The
+same data is available as JSON at `GET /account/usage` and through both SDKs as
+`account_usage()`.
+
+Paid tiers are a mailto for now. Building billing before there are users would
+be the wrong order.
+
 ## Operational notes
 
 - **Cold start** is dominated by loading the embedding model, a few seconds from

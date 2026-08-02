@@ -110,6 +110,11 @@ class Moo:
         """Masked per-key request counts."""
         return self._call(ops.usage())
 
+    def account_usage(self) -> dict[str, Any]:
+        """Credits and per-endpoint usage for this key: what is left, when the
+        window resets, and where the credits went."""
+        return self._call(ops.account_usage())
+
     def contract(self) -> dict[str, Any]:
         """Machine-readable descriptor: contract version, handle formats, error
         envelope, and the MCP tool schemas."""

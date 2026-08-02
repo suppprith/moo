@@ -26,6 +26,7 @@ class Op:
 ENDPOINTS = {
     ("GET", "/health"): "health",
     ("GET", "/usage"): "usage",
+    ("GET", "/account/usage"): "account_usage",
     ("GET", "/contract"): "contract",
     ("GET", "/v1/tools"): "tools",
     ("GET", "/search"): "search",
@@ -50,6 +51,10 @@ def health() -> Op:
 
 def usage() -> Op:
     return Op("GET", "/usage")
+
+
+def account_usage() -> Op:
+    return Op("GET", "/account/usage")
 
 
 def contract() -> Op:

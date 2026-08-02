@@ -10,13 +10,13 @@ import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 import queue
 import threading
 
-from . import auth, ids
+from . import accounts, auth, credits, ids, pages
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
 from .extract import MAX_URLS as EXTRACT_MAX_URLS, extract_urls
@@ -70,18 +70,24 @@ app.add_middleware(
 
 
 _AUTH_EXEMPT = {"/", "/health", "/contract", "/v1/tools", "/openapi.json", "/docs", "/redoc"}
+_AUTH_EXEMPT_PREFIXES = ("/docs", "/openapi", "/signup", "/account")
 
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     """Tag every request with an id echoed in the response header and in any
     error envelope, so a failing call is traceable end to end. Also enforces
-    optional API-key auth + per-key rate limiting."""
+    optional API-key auth + per-key rate limiting, and charges the call's
+    credits once it has run (a handler that knows better sets
+    ``request.state.credits``; a 5xx is never billed)."""
     request.state.request_id = new_request_id()
+    request.state.key_id = None
     path = request.url.path
-    if auth.enabled() and path not in _AUTH_EXEMPT and not path.startswith(("/docs", "/openapi")):
+    gated = (auth.enabled() and path not in _AUTH_EXEMPT
+             and not path.startswith(_AUTH_EXEMPT_PREFIXES))
+    if gated:
         try:
-            auth.check(request)
+            request.state.key_id = auth.authenticate(request)["key_id"]
         except ApiError as exc:
             headers = {"X-Request-ID": request.state.request_id}
             if exc.retry_after is not None:
@@ -93,7 +99,20 @@ async def request_id_middleware(request: Request, call_next):
             )
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
+    if gated and request.state.key_id and response.status_code < 500:
+        units = getattr(request.state, "credits", None)
+        if units is None:
+            units = credits.cost_for_path(path, request.method)
+        if units:
+            auth.charge(request.state.key_id, _route_template(request, path), units)
     return response
+
+
+def _route_template(request: Request, path: str) -> str:
+    """The matched route ("/chunk/{id}"), so usage rows stay bounded and never
+    carry a query."""
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or path
 
 
 def _request_id(request: Request) -> str:
@@ -200,6 +219,79 @@ def usage() -> dict:
     `keys` is the persisted per-key counters for issued keys. Requires a valid
     key when auth is on."""
     return {"enabled": auth.enabled(), "usage": auth.usage(), "keys": auth.issued_usage()}
+
+
+@app.get("/signup", include_in_schema=False)
+def signup_page() -> HTMLResponse:
+    """Where a stranger starts: sign in with GitHub, leave with a key."""
+    return HTMLResponse(pages.signup_page(enabled=accounts.enabled(),
+                                          free_credits=credits.free_credits()))
+
+
+@app.get("/signup/github", include_in_schema=False)
+def signup_github() -> Any:
+    """Hand off to GitHub with a one-time state, kept in a cookie so the
+    callback can prove the round trip started here."""
+    if not accounts.enabled():
+        raise HTTPException(status_code=404, detail="self-serve signup is not enabled")
+    state = accounts.new_state()
+    response = RedirectResponse(accounts.authorize_url(state), status_code=302)
+    response.set_cookie(
+        accounts.STATE_COOKIE, state, max_age=600, httponly=True, samesite="lax",
+        secure=accounts.public_base_url().startswith("https://"),
+    )
+    return response
+
+
+@app.get("/signup/github/callback", include_in_schema=False)
+def signup_github_callback(request: Request, code: str | None = None,
+                           state: str | None = None) -> HTMLResponse:
+    """Exchange the code, find or create the account, and show the key once."""
+    if not accounts.enabled():
+        raise HTTPException(status_code=404, detail="self-serve signup is not enabled")
+    expected = request.cookies.get(accounts.STATE_COOKIE)
+    if not code or not state or not expected or state != expected:
+        raise ApiError("invalid_request", "sign-in could not be verified, start again")
+
+    profile = accounts.exchange_code(code)
+    conn = get_connection()
+    try:
+        account = accounts.upsert_account(conn, profile)
+        key, row = accounts.issue_key(conn, account)
+    finally:
+        conn.close()
+    auth.reset()
+
+    response = HTMLResponse(pages.key_issued_page(
+        key, login=account.get("login"), credits=row["credits_included"],
+        base_url=accounts.public_base_url()))
+    response.delete_cookie(accounts.STATE_COOKIE)
+    return response
+
+
+@app.get("/account", include_in_schema=False)
+def account_page() -> HTMLResponse:
+    """Paste a key, see what it spent. The key never leaves the tab."""
+    return HTMLResponse(pages.dashboard_page())
+
+
+@app.get("/account/usage")
+def account_usage(request: Request) -> dict:
+    """Credits and per-endpoint usage for the presented key. Requires the key
+    itself, so one key can never see another's usage."""
+    presented = auth.presented_key(request)
+    if not presented:
+        raise ApiError("unauthorized", "present your API key to see its usage")
+    conn = get_connection()
+    try:
+        from . import keys as key_store
+
+        row = key_store.lookup(conn, presented)
+        if row is None:
+            raise ApiError("unauthorized", "missing or invalid API key")
+        return credits.account_view(conn, row)
+    finally:
+        conn.close()
 
 
 @app.get("/contract")
@@ -382,13 +474,14 @@ class ExtractRequest(BaseModel):
 
 
 @app.post("/v1/extract")
-def extract_post(req: ExtractRequest) -> dict:
+def extract_post(req: ExtractRequest, request: Request) -> dict:
     """Fetch URL(s) and return each page as clean markdown with `doc_`/`chk_`
     handles into the store. `depth=claims` also runs the evidence layer per
     page (claims + confidence + contradictions — no other extract endpoint does
     this). Failures are per-URL: each failed entry carries a structured
     `error`, the rest of the batch still returns. Content is untrusted
     third-party data (see `notice`)."""
+    request.state.credits = len(req.urls) * credits.EXTRACT_COST_PER_URL
     conn = get_connection_for_search()
     try:
         return extract_urls(conn, req.urls, depth=req.depth, force=req.force)
@@ -486,7 +579,7 @@ def _report_for_run(conn, run: dict, *, use_llm: bool, output_schema: dict | Non
 
 
 @app.post("/research")
-def research_post(req: ResearchRequest) -> dict:
+def research_post(req: ResearchRequest, request: Request) -> dict:
     """Run a full deep-research run (plan -> iterative loop -> cited report) and
     return the structured report. Budget is enforced end-to-end; a run that hits
     a cap returns `status: partial`. Use POST /research/stream for progress, or
@@ -497,6 +590,7 @@ def research_post(req: ResearchRequest) -> dict:
             validate_schema(req.output_schema)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
+    request.state.credits = credits.research_cost(req.max_steps)
     conn = get_connection_for_search()
     try:
         run = research_session.run_research(
@@ -509,7 +603,7 @@ def research_post(req: ResearchRequest) -> dict:
 
 
 @app.post("/research/stream")
-def research_stream(req: ResearchRequest):
+def research_stream(req: ResearchRequest, request: Request):
     """Streaming (SSE) deep research: emits `plan`, a `progress` event per step
     (with why it was spawned), then a terminal `report` + `done` — or `error`.
     Reuses the app.streaming event contract."""
@@ -518,6 +612,7 @@ def research_stream(req: ResearchRequest):
             validate_schema(req.output_schema)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
+    request.state.credits = credits.research_cost(req.max_steps)
 
     def frames():
         events: queue.Queue = queue.Queue()

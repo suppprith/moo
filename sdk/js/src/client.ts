@@ -48,6 +48,7 @@ export interface MooOptions {
 export const ENDPOINTS: Record<string, string> = {
   'GET /health': 'health',
   'GET /usage': 'usage',
+  'GET /account/usage': 'accountUsage',
   'GET /contract': 'contract',
   'GET /v1/tools': 'tools',
   'GET /search': 'search',
@@ -226,6 +227,14 @@ export class Moo {
   /** Masked per-key request counts. */
   usage(): Promise<Record<string, unknown>> {
     return this.call({ method: 'GET', path: '/usage' });
+  }
+
+  /**
+   * Credits and per-endpoint usage for this key: what is left, when the window
+   * resets, and where the credits went.
+   */
+  accountUsage(): Promise<Record<string, unknown>> {
+    return this.call({ method: 'GET', path: '/account/usage' });
   }
 
   /** Contract version, handle formats, error envelope, and MCP tool schemas. */

@@ -291,8 +291,15 @@ rate limit, quota and counters that survive a restart. Clients pass
 exhausted quota gets a non-retryable `429`, and `GET /usage` reports per-key
 counts. No query content is ever logged.
 
-Deploy steps, the SQLite-per-tenant storage decision and the operational notes:
-[docs/hosting.md](docs/hosting.md).
+A hosted instance can also issue its own keys. With GitHub sign-in configured,
+`/signup` takes a stranger from nothing to a working call: sign in, get a key
+shown once, 1000 credits a month. Calls are weighted rather than counted (a
+search is 1, extract is 1 per URL, a deep-research run is 10 to 25, and following
+a citation is free), and `/account` shows where they went. Self-hosted instances
+skip all of it and issue unmetered keys by hand.
+
+Deploy steps, the credit model, the SQLite-per-tenant storage decision and the
+operational notes: [docs/hosting.md](docs/hosting.md).
 
 Errors come back in one envelope with a stable `code`, a `retryable` flag, and a
 request id echoed in the `X-Request-ID` header, so an agent can branch on the
