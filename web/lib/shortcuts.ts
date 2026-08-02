@@ -70,6 +70,8 @@ export const SHORTCUTS: { keys: string; does: string }[] = [
   { keys: "j / k", does: "move down and up the results" },
   { keys: "Enter", does: "open the selected source" },
   { keys: "o", does: "open the selected source in a new tab" },
+  { keys: "e", does: "show the evidence behind the selection" },
+  { keys: "c", does: "copy the cited answer as markdown" },
   { keys: "1 2 3", does: "raw, claims, full" },
   { keys: "d", does: "deep research this query" },
   { keys: "g", does: "toggle the evidence graph" },

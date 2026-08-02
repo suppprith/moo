@@ -1140,3 +1140,9 @@ button {
 .sh-row dt { display: flex; gap: 4px; min-width: 96px; }
 .sh-row dd { margin: 0; color: var(--ink-2); font-size: 13.5px; }
 .sh-row kbd { margin-left: 0; }
+.toast {
+  position: fixed; z-index: 52; bottom: 24px; left: 50%; transform: translateX(-50%);
+  padding: 9px 16px; font-size: 13.5px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: 99px; box-shadow: var(--shadow-md);
+}

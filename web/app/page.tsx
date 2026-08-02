@@ -57,6 +57,7 @@ export default function Home() {
   const [selected, setSelected] = useState(-1);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const onModeRef = useRef<(m: Mode) => void>(() => {});
   const goHomeRef = useRef<() => void>(() => {});
@@ -93,6 +94,28 @@ export default function Home() {
     if (query) run(query, m);
   };
 
+  /** The answer with [S#] turned into links, which is what anyone pasting it
+   *  into an issue or a PR actually wants. */
+  const copyAnswer = useCallback(async () => {
+    const answer = data?.answer;
+    if (!answer) return;
+    const cited = answer.replace(/\[S(\d+)\]/g, (match, n: string) => {
+      const source = data?.citations.find((c) => c.index === Number(n));
+      return source?.url ? `[[S${n}]](${source.url})` : match;
+    });
+    const sources = (data?.citations ?? [])
+      .map((c) => `- [S${c.index}] ${c.title ?? c.url ?? ""} ${c.url ?? ""}`.trim())
+      .join("\n");
+    const markdown = `> ${data?.query}\n\n${cited}\n\n${sources}\n`;
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("Could not copy to the clipboard.");
+    }
+  }, [data]);
+
   const openSelected = useCallback(
     (newTab: boolean) => {
       const source = data?.sources[selected];
@@ -110,6 +133,7 @@ export default function Home() {
     [data, selected],
   );
 
+  const hasAnswer = Boolean(data?.answer);
   const commands: Command[] = useMemo(() => {
     const list: Command[] = [
       { id: "focus", label: "Search something else", keys: "/", group: "Search" },
@@ -126,8 +150,16 @@ export default function Home() {
         { id: "research", label: "Deep research this query", keys: "d", group: "Search" },
         { id: "graph", label: "Toggle the evidence graph", keys: "g", group: "View" });
     }
+    if (hasAnswer) {
+      list.splice(1, 0, {
+        id: "copy",
+        label: "Copy the cited answer as markdown",
+        hint: "citations become links",
+        group: "Search",
+      });
+    }
     return list;
-  }, [query]);
+  }, [query, hasAnswer]);
 
   const runCommand = useCallback(
     (id: string) => {
@@ -137,6 +169,7 @@ export default function Home() {
       if (id === "graph" && query) return setGraph((g) => (g ? null : query));
       if (id === "home") return goHomeRef.current();
       if (id === "help") return setHelp(true);
+      if (id === "copy") return void copyAnswer();
       if (id === "docs") return void (window.location.href = "/docs");
       if (id === "why") return void (window.location.href = "/why");
       if (id === "focus") {
@@ -145,7 +178,7 @@ export default function Home() {
         box?.select();
       }
     },
-    [query],
+    [copyAnswer, query],
   );
 
   useEffect(() => {
@@ -179,6 +212,18 @@ export default function Home() {
             openSelected(true);
           }
           break;
+        case "e":
+          if (selected >= 0) {
+            event.preventDefault();
+            openSelected(false);
+          }
+          break;
+        case "c":
+          if (data?.answer) {
+            event.preventDefault();
+            void copyAnswer();
+          }
+          break;
         case "1":
           onModeRef.current("raw");
           break;
@@ -207,7 +252,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [data, help, openSelected, palette, panel, query, selected]);
+  }, [copyAnswer, data, help, openSelected, palette, panel, query, selected]);
 
   const goHome = () => {
     setSearched(false);
@@ -347,6 +392,7 @@ export default function Home() {
         />
       )}
       {help && <ShortcutHelp shortcuts={SHORTCUTS} onClose={() => setHelp(false)} />}
+      {copied && <div className="toast">Answer copied as markdown</div>}
     </div>
   );
 }
