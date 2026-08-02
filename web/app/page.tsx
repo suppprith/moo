@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
-import { ApiError, search } from "@/lib/api";
+import { API_BASE, ApiError, search } from "@/lib/api";
 import type { Mode, SearchResponse } from "@/lib/types";
 import { Answer } from "@/components/Answer";
 import { ClaimList } from "@/components/ClaimList";
@@ -10,6 +11,9 @@ import { ModeBar } from "@/components/ModeBar";
 import { ResearchView } from "@/components/ResearchView";
 import { SearchBox } from "@/components/SearchBox";
 import { SourceList } from "@/components/SourceList";
+
+/** A public playground says so: the visitor is on someone else's quota. */
+const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
 const EXAMPLES = [
   "Postgres vs MySQL for a new web app",
@@ -96,6 +100,13 @@ export default function Home() {
             Live search with an evidence layer. Claims backed by typed evidence — supports,
             contradicts, explains — with confidence and source trust, not ten blue links.
           </p>
+          {DEMO && (
+            <p className="demo-note">
+              This is a shared demo instance, rate limited per visitor and running on someone
+              else&apos;s hardware. <a href={`${API_BASE}/signup`}>Get a key</a> for your own quota,
+              or <Link href="/docs/hosting">run it yourself</Link>.
+            </p>
+          )}
           <SearchBox loading={loading} size="lg" onSearch={onSearch} />
           <div className="examples">
             {EXAMPLES.map((ex) => (
@@ -103,6 +114,11 @@ export default function Home() {
                 {ex}
               </button>
             ))}
+          </div>
+          <div className="home-links">
+            <Link href="/docs">Docs</Link>
+            <Link href="/why">Why moo</Link>
+            <a href="https://github.com/suppprith/moo">GitHub</a>
           </div>
         </div>
       </div>

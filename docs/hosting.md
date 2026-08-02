@@ -169,6 +169,18 @@ same data is available as JSON at `GET /account/usage` and through both SDKs as
 Paid tiers are a mailto for now. Building billing before there are users would
 be the wrong order.
 
+## A public playground
+
+The web app doubles as the try-it-now surface, and a demo instance has to survive
+being linked. `MOO_DEMO_RATE_LIMIT_PER_MIN` meters keyless callers per visitor
+(by `X-Forwarded-For`, falling back to the socket address, used as a bucket and
+never stored) while keyed callers keep their own quota. Unset, keyless calls are
+unlimited, which is right on a laptop and wrong on the internet.
+
+On the web side, `NEXT_PUBLIC_DEMO_MODE=1` tells visitors they are on a shared
+instance and points them at signup or self-hosting. Set `MOO_CORS_ORIGINS` to
+the site's origin, or the browser will not be allowed to call the API at all.
+
 ## Operational notes
 
 - **Cold start** is dominated by loading the embedding model, a few seconds from

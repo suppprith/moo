@@ -83,7 +83,7 @@ async def request_id_middleware(request: Request, call_next):
     request.state.request_id = new_request_id()
     request.state.key_id = None
     path = request.url.path
-    gated = (auth.enabled() and path not in _AUTH_EXEMPT
+    gated = (auth.active() and path not in _AUTH_EXEMPT
              and not path.startswith(_AUTH_EXEMPT_PREFIXES))
     if gated:
         try:

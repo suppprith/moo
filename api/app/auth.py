@@ -63,11 +63,41 @@ def enabled() -> bool:
     return _keys() is not None or _issued_keys() > 0
 
 
+def active() -> bool:
+    """Whether any check runs at all: keys are configured, or a demo limit is
+    set and keyless callers have to be metered per visitor."""
+    return enabled() or demo_limit() is not None
+
+
 def _rate_limit() -> int:
     try:
         return int(os.environ.get("MOO_RATE_LIMIT_PER_MIN", "60"))
     except ValueError:
         return 60
+
+
+def demo_limit() -> int | None:
+    """Per-visitor limit for keyless calls, which is what makes a public
+    playground safe to leave open. Unset (the default) means keyless requests
+    are unlimited, which is right for a laptop and wrong for the internet."""
+    raw = os.environ.get("MOO_DEMO_RATE_LIMIT_PER_MIN", "").strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _client_ip(request) -> str:
+    """The visitor, as far as we can tell behind a proxy. Only ever used as a
+    rate-limit bucket, never stored."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    client = getattr(request, "client", None)
+    return getattr(client, "host", None) or "unknown"
 
 
 def _extract_key(request) -> str | None:
@@ -101,11 +131,15 @@ def authenticate(request) -> dict:
     key, so the caller can charge it. Raises ApiError (unauthorized /
     rate_limited / budget_exceeded) otherwise."""
     env_keys = _keys()
-    if env_keys is None and _issued_keys() == 0:
-        return {"identity": "local", "key_id": None, "row": None}
-
     key = _extract_key(request)
+
+    if env_keys is None and _issued_keys() == 0:
+        return _open_or_demo(request)
+
     if not key:
+        demo = demo_limit()
+        if demo is not None:
+            return _open_or_demo(request)
         raise ApiError("unauthorized", "missing or invalid API key")
 
     if env_keys and key in env_keys:
@@ -134,6 +168,18 @@ def authenticate(request) -> dict:
         conn.close()
     _usage[identity]["requests"] += 1
     return {"identity": identity, "key_id": row["id"], "row": row}
+
+
+def _open_or_demo(request) -> dict:
+    """A keyless call: free on a local instance, rate limited per visitor on a
+    public playground."""
+    demo = demo_limit()
+    if demo is None:
+        return {"identity": "local", "key_id": None, "row": None}
+    identity = f"ip:{_client_ip(request)}"
+    _enforce_window(identity, demo)
+    _usage[identity]["requests"] += 1
+    return {"identity": identity, "key_id": None, "row": None}
 
 
 def check(request) -> str:
