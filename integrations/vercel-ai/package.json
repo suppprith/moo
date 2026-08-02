@@ -1,0 +1,55 @@
+{
+  "name": "@moo/ai-sdk",
+  "version": "0.1.0",
+  "description": "moo tools for the Vercel AI SDK: live software search with claim-level evidence",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai-sdk",
+    "vercel",
+    "tools",
+    "search",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suppprith/moo.git",
+    "directory": "integrations/vercel-ai"
+  },
+  "homepage": "https://github.com/suppprith/moo/tree/main/integrations/vercel-ai",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "zod": "^3.25.76 || ^4.0.0"
+  },
+  "peerDependencies": {
+    "moo-js": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "moo-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

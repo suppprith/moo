@@ -149,6 +149,23 @@ endpoint the client has not caught up with.
 
 [`sdk/python`](sdk/python) · [`sdk/js`](sdk/js)
 
+## Or plug into your framework
+
+```python
+from langchain_moo import MooRetriever, moo_toolkit      # LangChain
+from llama_index_moo import MooRetriever, MooToolSpec    # LlamaIndex
+```
+
+```ts
+import { mooTools } from '@moo/ai-sdk';                  // Vercel AI SDK
+```
+
+Each package wraps the SDK in that framework's own shapes: a retriever whose
+documents keep moo's handles, trust scores and injection flags, and tools for
+search, page extraction and deep research. CrewAI and the OpenAI Agents SDK get
+copy-paste recipes. Full guide, including what the model sees for each tool:
+[docs/integrations.md](docs/integrations.md).
+
 ## Deep research
 
 `deep_research(question)` over MCP, or `POST /research` and `POST /research/stream`
@@ -290,6 +307,7 @@ numbers.
 | `api/` | Python, FastAPI, uv, SQLite | Retrieval, evidence, research engine, MCP server, HTTP API, CLI |
 | `web/` | Next.js, TypeScript | Optional human search UI |
 | `sdk/` | Python, TypeScript | Official clients (`sdk/python`, `sdk/js`) |
+| `integrations/` | Python, TypeScript | LangChain, LlamaIndex, Vercel AI SDK packages |
 | `docs/` | Markdown | Agent guide, data model, domain scope |
 
 Day-to-day work happens in `api/`:
