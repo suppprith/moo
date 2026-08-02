@@ -190,12 +190,15 @@ def retrieve(
     since: str | None = None,
     source_boost: dict[str, float] | None = None,
     index_weights: tuple[float, float] | None = None,
+    fuse_signals: bool = True,
 ) -> list[RetrievedChunk]:
     """Hybrid retrieval over both indexes. ``queries`` adds fan-out variants
 ; ``source_boost`` lets query understanding weight source types
 , e.g. {"github_issue": 1.3} for troubleshooting queries;
     ``index_weights`` = (vector, keyword) RRF vote multipliers from the
-    adaptive router."""
+    adaptive router. ``fuse_signals=False`` returns plain RRF order, which is
+    what the eval harness ablates the trust/corroboration/recency blend
+    against."""
     variants = [query] + [q for q in (queries or []) if q and q != query]
     filters = {"source_types": source_types, "since": since}
     w_vec, w_kw = index_weights or (1.0, 1.0)
@@ -244,9 +247,10 @@ def retrieve(
         if len(out) >= k + FUSE_OVERSAMPLE:
             break
 
-    for hit in out:
-        fuse(hit)
-    out.sort(key=lambda h: -h.score)
+    if fuse_signals:
+        for hit in out:
+            fuse(hit)
+        out.sort(key=lambda h: -h.score)
     return out[:k]
 
 

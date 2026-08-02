@@ -1,0 +1,149 @@
+{
+  "version": "1.0",
+  "authored_on": "2026-08-02",
+  "about": "Graded relevance judgments for retrieval eval. Judgments name a document by URL substring (plus an optional heading substring), not a chunk id, because chunk ids change every time the corpus is rechunked and a judgment that dies on rechunk is worse than none. Grades: 3 = the document that answers the query, 2 = strongly relevant, 1 = tangential but reasonable, absent = not relevant.",
+  "corpus_note": "Authored against the local store as of 2026-08-02 (79 documents, 246 chunks: Postgres wiki, SQLite docs, FastAPI docs, Stack Overflow, Redis releases, use-the-index-luke). Queries were chosen to be answerable from that corpus, so these numbers measure ranking, not coverage. Re-author when the corpus changes materially.",
+  "queries": [
+    {
+      "id": "sqlite-production",
+      "query": "Is SQLite good enough for production?",
+      "intent": "comparison",
+      "judgments": [
+        { "url_contains": "sqlite.org/whentouse.html", "grade": 3 },
+        { "url_contains": "sqlite.org/wal.html", "grade": 2 },
+        { "url_contains": "improve-insert-per-second-performance-of-sqlite", "grade": 1 }
+      ]
+    },
+    {
+      "id": "sqlite-wal",
+      "query": "How does SQLite WAL mode work?",
+      "intent": "definition",
+      "judgments": [
+        { "url_contains": "sqlite.org/wal.html", "grade": 3 },
+        { "url_contains": "sqlite.org/whentouse.html", "grade": 1 }
+      ]
+    },
+    {
+      "id": "sqlite-insert-speed",
+      "query": "How do I make SQLite inserts faster?",
+      "intent": "how-to",
+      "judgments": [
+        { "url_contains": "improve-insert-per-second-performance-of-sqlite", "grade": 3 },
+        { "url_contains": "sqlite.org/wal.html", "grade": 2 }
+      ]
+    },
+    {
+      "id": "sqlite-transactions-inserts",
+      "query": "Should I wrap SQLite inserts in a transaction?",
+      "intent": "how-to",
+      "judgments": [
+        {
+          "url_contains": "improve-insert-per-second-performance-of-sqlite",
+          "heading_contains": "transaction",
+          "grade": 3
+        },
+        { "url_contains": "improve-insert-per-second-performance-of-sqlite", "grade": 2 }
+      ]
+    },
+    {
+      "id": "redis-vs-memcached",
+      "query": "Redis vs Memcached for caching",
+      "intent": "comparison",
+      "judgments": [
+        { "url_contains": "memcached-vs-redis", "grade": 3 },
+        { "url_contains": "github.com/redis/redis/releases", "grade": 1 }
+      ]
+    },
+    {
+      "id": "redis-persistence",
+      "query": "Does Redis persist data to disk?",
+      "intent": "why",
+      "judgments": [
+        {
+          "url_contains": "memcached-vs-redis",
+          "heading_contains": "Persistence",
+          "grade": 3
+        },
+        { "url_contains": "memcached-vs-redis", "grade": 2 }
+      ]
+    },
+    {
+      "id": "postgres-timestamp-timezone",
+      "query": "Should I use timestamp or timestamptz in Postgres?",
+      "intent": "comparison",
+      "judgments": [
+        {
+          "url_contains": "wiki.postgresql.org/wiki/Don%27t_Do_This",
+          "heading_contains": "timestamp",
+          "grade": 3
+        },
+        { "url_contains": "wiki.postgresql.org/wiki/Don%27t_Do_This", "grade": 1 }
+      ]
+    },
+    {
+      "id": "postgres-antipatterns",
+      "query": "What should I avoid when designing a Postgres schema?",
+      "intent": "why",
+      "judgments": [
+        { "url_contains": "wiki.postgresql.org/wiki/Don%27t_Do_This", "grade": 3 },
+        { "url_contains": "use-the-index-luke.com", "grade": 1 }
+      ]
+    },
+    {
+      "id": "postgres-char-n",
+      "query": "Is char(n) a good choice for fixed length identifiers in Postgres?",
+      "intent": "why",
+      "judgments": [
+        {
+          "url_contains": "wiki.postgresql.org/wiki/Don%27t_Do_This",
+          "heading_contains": "char(n)",
+          "grade": 3
+        },
+        { "url_contains": "wiki.postgresql.org/wiki/Don%27t_Do_This", "grade": 1 }
+      ]
+    },
+    {
+      "id": "index-leaf-nodes",
+      "query": "How does a B-tree index leaf node work?",
+      "intent": "definition",
+      "judgments": [
+        { "url_contains": "use-the-index-luke.com/sql/anatomy/the-leaf-nodes", "grade": 3 },
+        { "url_contains": "use-the-index-luke.com", "grade": 2 }
+      ]
+    },
+    {
+      "id": "fastapi-async-def",
+      "query": "When should a FastAPI route be async def instead of def?",
+      "intent": "how-to",
+      "judgments": [
+        { "url_contains": "fastapi.tiangolo.com/async/", "grade": 3 },
+        { "url_contains": "fastapi.tiangolo.com/tutorial/first-steps", "grade": 1 }
+      ]
+    },
+    {
+      "id": "sql-injection-php",
+      "query": "How do I prevent SQL injection in PHP?",
+      "intent": "how-to",
+      "judgments": [
+        { "url_contains": "how-can-i-prevent-sql-injection-in-php", "grade": 3 }
+      ]
+    },
+    {
+      "id": "first-row-per-group",
+      "query": "How do I select the first row in each group in SQL?",
+      "intent": "how-to",
+      "judgments": [
+        { "url_contains": "select-first-row-in-each-group-by-group", "grade": 3 }
+      ]
+    },
+    {
+      "id": "list-postgres-tables",
+      "query": "How do I list all tables in a Postgres database?",
+      "intent": "how-to",
+      "judgments": [
+        { "url_contains": "how-to-show-tables-in-postgresql", "grade": 3 },
+        { "url_contains": "postgresql-describe-table", "grade": 2 }
+      ]
+    }
+  ]
+}

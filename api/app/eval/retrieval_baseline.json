@@ -1,0 +1,925 @@
+{
+  "k": 10,
+  "n_queries": 14,
+  "configs": {
+    "bm25": {
+      "summary": {
+        "p@5": 0.7857,
+        "p@10": 0.6929,
+        "r@10": 0.3421,
+        "ndcg@10": 0.767,
+        "mrr": 0.8893,
+        "queries": 14
+      },
+      "latency_ms": 1.4,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.2,
+          "p@10": 0.1,
+          "r@10": 0.0179,
+          "ndcg@10": 0.0169,
+          "mrr": 0.25,
+          "hits": 1,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 1.0,
+          "p@10": 0.8,
+          "r@10": 0.1569,
+          "ndcg@10": 0.858,
+          "mrr": 1.0,
+          "hits": 8,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5882,
+          "ndcg@10": 0.9163,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3333,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.8,
+          "p@10": 0.7,
+          "r@10": 0.2917,
+          "ndcg@10": 0.7331,
+          "mrr": 1.0,
+          "hits": 7,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 0.8,
+          "p@10": 0.6,
+          "r@10": 0.1935,
+          "ndcg@10": 0.6387,
+          "mrr": 1.0,
+          "hits": 6,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.2,
+          "p@10": 0.5,
+          "r@10": 0.1429,
+          "ndcg@10": 0.3628,
+          "mrr": 0.2,
+          "hits": 5,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.5,
+          "r@10": 0.1613,
+          "ndcg@10": 0.8487,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.6,
+          "p@10": 0.3,
+          "r@10": 0.75,
+          "ndcg@10": 0.9203,
+          "mrr": 1.0,
+          "hits": 3,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.927,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.4,
+          "p@10": 0.2,
+          "r@10": 0.25,
+          "ndcg@10": 0.5164,
+          "mrr": 1.0,
+          "hits": 2,
+          "judged_in_corpus": 8
+        }
+      ]
+    },
+    "vector": {
+      "summary": {
+        "p@5": 0.8,
+        "p@10": 0.7929,
+        "r@10": 0.3789,
+        "ndcg@10": 0.8053,
+        "mrr": 0.9524,
+        "queries": 14
+      },
+      "latency_ms": 8828.4,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.4,
+          "p@10": 0.7,
+          "r@10": 0.125,
+          "ndcg@10": 0.4382,
+          "mrr": 0.3333,
+          "hits": 7,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.1961,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5882,
+          "ndcg@10": 0.8539,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3333,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.6,
+          "p@10": 0.7,
+          "r@10": 0.2917,
+          "ndcg@10": 0.8003,
+          "mrr": 1.0,
+          "hits": 7,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 0.8,
+          "p@10": 0.8,
+          "r@10": 0.2581,
+          "ndcg@10": 0.5772,
+          "mrr": 1.0,
+          "hits": 8,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.6,
+          "p@10": 0.5,
+          "r@10": 0.1429,
+          "ndcg@10": 0.5965,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.9,
+          "r@10": 0.2903,
+          "ndcg@10": 0.7614,
+          "mrr": 1.0,
+          "hits": 9,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.4,
+          "p@10": 0.2,
+          "r@10": 0.5,
+          "ndcg@10": 0.7044,
+          "mrr": 1.0,
+          "hits": 2,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.9432,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 0.6,
+          "p@10": 0.6,
+          "r@10": 0.3,
+          "ndcg@10": 0.6595,
+          "mrr": 1.0,
+          "hits": 6,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.8,
+          "p@10": 0.7,
+          "r@10": 0.875,
+          "ndcg@10": 0.9395,
+          "mrr": 1.0,
+          "hits": 7,
+          "judged_in_corpus": 8
+        }
+      ]
+    },
+    "hybrid": {
+      "summary": {
+        "p@5": 0.7857,
+        "p@10": 0.7571,
+        "r@10": 0.3777,
+        "ndcg@10": 0.8085,
+        "mrr": 0.9464,
+        "queries": 14
+      },
+      "latency_ms": 78.5,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.4,
+          "p@10": 0.6,
+          "r@10": 0.1071,
+          "ndcg@10": 0.4569,
+          "mrr": 0.25,
+          "hits": 6,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.1961,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5882,
+          "ndcg@10": 0.8866,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3333,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.6,
+          "p@10": 0.8,
+          "r@10": 0.3333,
+          "ndcg@10": 0.8609,
+          "mrr": 1.0,
+          "hits": 8,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 0.8,
+          "p@10": 0.7,
+          "r@10": 0.2258,
+          "ndcg@10": 0.5857,
+          "mrr": 1.0,
+          "hits": 7,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.4,
+          "p@10": 0.4,
+          "r@10": 0.1143,
+          "ndcg@10": 0.5036,
+          "mrr": 1.0,
+          "hits": 4,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.5,
+          "r@10": 0.1613,
+          "ndcg@10": 0.6387,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.4,
+          "p@10": 0.4,
+          "r@10": 1.0,
+          "ndcg@10": 0.8909,
+          "mrr": 1.0,
+          "hits": 4,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.9371,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 1.0,
+          "p@10": 0.9,
+          "r@10": 0.45,
+          "ndcg@10": 0.9364,
+          "mrr": 1.0,
+          "hits": 9,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.4,
+          "p@10": 0.3,
+          "r@10": 0.375,
+          "ndcg@10": 0.622,
+          "mrr": 1.0,
+          "hits": 3,
+          "judged_in_corpus": 8
+        }
+      ]
+    },
+    "hybrid+fusion": {
+      "summary": {
+        "p@5": 0.8143,
+        "p@10": 0.7357,
+        "r@10": 0.3554,
+        "ndcg@10": 0.7431,
+        "mrr": 0.8274,
+        "queries": 14
+      },
+      "latency_ms": 77.8,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.8,
+          "p@10": 0.5,
+          "r@10": 0.0893,
+          "ndcg@10": 0.646,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.1961,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5882,
+          "ndcg@10": 0.8866,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 0.4,
+          "p@10": 0.7,
+          "r@10": 0.2333,
+          "ndcg@10": 0.531,
+          "mrr": 0.25,
+          "hits": 7,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.6,
+          "p@10": 0.7,
+          "r@10": 0.2917,
+          "ndcg@10": 0.5554,
+          "mrr": 0.3333,
+          "hits": 7,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3226,
+          "ndcg@10": 0.6756,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.8,
+          "p@10": 0.4,
+          "r@10": 0.1143,
+          "ndcg@10": 0.5638,
+          "mrr": 1.0,
+          "hits": 4,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.5,
+          "r@10": 0.1613,
+          "ndcg@10": 0.6387,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.6,
+          "p@10": 0.3,
+          "r@10": 0.75,
+          "ndcg@10": 0.56,
+          "mrr": 0.5,
+          "hits": 3,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.9371,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 0.8,
+          "p@10": 0.9,
+          "r@10": 0.45,
+          "ndcg@10": 0.7799,
+          "mrr": 0.5,
+          "hits": 9,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.4,
+          "p@10": 0.3,
+          "r@10": 0.375,
+          "ndcg@10": 0.6292,
+          "mrr": 1.0,
+          "hits": 3,
+          "judged_in_corpus": 8
+        }
+      ]
+    },
+    "hybrid+fusion+fanout": {
+      "summary": {
+        "p@5": 0.8,
+        "p@10": 0.7357,
+        "r@10": 0.3534,
+        "ndcg@10": 0.7417,
+        "mrr": 0.8333,
+        "queries": 14
+      },
+      "latency_ms": 149.2,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.8,
+          "p@10": 0.6,
+          "r@10": 0.1071,
+          "ndcg@10": 0.7248,
+          "mrr": 1.0,
+          "hits": 6,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 0.8,
+          "p@10": 0.9,
+          "r@10": 0.1765,
+          "ndcg@10": 0.9052,
+          "mrr": 1.0,
+          "hits": 9,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 0.8,
+          "p@10": 0.9,
+          "r@10": 0.5294,
+          "ndcg@10": 0.6907,
+          "mrr": 0.5,
+          "hits": 9,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 0.6,
+          "p@10": 0.8,
+          "r@10": 0.2667,
+          "ndcg@10": 0.641,
+          "mrr": 0.3333,
+          "hits": 8,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.6,
+          "p@10": 0.7,
+          "r@10": 0.2917,
+          "ndcg@10": 0.5554,
+          "mrr": 0.3333,
+          "hits": 7,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3226,
+          "ndcg@10": 0.666,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.6,
+          "p@10": 0.4,
+          "r@10": 0.1143,
+          "ndcg@10": 0.5353,
+          "mrr": 1.0,
+          "hits": 4,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.5,
+          "r@10": 0.1613,
+          "ndcg@10": 0.6387,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.6,
+          "p@10": 0.3,
+          "r@10": 0.75,
+          "ndcg@10": 0.56,
+          "mrr": 0.5,
+          "hits": 3,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.9371,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 0.8,
+          "p@10": 0.9,
+          "r@10": 0.45,
+          "ndcg@10": 0.89,
+          "mrr": 1.0,
+          "hits": 9,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.6,
+          "p@10": 0.3,
+          "r@10": 0.375,
+          "ndcg@10": 0.6389,
+          "mrr": 1.0,
+          "hits": 3,
+          "judged_in_corpus": 8
+        }
+      ]
+    },
+    "hybrid+fusion+rerank": {
+      "summary": {
+        "p@5": 0.8143,
+        "p@10": 0.7357,
+        "r@10": 0.3554,
+        "ndcg@10": 0.7431,
+        "mrr": 0.8274,
+        "queries": 14
+      },
+      "latency_ms": 84.9,
+      "rows": [
+        {
+          "id": "sqlite-production",
+          "p@5": 0.8,
+          "p@10": 0.5,
+          "r@10": 0.0893,
+          "ndcg@10": 0.646,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 56
+        },
+        {
+          "id": "sqlite-wal",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2564,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 39
+        },
+        {
+          "id": "sqlite-insert-speed",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.1961,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 51
+        },
+        {
+          "id": "sqlite-transactions-inserts",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.5882,
+          "ndcg@10": 0.8866,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 17
+        },
+        {
+          "id": "redis-vs-memcached",
+          "p@5": 0.4,
+          "p@10": 0.7,
+          "r@10": 0.2333,
+          "ndcg@10": 0.531,
+          "mrr": 0.25,
+          "hits": 7,
+          "judged_in_corpus": 30
+        },
+        {
+          "id": "redis-persistence",
+          "p@5": 0.6,
+          "p@10": 0.7,
+          "r@10": 0.2917,
+          "ndcg@10": 0.5554,
+          "mrr": 0.3333,
+          "hits": 7,
+          "judged_in_corpus": 24
+        },
+        {
+          "id": "postgres-timestamp-timezone",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.3226,
+          "ndcg@10": 0.6756,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "postgres-antipatterns",
+          "p@5": 0.8,
+          "p@10": 0.4,
+          "r@10": 0.1143,
+          "ndcg@10": 0.5638,
+          "mrr": 1.0,
+          "hits": 4,
+          "judged_in_corpus": 35
+        },
+        {
+          "id": "postgres-char-n",
+          "p@5": 1.0,
+          "p@10": 0.5,
+          "r@10": 0.1613,
+          "ndcg@10": 0.6387,
+          "mrr": 1.0,
+          "hits": 5,
+          "judged_in_corpus": 31
+        },
+        {
+          "id": "index-leaf-nodes",
+          "p@5": 0.6,
+          "p@10": 0.3,
+          "r@10": 0.75,
+          "ndcg@10": 0.56,
+          "mrr": 0.5,
+          "hits": 3,
+          "judged_in_corpus": 4
+        },
+        {
+          "id": "fastapi-async-def",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.2381,
+          "ndcg@10": 0.9371,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 42
+        },
+        {
+          "id": "sql-injection-php",
+          "p@5": 1.0,
+          "p@10": 1.0,
+          "r@10": 0.9091,
+          "ndcg@10": 1.0,
+          "mrr": 1.0,
+          "hits": 10,
+          "judged_in_corpus": 11
+        },
+        {
+          "id": "first-row-per-group",
+          "p@5": 0.8,
+          "p@10": 0.9,
+          "r@10": 0.45,
+          "ndcg@10": 0.7799,
+          "mrr": 0.5,
+          "hits": 9,
+          "judged_in_corpus": 20
+        },
+        {
+          "id": "list-postgres-tables",
+          "p@5": 0.4,
+          "p@10": 0.3,
+          "r@10": 0.375,
+          "ndcg@10": 0.6292,
+          "mrr": 1.0,
+          "hits": 3,
+          "judged_in_corpus": 8
+        }
+      ]
+    }
+  },
+  "judgments_version": "1.0"
+}

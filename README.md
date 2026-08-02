@@ -316,6 +316,7 @@ uv run python -m app.eval.benchmark        # coverage, citation accuracy, source
 uv run python -m app.eval.flywheel         # score every configured engine, log history
 uv run python -m app.eval.flywheel --gate  # exit 1 if moo regressed against itself
 uv run python -m app.eval.stale_traps      # the one claim that has to hold
+uv run python -m app.eval.retrieval        # P/R/nDCG + what each ranking stage is worth
 ```
 
 The benchmark compares single-shot search against `deep_research` on a versioned
@@ -324,6 +325,26 @@ task set, with a recorded baseline in
 standing version: it scores moo on every run, adds Exa and Tavily as columns when
 their keys are set, and the gate fails a commit that drops moo below its own last
 numbers.
+
+**The retrieval eval** grades ranked chunks against versioned relevance
+judgments ([`relevance.json`](api/app/eval/relevance.json), documents named by
+URL substring so a rechunk does not invalidate them) and reports precision,
+recall, nDCG and MRR for each stage of the pipeline in turn: BM25 alone, vectors
+alone, the hybrid merge, plus the trust/corroboration/recency blend, plus query
+fan-out, plus reranking. The delta line under the table is the point, because a
+stage that does not move nDCG is complexity to delete.
+
+The first run said something worth knowing: **the fusion blend costs nDCG@10
+0.808 → 0.743 on this corpus**, and the four queries it hurts are all ones whose
+best answer is a Stack Overflow post or a blog. Fresh, high-trust GitHub chunks
+leapfrog the community answer that actually answers the question, because trust
+and recency multiply to about a 40% swing, which is enough to override
+relevance. That is the trade the blend was designed to make; the numbers say the
+weights are too strong for a curated store. Recorded in
+[`retrieval_baseline.json`](api/app/eval/retrieval_baseline.json), unchanged for
+now, and worth re-running against live results before touching the weights,
+since fusion was built for pages fetched at query time rather than a fixed
+corpus.
 
 **The stale-answer traps** are the one that matters. Each is a real query whose
 popular answer is out of date (`datetime.utcnow()`, `ReactDOM.render`,
