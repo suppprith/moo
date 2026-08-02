@@ -118,6 +118,37 @@ blocks. Results always carry highlighted spans and a relevance score that is
 comparable across queries; `depth=claims` attaches the evidence layer as an
 optional field.
 
+## Or use an SDK
+
+```bash
+pip install moo        # Python, sync + async
+npm install moo-js     # JavaScript and TypeScript, Node + edge runtimes
+```
+
+```python
+from moo import Moo
+
+moo = Moo()  # MOO_BASE_URL / MOO_API_KEY from the environment
+
+def web_search(query: str) -> list[dict]:
+    return moo.web_search(query, max_results=8)["results"]
+```
+
+```ts
+import { Moo } from 'moo-js';
+
+const moo = new Moo();
+const { results } = await moo.webSearch('postgres connection pooling');
+```
+
+Both cover the whole surface (search, web search, extract, deep research with SSE
+streaming, handle drill-down, graph), retry `429` and `5xx` honoring `Retry-After`,
+and raise a typed error carrying moo's `code`, `retryable` flag and request id. A
+contract test in each SDK reads `api/openapi.json` and fails when moo grows an
+endpoint the client has not caught up with.
+
+[`sdk/python`](sdk/python) · [`sdk/js`](sdk/js)
+
 ## Deep research
 
 `deep_research(question)` over MCP, or `POST /research` and `POST /research/stream`
@@ -258,6 +289,7 @@ numbers.
 | --- | --- | --- |
 | `api/` | Python, FastAPI, uv, SQLite | Retrieval, evidence, research engine, MCP server, HTTP API, CLI |
 | `web/` | Next.js, TypeScript | Optional human search UI |
+| `sdk/` | Python, TypeScript | Official clients (`sdk/python`, `sdk/js`) |
 | `docs/` | Markdown | Agent guide, data model, domain scope |
 
 Day-to-day work happens in `api/`:

@@ -1,0 +1,51 @@
+name: sdk-publish
+
+# Publishing is tag-driven and manual: push sdk-python-v* or sdk-js-v* once the
+# version in the package metadata matches. Nothing publishes on an ordinary push.
+on:
+  push:
+    tags:
+      - "sdk-python-v*"
+      - "sdk-js-v*"
+
+jobs:
+  python:
+    if: startsWith(github.ref_name, 'sdk-python-v')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install httpx pytest build
+      - run: python -m pytest tests -q
+      - run: python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdk/python/dist
+
+  js:
+    if: startsWith(github.ref_name, 'sdk-js-v')
+    runs-on: ubuntu-latest
+    environment: release
+    defaults:
+      run:
+        working-directory: sdk/js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

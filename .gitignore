@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+sdk/python/dist/
 .venv/
 venv/
 .env
@@ -15,6 +16,7 @@ venv/
 node_modules/
 .next/
 out/
+sdk/js/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
