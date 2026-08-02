@@ -1,0 +1,300 @@
+{
+  "version": "1.0",
+  "verified_on": "2026-08-02",
+  "about": "Queries whose widely-cited answer is verifiably outdated. Each trap names the old answer (still all over blogs, Stack Overflow and model training data), the answer that is current, and where the change is documented. An engine passes a trap when it surfaces the current answer AND marks the old one as outdated; repeating the old answer with no warning is the failure this task set exists to measure.",
+  "staleness_cues": [
+    "deprecated", "removed in", "was removed", "no longer", "superseded",
+    "obsolete", "replaced by", "instead of", "legacy", "outdated",
+    "not recommended", "since version", "as of "
+  ],
+  "traps": [
+    {
+      "id": "python-utcnow",
+      "query": "how do I get the current UTC time in Python",
+      "product": "python",
+      "changed_in": "3.12",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "datetime.utcnow() returns a naive datetime and is deprecated since 3.12",
+        "markers": ["utcnow()"]
+      },
+      "current": {
+        "summary": "datetime.now(timezone.utc) (or datetime.UTC) returns an aware datetime",
+        "markers": ["now(timezone.utc)", "now(datetime.utc)", "now(utc)", "now(tz=timezone.utc)"]
+      },
+      "authoritative_sources": ["docs.python.org"]
+    },
+    {
+      "id": "python-distutils",
+      "query": "how to package a Python project with distutils",
+      "product": "python",
+      "changed_in": "3.12",
+      "change_type": "removed",
+      "stale": {
+        "summary": "distutils was removed from the standard library in Python 3.12",
+        "markers": ["from distutils", "import distutils"]
+      },
+      "current": {
+        "summary": "use setuptools with a pyproject.toml build backend",
+        "markers": ["setuptools", "pyproject.toml", "build backend"]
+      },
+      "authoritative_sources": ["docs.python.org", "packaging.python.org"]
+    },
+    {
+      "id": "python-get-event-loop",
+      "query": "how do I get the asyncio event loop in Python",
+      "product": "python",
+      "changed_in": "3.12",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "asyncio.get_event_loop() outside a running loop is deprecated",
+        "markers": ["get_event_loop()"]
+      },
+      "current": {
+        "summary": "asyncio.run() at the entry point, asyncio.get_running_loop() inside a coroutine",
+        "markers": ["asyncio.run(", "get_running_loop"]
+      },
+      "authoritative_sources": ["docs.python.org"]
+    },
+    {
+      "id": "python-setup-py-install",
+      "query": "how do I install a Python package from source with setup.py",
+      "product": "python",
+      "changed_in": "setuptools 58.3 / pip 21",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "python setup.py install is deprecated",
+        "markers": ["setup.py install", "setup.py develop"]
+      },
+      "current": {
+        "summary": "pip install . (or pip install -e . for an editable install)",
+        "markers": ["pip install .", "pip install -e .", "python -m build"]
+      },
+      "authoritative_sources": ["packaging.python.org", "setuptools.pypa.io"]
+    },
+    {
+      "id": "react-reactdom-render",
+      "query": "how do I render a React app into the DOM",
+      "product": "react",
+      "changed_in": "18",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "ReactDOM.render was deprecated in React 18",
+        "markers": ["reactdom.render("]
+      },
+      "current": {
+        "summary": "createRoot(container).render(<App />)",
+        "markers": ["createroot"]
+      },
+      "authoritative_sources": ["react.dev"]
+    },
+    {
+      "id": "react-component-will-mount",
+      "query": "when should I use componentWillMount in React",
+      "product": "react",
+      "changed_in": "16.3 deprecated, 17 renamed",
+      "change_type": "renamed",
+      "stale": {
+        "summary": "componentWillMount is a legacy lifecycle method",
+        "markers": ["componentwillmount"]
+      },
+      "current": {
+        "summary": "use componentDidMount, or the UNSAFE_ prefixed name if you truly need it",
+        "markers": ["componentdidmount", "unsafe_componentwillmount", "useeffect"]
+      },
+      "authoritative_sources": ["react.dev", "legacy.reactjs.org"]
+    },
+    {
+      "id": "docker-compose-v1",
+      "query": "how do I start my services with docker compose",
+      "product": "docker",
+      "changed_in": "Compose V2 (V1 end of life July 2023)",
+      "change_type": "superseded",
+      "stale": {
+        "summary": "the standalone docker-compose (V1) binary is end of life",
+        "markers": ["docker-compose up", "docker-compose -f", "pip install docker-compose"]
+      },
+      "current": {
+        "summary": "docker compose up, the V2 plugin built into the Docker CLI",
+        "markers": ["docker compose up", "compose v2", "compose plugin"]
+      },
+      "authoritative_sources": ["docs.docker.com"]
+    },
+    {
+      "id": "compose-file-version-key",
+      "query": "what version should I put at the top of my docker-compose.yml",
+      "product": "docker",
+      "changed_in": "Compose Specification",
+      "change_type": "obsolete",
+      "stale": {
+        "summary": "a top-level version: \"3.x\" key",
+        "markers": ["version: '3", "version: \"3", "version: 3"]
+      },
+      "current": {
+        "summary": "the version key is obsolete and Compose warns about it",
+        "markers": ["obsolete", "no longer required", "not required", "can be omitted", "compose specification"]
+      },
+      "authoritative_sources": ["docs.docker.com"]
+    },
+    {
+      "id": "k8s-podsecuritypolicy",
+      "query": "how do I enforce PodSecurityPolicy in Kubernetes",
+      "product": "kubernetes",
+      "changed_in": "1.25",
+      "change_type": "removed",
+      "stale": {
+        "summary": "PodSecurityPolicy was removed in Kubernetes 1.25",
+        "markers": ["podsecuritypolicy", "kind: podsecuritypolicy"]
+      },
+      "current": {
+        "summary": "Pod Security Admission with the Pod Security Standards, or a policy engine",
+        "markers": ["pod security admission", "pod security standards", "podsecurity admission"]
+      },
+      "authoritative_sources": ["kubernetes.io"]
+    },
+    {
+      "id": "kubectl-run-generator",
+      "query": "how do I create a deployment with kubectl run",
+      "product": "kubernetes",
+      "changed_in": "1.18",
+      "change_type": "removed",
+      "stale": {
+        "summary": "kubectl run --generator was removed; kubectl run only creates pods now",
+        "markers": ["--generator"]
+      },
+      "current": {
+        "summary": "kubectl create deployment",
+        "markers": ["kubectl create deployment"]
+      },
+      "authoritative_sources": ["kubernetes.io"]
+    },
+    {
+      "id": "apt-key-add",
+      "query": "how do I add a signing key for an apt repository",
+      "product": "debian",
+      "changed_in": "Debian 11 / Ubuntu 22.04",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "apt-key add is deprecated and adds a globally trusted key",
+        "markers": ["apt-key add", "apt-key adv"]
+      },
+      "current": {
+        "summary": "store the key in /etc/apt/keyrings and reference it with signed-by",
+        "markers": ["/etc/apt/keyrings", "signed-by", "trusted.gpg.d"]
+      },
+      "authoritative_sources": ["wiki.debian.org", "manpages.debian.org", "ubuntu.com"]
+    },
+    {
+      "id": "nginx-http2-listen",
+      "query": "how do I enable HTTP/2 in nginx",
+      "product": "nginx",
+      "changed_in": "1.25.1",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "the http2 parameter of the listen directive is deprecated",
+        "markers": ["listen 443 ssl http2", "ssl http2;"]
+      },
+      "current": {
+        "summary": "the separate http2 on; directive",
+        "markers": ["http2 on"]
+      },
+      "authoritative_sources": ["nginx.org"]
+    },
+    {
+      "id": "mysql-query-cache",
+      "query": "how do I tune the MySQL query cache",
+      "product": "mysql",
+      "changed_in": "8.0",
+      "change_type": "removed",
+      "stale": {
+        "summary": "the query cache was removed in MySQL 8.0",
+        "markers": ["query_cache_size", "query_cache_type"]
+      },
+      "current": {
+        "summary": "there is no query cache; size the InnoDB buffer pool instead",
+        "markers": ["innodb_buffer_pool", "no query cache", "removed in mysql 8", "removed in 8.0"]
+      },
+      "authoritative_sources": ["dev.mysql.com"]
+    },
+    {
+      "id": "postgres-wal-level-archive",
+      "query": "what wal_level do I need for streaming replication in Postgres",
+      "product": "postgresql",
+      "changed_in": "9.6",
+      "change_type": "renamed",
+      "stale": {
+        "summary": "wal_level = archive and hot_standby were merged and removed as names",
+        "markers": ["wal_level = archive", "wal_level=archive", "wal_level = hot_standby"]
+      },
+      "current": {
+        "summary": "wal_level = replica, which is the default",
+        "markers": ["wal_level = replica", "wal_level=replica"]
+      },
+      "authoritative_sources": ["postgresql.org"]
+    },
+    {
+      "id": "redis-slaveof",
+      "query": "how do I configure a Redis replica",
+      "product": "redis",
+      "changed_in": "5.0",
+      "change_type": "renamed",
+      "stale": {
+        "summary": "SLAVEOF and slave-* config names are deprecated aliases",
+        "markers": ["slaveof"]
+      },
+      "current": {
+        "summary": "REPLICAOF and the replica-* config names",
+        "markers": ["replicaof"]
+      },
+      "authoritative_sources": ["redis.io"]
+    },
+    {
+      "id": "git-switch-branch",
+      "query": "how do I create and switch to a new git branch",
+      "product": "git",
+      "changed_in": "2.23",
+      "change_type": "superseded",
+      "stale": {
+        "summary": "git checkout -b still works but its overloaded behaviour is why it was split",
+        "markers": ["git checkout -b"]
+      },
+      "current": {
+        "summary": "git switch -c, with git restore for files",
+        "markers": ["git switch -c", "git switch"]
+      },
+      "authoritative_sources": ["git-scm.com"]
+    },
+    {
+      "id": "node-url-parse",
+      "query": "how do I parse a URL in Node.js",
+      "product": "node",
+      "changed_in": "11",
+      "change_type": "deprecated",
+      "stale": {
+        "summary": "the legacy url.parse() API is deprecated",
+        "markers": ["url.parse("]
+      },
+      "current": {
+        "summary": "the WHATWG URL class: new URL(input)",
+        "markers": ["new url(", "whatwg url", "url.canparse"]
+      },
+      "authoritative_sources": ["nodejs.org"]
+    },
+    {
+      "id": "java-simpledateformat",
+      "query": "how do I format a date in Java",
+      "product": "java",
+      "changed_in": "8",
+      "change_type": "superseded",
+      "stale": {
+        "summary": "SimpleDateFormat is not thread safe and predates java.time",
+        "markers": ["simpledateformat", "new date()"]
+      },
+      "current": {
+        "summary": "java.time with DateTimeFormatter",
+        "markers": ["datetimeformatter", "java.time", "localdatetime"]
+      },
+      "authoritative_sources": ["docs.oracle.com"]
+    }
+  ]
+}

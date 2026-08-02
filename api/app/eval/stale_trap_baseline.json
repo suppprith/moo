@@ -1,0 +1,424 @@
+{
+  "n_traps": 18,
+  "engines": {
+    "moo_fast": {
+      "summary": {
+        "n": 18,
+        "errors": 0,
+        "pass_rate": 0.0,
+        "current_rate": 0.0,
+        "flag_rate": 0.0,
+        "structural_flag_rate": 0.0,
+        "silent_stale_rate": 0.0,
+        "two_sided_rate": 0.0,
+        "latency_ms": 1719.6
+      },
+      "rows": [
+        {
+          "id": "python-utcnow",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "python-distutils",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "python-get-event-loop",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "python-setup-py-install",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "react-reactdom-render",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "react-component-will-mount",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "docker-compose-v1",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "compose-file-version-key",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "k8s-podsecuritypolicy",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "kubectl-run-generator",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "apt-key-add",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "nginx-http2-listen",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "mysql-query-cache",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "no longer",
+            "as of "
+          ],
+          "quote": null
+        },
+        {
+          "id": "postgres-wal-level-archive",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "outdated"
+          ],
+          "quote": null
+        },
+        {
+          "id": "redis-slaveof",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": null
+        },
+        {
+          "id": "git-switch-branch",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "node-url-parse",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        },
+        {
+          "id": "java-simpledateformat",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": null
+        }
+      ]
+    }
+  },
+  "task_set_version": "1.0",
+  "config": {
+    "engines": [
+      "moo_fast"
+    ],
+    "live_provider": null,
+    "llm": false
+  },
+  "gate": {
+    "passed": false,
+    "pass_bar": 0.7,
+    "margin": 0.3,
+    "checks": [
+      {
+        "name": "moo pass rate",
+        "passed": false,
+        "detail": "best moo engine moo_fast flagged 0% of traps (bar 70%)"
+      },
+      {
+        "name": "margin over competitors",
+        "passed": null,
+        "detail": "no competitor keys set, head-to-head not evaluated"
+      }
+    ]
+  }
+}

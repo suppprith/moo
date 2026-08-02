@@ -308,6 +308,7 @@ uv run python -m app.eval.benchmark        # coverage, citation accuracy, source
                                            # and contradiction recall, token cost
 uv run python -m app.eval.flywheel         # score every configured engine, log history
 uv run python -m app.eval.flywheel --gate  # exit 1 if moo regressed against itself
+uv run python -m app.eval.stale_traps      # the one claim that has to hold
 ```
 
 The benchmark compares single-shot search against `deep_research` on a versioned
@@ -316,6 +317,24 @@ task set, with a recorded baseline in
 standing version: it scores moo on every run, adds Exa and Tavily as columns when
 their keys are set, and the gate fails a commit that drops moo below its own last
 numbers.
+
+**The stale-answer traps** are the one that matters. Each is a real query whose
+popular answer is out of date (`datetime.utcnow()`, `ReactDOM.render`,
+`PodSecurityPolicy`, `wal_level = archive`, `listen 443 ssl http2`), paired with
+the answer that is actually current and the release that changed it. An engine
+passes a trap only by surfacing the current answer *and* marking the old one as
+outdated, whether structurally (a disputed point, a superseded claim, a
+version-outdated source) or in plain text. Repeating the stale answer with no
+warning is the failure being counted, and it is what a plain web search does.
+`--gate` exits non-zero unless moo clears 70% and leads every competitor that ran
+by a wide margin; `--transcript` writes the per-trap record, quotes included.
+
+Right now it scores 0% here, and the saved run says why:
+[`stale_trap_baseline.json`](api/app/eval/stale_trap_baseline.json) records
+`live_provider: null`, so there was nothing to retrieve. The traps span Python,
+React, Kubernetes and nginx while the local store holds database and framework
+docs. The gate becomes meaningful the moment a discovery provider is configured,
+which is the point of running it early.
 
 ## Layout
 
