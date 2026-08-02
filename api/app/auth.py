@@ -1,13 +1,20 @@
 """Optional API-key auth + per-key rate limiting & usage metering.
 
 Off by default: with no keys configured, moo runs fully open — the local /
-self-hosted mode. Set ``MOO_API_KEYS`` (comma-separated) to require a key on the
-data endpoints; ``MOO_RATE_LIMIT_PER_MIN`` sets the per-key request limit
-(default 60). A key is presented as ``Authorization: Bearer <key>`` or
-``X-API-Key``.
+self-hosted mode. Two ways to switch it on:
 
-Metering counts requests per key (for later inspection via ``/usage``); no query
-*content* is ever stored.
+- ``MOO_API_KEYS`` (comma-separated) for a fixed set, unchanged from before.
+- Issued keys in the ``api_key`` table (``python -m app.keys create``), which a
+  hosted instance needs: hashed at rest, revocable, with per-key limits, quotas
+  and counters that survive a restart. Once an instance has issued a key it
+  stays gated, so revoking the last one does not silently reopen it.
+
+Either presents as ``Authorization: Bearer <key>`` or ``X-API-Key``.
+``MOO_RATE_LIMIT_PER_MIN`` (default 60) is the fallback limit for keys that do
+not set their own.
+
+Metering counts requests per key; no query *content* is ever stored. Rate-limit
+windows are per process, so several workers each get the configured limit.
 """
 
 from __future__ import annotations
@@ -16,10 +23,13 @@ import os
 import time
 from collections import defaultdict, deque
 
+from . import keys as key_store
 from .errors import ApiError
 
 _windows: dict[str, deque[float]] = defaultdict(deque)
 _usage: dict[str, dict] = defaultdict(lambda: {"requests": 0})
+_db_state: dict = {"checked_at": 0.0, "count": 0}
+_DB_CACHE_SECONDS = 5.0
 
 
 def _keys() -> set[str] | None:
@@ -28,8 +38,28 @@ def _keys() -> set[str] | None:
     return keys or None
 
 
+def _connect():
+    from .db import get_connection
+
+    return get_connection()
+
+
+def _issued_keys() -> int:
+    """How many issued keys exist, cached briefly so auth stays a memory hit on
+    the hot path while a newly issued key still takes effect within seconds."""
+    now = time.monotonic()
+    if now - _db_state["checked_at"] >= _DB_CACHE_SECONDS:
+        conn = _connect()
+        try:
+            _db_state["count"] = key_store.count(conn)
+        finally:
+            conn.close()
+        _db_state["checked_at"] = now
+    return _db_state["count"]
+
+
 def enabled() -> bool:
-    return _keys() is not None
+    return _keys() is not None or _issued_keys() > 0
 
 
 def _rate_limit() -> int:
@@ -46,36 +76,74 @@ def _extract_key(request) -> str | None:
     return request.headers.get("x-api-key")
 
 
-def check(request) -> str:
-    """Verify the request's key and enforce the per-key rate limit. Returns the
-    key ("local" when auth is disabled). Raises ApiError (unauthorized /
-    rate_limited) otherwise."""
-    keys = _keys()
-    if keys is None:
-        return "local"
-    key = _extract_key(request)
-    if not key or key not in keys:
-        raise ApiError("unauthorized", "missing or invalid API key")
-
-    limit = _rate_limit()
+def _enforce_window(identity: str, limit: int) -> None:
     now = time.monotonic()
-    window = _windows[key]
+    window = _windows[identity]
     while window and now - window[0] >= 60:
         window.popleft()
     if len(window) >= limit:
         retry_after = max(1, int(60 - (now - window[0])))
         raise ApiError("rate_limited", f"rate limit {limit}/min exceeded", retry_after=retry_after)
     window.append(now)
-    _usage[key]["requests"] += 1
-    return key
+
+
+def check(request) -> str:
+    """Verify the request's key and enforce its rate limit and quota. Returns the
+    identity used for metering ("local" when auth is disabled). Raises ApiError
+    (unauthorized / rate_limited / budget_exceeded) otherwise."""
+    env_keys = _keys()
+    if env_keys is None and _issued_keys() == 0:
+        return "local"
+
+    key = _extract_key(request)
+    if not key:
+        raise ApiError("unauthorized", "missing or invalid API key")
+
+    if env_keys and key in env_keys:
+        _enforce_window(key, _rate_limit())
+        _usage[key]["requests"] += 1
+        return key
+
+    conn = _connect()
+    try:
+        row = key_store.lookup(conn, key)
+        if row is None:
+            raise ApiError("unauthorized", "missing or invalid API key")
+        if row["quota"] is not None and row["requests"] >= row["quota"]:
+            raise ApiError("budget_exceeded", f"key quota of {row['quota']} requests exhausted")
+        identity = row["prefix"]
+        _enforce_window(identity, row["rate_limit_per_min"] or _rate_limit())
+        key_store.record_use(conn, row["id"])
+    finally:
+        conn.close()
+    _usage[identity]["requests"] += 1
+    return identity
 
 
 def usage() -> dict:
-    """Masked per-key request counts (keys are truncated)."""
+    """Masked per-key request counts for this process."""
     return {f"{k[:4]}…": v["requests"] for k, v in _usage.items()}
 
 
+def issued_usage() -> list[dict]:
+    """Persisted counters for issued keys. Never includes a key, only its prefix."""
+    if _issued_keys() == 0:
+        return []
+    conn = _connect()
+    try:
+        return [
+            {field: row[field] for field in
+             ("prefix", "label", "requests", "quota", "rate_limit_per_min",
+              "created_at", "last_used_at")}
+            for row in key_store.list_keys(conn)
+        ]
+    finally:
+        conn.close()
+
+
 def reset() -> None:
-    """Clear in-memory rate windows + usage (tests)."""
+    """Clear in-memory rate windows, usage, and the issued-key cache (tests)."""
     _windows.clear()
     _usage.clear()
+    _db_state["checked_at"] = 0.0
+    _db_state["count"] = 0

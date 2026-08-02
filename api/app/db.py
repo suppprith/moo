@@ -9,6 +9,7 @@ Apply migrations:  ``uv run python -m app.db``
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
@@ -16,7 +17,8 @@ log = logging.getLogger("moo.db")
 
 API_DIR = Path(__file__).resolve().parent.parent
 MIGRATIONS_DIR = API_DIR / "migrations"
-DEFAULT_DB_PATH = API_DIR / "data" / "moo.sqlite"
+# MOO_DB_PATH points the store at a mounted volume when moo runs in a container.
+DEFAULT_DB_PATH = Path(os.environ.get("MOO_DB_PATH") or API_DIR / "data" / "moo.sqlite")
 
 
 def get_connection(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:

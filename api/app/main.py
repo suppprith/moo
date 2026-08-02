@@ -49,9 +49,11 @@ app = FastAPI(
 
 @app.on_event("startup")
 def _startup() -> None:
-    from .bootstrap import ensure_ready
+    from .bootstrap import ensure_ready, preload_enabled, warm_models
 
     ensure_ready()
+    if preload_enabled():
+        threading.Thread(target=warm_models, daemon=True).start()
 
 
 _origins = os.environ.get(
@@ -194,8 +196,10 @@ def health() -> dict:
 
 @app.get("/usage")
 def usage() -> dict:
-    """Per-key request counts (masked). Requires a valid key when auth is on."""
-    return {"enabled": auth.enabled(), "usage": auth.usage()}
+    """Per-key request counts. `usage` is this process's masked in-memory tally;
+    `keys` is the persisted per-key counters for issued keys. Requires a valid
+    key when auth is on."""
+    return {"enabled": auth.enabled(), "usage": auth.usage(), "keys": auth.issued_usage()}
 
 
 @app.get("/contract")

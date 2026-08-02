@@ -1,0 +1,50 @@
+# Fly.io deploy for the moo API. Rename `app`, then:
+#
+#   fly launch --no-deploy --copy-config
+#   fly volumes create moo_data --size 3 --region <region>
+#   fly secrets set MOO_LLM_API_KEY=... MOO_BRAVE_API_KEY=...
+#   fly deploy
+#
+# One machine with one volume is the whole v1: the store is a per-instance
+# SQLite file, so scaling out means more instances with their own caches, not a
+# shared database. See docs/hosting.md for why that is the right trade for now.
+
+app = "moo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  MOO_DB_PATH = "/data/moo.sqlite"
+  MOO_PRELOAD = "1"
+  MOO_RATE_LIMIT_PER_MIN = "60"
+  PORT = "8000"
+
+[mounts]
+  source = "moo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 8
+    hard_limit = 16
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/health"
+
+# Embeddings run on CPU in-process, so memory matters more than cores.
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"

@@ -13,6 +13,7 @@ a missing optional config; only a truly broken DB path can fail.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from .db import DEFAULT_DB_PATH, migrate
@@ -38,6 +39,26 @@ def config_hints() -> list[str]:
             "or MOO_LLM_PROVIDER + MOO_LLM_API_KEY (BYOK); see api/.env.example"
         )
     return hints
+
+
+def preload_enabled() -> bool:
+    """Whether to load models at boot instead of on the first request. Off by
+    default (a CLI run should not pay for it), on in the container image."""
+    return os.environ.get("MOO_PRELOAD", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def warm_models(model_name: str | None = None) -> bool:
+    """Load the embedding model up front so the first search does not pay the
+    cold start. Best effort: a failure here must never stop the server."""
+    try:
+        from .embed import DEFAULT_MODEL, get_model
+
+        get_model(model_name or DEFAULT_MODEL)
+        log.info("embedding model warm")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not preload the embedding model: %s", exc)
+        return False
 
 
 def ensure_ready(db_path: Path | str = DEFAULT_DB_PATH, *, quiet: bool = False) -> dict:

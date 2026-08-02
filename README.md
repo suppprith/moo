@@ -267,15 +267,32 @@ response carries a notice that page content is data, not instructions.
 
 ## Running it as a service
 
-Open by default. To gate it when exposed, set keys and a per-key limit:
+```bash
+docker compose up --build     # the image bakes the model and warms it on boot
+curl localhost:8000/health
+```
+
+The store lives on a mounted volume (`MOO_DB_PATH`), so the container itself is
+stateless and replaceable. `api/fly.toml` is a working deploy: one machine, one
+volume, HTTPS, suspend when idle. Any host with a volume and ~2 GB of memory
+works the same way.
+
+Open by default. To gate it, either set fixed keys, or issue them:
 
 ```bash
 MOO_API_KEYS=key1,key2 MOO_RATE_LIMIT_PER_MIN=60 uv run fastapi dev app/main.py
+uv run python -m app.keys create --label alice --quota 1000
 ```
 
-Clients pass `Authorization: Bearer <key>` or `X-API-Key`. `/health`, `/contract`
-and `/v1/tools` stay open. Over-limit requests get a `429` with `Retry-After`, and
-`GET /usage` reports masked per-key counts. No query content is ever logged.
+Issued keys are stored as a hash, shown once, revocable, and carry their own
+rate limit, quota and counters that survive a restart. Clients pass
+`Authorization: Bearer <key>` or `X-API-Key`. `/health`, `/contract` and
+`/v1/tools` stay open. Over-limit requests get a `429` with `Retry-After`, an
+exhausted quota gets a non-retryable `429`, and `GET /usage` reports per-key
+counts. No query content is ever logged.
+
+Deploy steps, the SQLite-per-tenant storage decision and the operational notes:
+[docs/hosting.md](docs/hosting.md).
 
 Errors come back in one envelope with a stable `code`, a `retryable` flag, and a
 request id echoed in the `X-Request-ID` header, so an agent can branch on the

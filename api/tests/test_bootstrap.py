@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from app.bootstrap import config_hints, ensure_ready
+from app.bootstrap import config_hints, ensure_ready, preload_enabled, warm_models
 
 CFG_VARS = [
     "MOO_SEARCH_PROVIDER", "MOO_SEARXNG_URL", "MOO_SEARCH_URL",
@@ -60,3 +60,29 @@ def test_hints_clear_when_configured(monkeypatch):
 def test_migrate_prints_nothing_to_stdout(tmp_path, capsys):
     ensure_ready(tmp_path / "moo.sqlite", quiet=True)
     assert capsys.readouterr().out == ""
+
+
+def test_preload_is_off_unless_asked_for(monkeypatch):
+    monkeypatch.delenv("MOO_PRELOAD", raising=False)
+    assert preload_enabled() is False
+    for value in ("1", "true", "YES", "on"):
+        monkeypatch.setenv("MOO_PRELOAD", value)
+        assert preload_enabled() is True
+    monkeypatch.setenv("MOO_PRELOAD", "0")
+    assert preload_enabled() is False
+
+
+def test_warm_models_never_takes_the_server_down(monkeypatch):
+    from app import embed
+
+    monkeypatch.setattr(embed, "get_model", lambda name: (_ for _ in ()).throw(OSError("no disk")))
+    assert warm_models() is False
+
+
+def test_warm_models_loads_the_configured_model(monkeypatch):
+    from app import embed
+
+    loaded = []
+    monkeypatch.setattr(embed, "get_model", loaded.append)
+    assert warm_models("stub-model") is True
+    assert loaded == ["stub-model"]

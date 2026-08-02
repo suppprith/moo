@@ -1,0 +1,41 @@
+# Local container run: the same image a deploy uses, with the store on a named
+# volume so evidence and cached pages survive `down` and `up`.
+#
+#   docker compose up --build
+#   curl localhost:8000/health
+#
+# Optional pieces are passed through from your shell or a .env file; none are
+# required to boot. Uncomment searxng for keyless live search.
+
+services:
+  api:
+    build:
+      context: ./api
+    ports:
+      - "8000:8000"
+    volumes:
+      - moo-data:/data
+    environment:
+      MOO_DB_PATH: /data/moo.sqlite
+      MOO_PRELOAD: "1"
+      MOO_API_KEYS: ${MOO_API_KEYS:-}
+      MOO_RATE_LIMIT_PER_MIN: ${MOO_RATE_LIMIT_PER_MIN:-60}
+      MOO_CORS_ORIGINS: ${MOO_CORS_ORIGINS:-}
+      MOO_SEARXNG_URL: ${MOO_SEARXNG_URL:-}
+      MOO_BRAVE_API_KEY: ${MOO_BRAVE_API_KEY:-}
+      MOO_LLM_PROVIDER: ${MOO_LLM_PROVIDER:-}
+      MOO_LLM_API_KEY: ${MOO_LLM_API_KEY:-}
+      MOO_LLM_MODEL: ${MOO_LLM_MODEL:-}
+    restart: unless-stopped
+
+  # searxng:
+  #   image: searxng/searxng
+  #   ports:
+  #     - "8888:8080"
+  #   environment:
+  #     SEARXNG_BASE_URL: http://localhost:8888/
+  #   volumes:
+  #     - ./searxng:/etc/searxng   # settings.yml must enable the json format
+
+volumes:
+  moo-data:

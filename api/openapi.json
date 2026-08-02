@@ -883,7 +883,7 @@
     },
     "/usage": {
       "get": {
-        "description": "Per-key request counts (masked). Requires a valid key when auth is on.",
+        "description": "Per-key request counts. `usage` is this process's masked in-memory tally;\n`keys` is the persisted per-key counters for issued keys. Requires a valid\nkey when auth is on.",
         "operationId": "usage_usage_get",
         "responses": {
           "200": {
