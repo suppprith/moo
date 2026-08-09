@@ -112,7 +112,9 @@ def presented_key(request) -> str | None:
     return _extract_key(request)
 
 
-def _enforce_window(identity: str, limit: int) -> None:
+def _enforce_window(identity: str, limit: int) -> dict:
+    """Consume one slot and return what the caller has left, which is what the
+    X-RateLimit headers report."""
     now = time.monotonic()
     window = _windows[identity]
     while window and now - window[0] >= 60:
@@ -121,15 +123,21 @@ def _enforce_window(identity: str, limit: int) -> None:
         retry_after = max(1, int(60 - (now - window[0])))
         raise ApiError("rate_limited", f"rate limit {limit}/min exceeded", retry_after=retry_after)
     window.append(now)
+    return {
+        "limit": limit,
+        "remaining": max(0, limit - len(window)),
+        "reset": max(1, int(60 - (now - window[0]))),
+    }
 
 
 def authenticate(request) -> dict:
     """Verify the request's key and enforce its rate limit, quota and credits.
 
-    Returns ``{identity, key_id, row}``; ``identity`` is what metering is keyed
-    on ("local" when auth is disabled) and ``key_id`` is set only for an issued
-    key, so the caller can charge it. Raises ApiError (unauthorized /
-    rate_limited / budget_exceeded) otherwise."""
+    Returns ``{identity, key_id, row, rate}``; ``identity`` is what metering is
+    keyed on ("local" when auth is disabled), ``key_id`` is set only for an
+    issued key, so the caller can charge it, and ``rate`` is the window this
+    call consumed from (None when nothing is limited). Raises ApiError
+    (unauthorized / rate_limited / budget_exceeded) otherwise."""
     env_keys = _keys()
     key = _extract_key(request)
 
@@ -143,9 +151,9 @@ def authenticate(request) -> dict:
         raise ApiError("unauthorized", "missing or invalid API key")
 
     if env_keys and key in env_keys:
-        _enforce_window(key, _rate_limit())
+        rate = _enforce_window(key, _rate_limit())
         _usage[key]["requests"] += 1
-        return {"identity": key, "key_id": None, "row": None}
+        return {"identity": key, "key_id": None, "row": None, "rate": rate}
 
     conn = _connect()
     try:
@@ -162,12 +170,12 @@ def authenticate(request) -> dict:
                 f"they reset on {credits.period_end(row['period_start'])}",
             )
         identity = row["prefix"]
-        _enforce_window(identity, row["rate_limit_per_min"] or _rate_limit())
+        rate = _enforce_window(identity, row["rate_limit_per_min"] or _rate_limit())
         key_store.record_use(conn, row["id"])
     finally:
         conn.close()
     _usage[identity]["requests"] += 1
-    return {"identity": identity, "key_id": row["id"], "row": row}
+    return {"identity": identity, "key_id": row["id"], "row": row, "rate": rate}
 
 
 def _open_or_demo(request) -> dict:
@@ -175,11 +183,11 @@ def _open_or_demo(request) -> dict:
     public playground."""
     demo = demo_limit()
     if demo is None:
-        return {"identity": "local", "key_id": None, "row": None}
+        return {"identity": "local", "key_id": None, "row": None, "rate": None}
     identity = f"ip:{_client_ip(request)}"
-    _enforce_window(identity, demo)
+    rate = _enforce_window(identity, demo)
     _usage[identity]["requests"] += 1
-    return {"identity": identity, "key_id": None, "row": None}
+    return {"identity": identity, "key_id": None, "row": None, "rate": rate}
 
 
 def check(request) -> str:

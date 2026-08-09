@@ -12,6 +12,14 @@ from __future__ import annotations
 
 import html
 
+PRIVACY_URL = "https://github.com/suppprith/moo/blob/main/docs/privacy.md"
+
+
+def _privacy_note() -> str:
+    """Stated where a key is handed out, not buried three pages away."""
+    return (f'<p class="muted">Your queries are never stored. '
+            f'<a href="{PRIVACY_URL}">What moo keeps</a>.</p>')
+
 STYLE = """
 :root {
   color-scheme: light dark;
@@ -80,7 +88,7 @@ def signup_page(*, enabled: bool, free_credits: int) -> str:
           <tr><td>Following a handle from a result</td><td class="num">0</td></tr>
         </table>
         <p class="muted">Already have a key? <a href="/account">See your usage</a>.</p>
-        """
+        """ + _privacy_note()
     else:
         body = """
         <h1>This instance issues keys by hand</h1>
@@ -114,7 +122,8 @@ npm install moo-js     # javascript
 export MOO_BASE_URL={html.escape(base_url)}
 export MOO_API_KEY={safe_key}</pre>
     <p><a href="/account">Usage dashboard</a> &middot;
-       <a href="/docs">API reference</a></p>
+       <a href="/docs">API reference</a> &middot;
+       <a href="{PRIVACY_URL}">Privacy</a></p>
     """
     return _document("moo: your key", body)
 

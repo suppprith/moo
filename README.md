@@ -287,9 +287,20 @@ uv run python -m app.keys create --label alice --quota 1000
 Issued keys are stored as a hash, shown once, revocable, and carry their own
 rate limit, quota and counters that survive a restart. Clients pass
 `Authorization: Bearer <key>` or `X-API-Key`. `/health`, `/contract` and
-`/v1/tools` stay open. Over-limit requests get a `429` with `Retry-After`, an
-exhausted quota gets a non-retryable `429`, and `GET /usage` reports per-key
-counts. No query content is ever logged.
+`/v1/tools` stay open. Every gated response carries `X-RateLimit-Limit`,
+`-Remaining` and `-Reset`, so a client can back off before it is refused;
+over-limit requests get a `429` with `Retry-After`, an exhausted quota gets a
+non-retryable `429`, and `GET /usage` reports per-key counts.
+
+No query content is ever logged. Metering counts requests per key and records
+the route they hit, never what was asked. `docs/privacy.md` says exactly what is
+stored and where to check it in the code, and it changes in the same commit as
+the behaviour it describes.
+
+`GET /health` is the unauthenticated liveness probe an uptime monitor watches;
+`GET /metrics` reports p50 and p95 latency and status counts per route, in
+aggregate, with no query, key or address in it. What to alert on:
+[docs/ops.md](docs/ops.md).
 
 A hosted instance can also issue its own keys. With GitHub sign-in configured,
 `/signup` takes a stranger from nothing to a working call: sign in, get a key
@@ -384,7 +395,8 @@ uv run ruff check .
 ```
 
 Data model: [docs/data-model.md](docs/data-model.md). Agent guide:
-[docs/agents.md](docs/agents.md).
+[docs/agents.md](docs/agents.md). Latency and cost:
+[docs/performance.md](docs/performance.md).
 
 ## License
 

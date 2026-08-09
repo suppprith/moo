@@ -59,6 +59,20 @@ export const DOC_PAGES: DocPage[] = [
     group: "Operate",
   },
   {
+    slug: "ops",
+    title: "Running in production",
+    blurb: "Health, metrics, rate-limit headers, and what to alert on.",
+    file: "ops.md",
+    group: "Operate",
+  },
+  {
+    slug: "privacy",
+    title: "Privacy",
+    blurb: "What moo stores, what it does not, and where to check in the code.",
+    file: "privacy.md",
+    group: "Operate",
+  },
+  {
     slug: "performance",
     title: "Latency and cost",
     blurb: "Per-stage timings, the budgets, and what a cold query spends on models.",

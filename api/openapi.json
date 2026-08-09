@@ -465,7 +465,7 @@
     },
     "/health": {
       "get": {
-        "description": "Liveness probe.",
+        "description": "Liveness probe, and the endpoint an uptime monitor should watch. Stays\nreachable without a key so a monitor never needs one. `errors_5xx_recent`\nis the count inside the alert window, which is what a spike rule fires on.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -482,6 +482,27 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/metrics": {
+      "get": {
+        "description": "Per-route p50/p95 latency and status counts over a rolling window, for a\nstatus page or a scrape. Aggregate only: no query, no key, no client.",
+        "operationId": "metrics_endpoint_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Metrics Endpoint Metrics Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metrics Endpoint"
       }
     },
     "/research": {

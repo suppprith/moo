@@ -111,6 +111,10 @@ class AsyncMoo:
         """Masked per-key request counts."""
         return await self._call(ops.usage())
 
+    async def metrics(self) -> dict[str, Any]:
+        """Per-route p50/p95 latency and status counts over a rolling window."""
+        return await self._call(ops.metrics())
+
     async def account_usage(self) -> dict[str, Any]:
         """Credits and per-endpoint usage for this key."""
         return await self._call(ops.account_usage())

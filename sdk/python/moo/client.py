@@ -110,6 +110,10 @@ class Moo:
         """Masked per-key request counts."""
         return self._call(ops.usage())
 
+    def metrics(self) -> dict[str, Any]:
+        """Per-route p50/p95 latency and status counts over a rolling window."""
+        return self._call(ops.metrics())
+
     def account_usage(self) -> dict[str, Any]:
         """Credits and per-endpoint usage for this key: what is left, when the
         window resets, and where the credits went."""

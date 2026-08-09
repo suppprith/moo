@@ -6,6 +6,7 @@ Run locally with:  uv run fastapi dev app/main.py
 from typing import Any, Literal
 
 import os
+import time
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 import queue
 import threading
 
-from . import accounts, auth, credits, ids, pages
+from . import accounts, auth, credits, ids, metrics, pages
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
 from .extract import MAX_URLS as EXTRACT_MAX_URLS, extract_urls
@@ -65,7 +66,8 @@ app.add_middleware(
     allow_origins=[o.strip() for o in _origins if o.strip()],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Retry-After", "X-RateLimit-Limit",
+                    "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 
 
@@ -77,21 +79,33 @@ _AUTH_EXEMPT_PREFIXES = ("/docs", "/openapi", "/signup", "/account")
 async def request_id_middleware(request: Request, call_next):
     """Tag every request with an id echoed in the response header and in any
     error envelope, so a failing call is traceable end to end. Also enforces
-    optional API-key auth + per-key rate limiting, and charges the call's
-    credits once it has run (a handler that knows better sets
-    ``request.state.credits``; a 5xx is never billed)."""
+    optional API-key auth + per-key rate limiting, reports what is left of that
+    limit in the response headers, records the call's latency for `/metrics`,
+    and charges its credits once it has run (a handler that knows better sets
+    ``request.state.credits``; a 5xx is never billed).
+
+    Latency is measured to the response head, so a streaming endpoint is timed
+    by how long it took to start, not to finish."""
     request.state.request_id = new_request_id()
     request.state.key_id = None
+    request.state.rate = None
     path = request.url.path
+    started = time.perf_counter()
     gated = (auth.active() and path not in _AUTH_EXEMPT
              and not path.startswith(_AUTH_EXEMPT_PREFIXES))
     if gated:
         try:
-            request.state.key_id = auth.authenticate(request)["key_id"]
+            allowed = auth.authenticate(request)
+            request.state.key_id = allowed["key_id"]
+            request.state.rate = allowed.get("rate")
         except ApiError as exc:
             headers = {"X-Request-ID": request.state.request_id}
             if exc.retry_after is not None:
                 headers["Retry-After"] = str(exc.retry_after)
+                headers["X-RateLimit-Remaining"] = "0"
+                headers["X-RateLimit-Reset"] = str(exc.retry_after)
+            metrics.record(request.method, path, exc.status,
+                           (time.perf_counter() - started) * 1000)
             return JSONResponse(
                 status_code=exc.status,
                 content=envelope(exc.code, exc.message, exc.retryable, request.state.request_id),
@@ -99,12 +113,20 @@ async def request_id_middleware(request: Request, call_next):
             )
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
+    rate = request.state.rate
+    if rate:
+        response.headers["X-RateLimit-Limit"] = str(rate["limit"])
+        response.headers["X-RateLimit-Remaining"] = str(rate["remaining"])
+        response.headers["X-RateLimit-Reset"] = str(rate["reset"])
+    route = _route_template(request, path)
+    metrics.record(request.method, route, response.status_code,
+                   (time.perf_counter() - started) * 1000)
     if gated and request.state.key_id and response.status_code < 500:
         units = getattr(request.state, "credits", None)
         if units is None:
             units = credits.cost_for_path(path, request.method)
         if units:
-            auth.charge(request.state.key_id, _route_template(request, path), units)
+            auth.charge(request.state.key_id, route, units)
     return response
 
 
@@ -209,8 +231,23 @@ class SearchResponse(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    """Liveness probe."""
-    return {"status": "ok", "contract_version": CONTRACT_VERSION, "auth": auth.enabled()}
+    """Liveness probe, and the endpoint an uptime monitor should watch. Stays
+    reachable without a key so a monitor never needs one. `errors_5xx_recent`
+    is the count inside the alert window, which is what a spike rule fires on."""
+    return {
+        "status": "ok",
+        "contract_version": CONTRACT_VERSION,
+        "auth": auth.enabled(),
+        "uptime_seconds": metrics.uptime_seconds(),
+        "errors_5xx_recent": metrics.errors_5xx_recent(),
+    }
+
+
+@app.get("/metrics")
+def metrics_endpoint() -> dict:
+    """Per-route p50/p95 latency and status counts over a rolling window, for a
+    status page or a scrape. Aggregate only: no query, no key, no client."""
+    return metrics.snapshot()
 
 
 @app.get("/usage")
