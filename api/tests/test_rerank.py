@@ -71,3 +71,33 @@ def test_budget_caps_candidates_sent(monkeypatch):
 
     rerank.rerank(conn, "q", hits, use_llm=True)
     assert captured["n"] == rerank.MAX_CANDIDATES
+
+
+def test_unusable_response_is_cached_so_a_repeat_costs_nothing(monkeypatch):
+    from app import llm
+
+    conn = _db()
+    calls = {"n": 0}
+
+    def unusable(*a, **k):
+        calls["n"] += 1
+        return {}
+
+    monkeypatch.setattr(llm, "get_client", lambda: {"provider": "openai"})
+    monkeypatch.setattr(llm, "generate_json", unusable)
+
+    first = rerank.rerank(conn, "q", _hits(1, 2, 3))
+    second = rerank.rerank(conn, "q", _hits(1, 2, 3))
+    assert [h.chunk_id for h in first] == [1, 2, 3]
+    assert [h.chunk_id for h in second] == [1, 2, 3]
+    assert calls["n"] == 1
+
+
+def test_unusable_response_is_not_cached_without_a_provider(monkeypatch):
+    from app import llm
+
+    conn = _db()
+    monkeypatch.setattr(llm, "get_client", lambda: None)
+    monkeypatch.setattr(llm, "generate_json", lambda *a, **k: None)
+    rerank.rerank(conn, "q", _hits(1, 2, 3))
+    assert conn.execute("SELECT count(*) FROM llm_cache").fetchone()[0] == 0

@@ -30,6 +30,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 log = logging.getLogger("moo.llm")
@@ -144,16 +145,34 @@ def __getattr__(name: str):
     raise AttributeError(name)
 
 
-_STATS = {"calls": 0, "cache_hits": 0, "cache_misses": 0}
+_STAT_FIELDS = ("calls", "attempts", "cache_hits", "cache_misses", "prompt_chars")
+_local = threading.local()
+
+
+def _stats() -> dict:
+    """Counters are thread-local: a research run resets and reads them on its own
+    worker thread while request threads meter themselves, and neither clobbers
+    the other's totals."""
+    stats = getattr(_local, "stats", None)
+    if stats is None:
+        stats = dict.fromkeys(_STAT_FIELDS, 0)
+        _local.stats = stats
+    return stats
 
 
 def reset_stats() -> None:
-    for k in _STATS:
-        _STATS[k] = 0
+    _local.stats = dict.fromkeys(_STAT_FIELDS, 0)
 
 
 def get_stats() -> dict:
-    return dict(_STATS)
+    """`calls` are provider requests actually issued; `attempts` counts every
+    stage that wanted one, so a keyless run still measures its model demand.
+    `prompt_chars` is the input those attempts would have sent."""
+    return dict(_stats())
+
+
+def attempts() -> int:
+    return _stats()["attempts"]
 
 
 def cache_key(stage: str, normalized_input: str) -> str:
@@ -163,10 +182,11 @@ def cache_key(stage: str, normalized_input: str) -> str:
 
 def cache_get(conn: sqlite3.Connection, key: str):
     row = conn.execute("SELECT value FROM llm_cache WHERE key = ?", (key,)).fetchone()
+    stats = _stats()
     if row:
-        _STATS["cache_hits"] += 1
+        stats["cache_hits"] += 1
         return json.loads(row[0])
-    _STATS["cache_misses"] += 1
+    stats["cache_misses"] += 1
     return None
 
 
@@ -316,11 +336,14 @@ def generate_json(
     """One structured LLM call via the configured provider. Returns parsed JSON,
     or ``None`` when no provider is configured or the call fails (callers fall
     back to heuristics — an LLM failure never breaks retrieval)."""
+    system = system or "You are a component in a search pipeline. Output only JSON."
+    stats = _stats()
+    stats["attempts"] += 1
+    stats["prompt_chars"] += len(prompt) + len(system)
     cfg = _resolve_config()
     if cfg is None:
         return None
-    _STATS["calls"] += 1
-    system = system or "You are a component in a search pipeline. Output only JSON."
+    stats["calls"] += 1
     backend = _BACKENDS[cfg["provider"]]
     try:
         return backend(cfg, prompt, schema, system, model or cfg["model"], max_tokens)

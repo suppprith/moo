@@ -5,7 +5,8 @@ and reorders it by true query-document relevance — the signal rank fusion
 can't see. Two swappable backends, chosen by env ``MOO_RERANKER``:
 
 - ``llm`` (default) — one cheap listwise LLM call, cached by query+candidate
-  set, heuristic-identity fallback when keyless.
+  set, heuristic-identity fallback when keyless. A response the stage cannot use
+  is cached too, so a repeated query never re-pays for the same bad answer.
 - ``cross`` — a local cross-encoder (default
   ``cross-encoder/ms-marco-MiniLM-L-6-v2``, override with
   ``MOO_CROSS_ENCODER_MODEL``) scores each (query, text) pair on CPU: no API,
@@ -57,6 +58,9 @@ Query: {query}
 
 Candidates:
 {candidates}"""
+
+
+_UNUSABLE = {"order": [], "unusable": True}
 
 
 def _cache_key(query: str, chunk_ids: list[int]) -> str:
@@ -143,9 +147,11 @@ def rerank(
     payload = llm.cache_get(conn, key)
     if payload is None and use_llm:
         payload = _llm_order(query, candidates)
+        if payload is None and llm.get_client():
+            payload = dict(_UNUSABLE)
         if payload is not None:
             llm.cache_put(conn, key, payload, llm.CHEAP_MODEL)
-    if payload is None:
+    if payload is None or payload.get("unusable"):
         return hits
 
     valid = set(chunk_ids)

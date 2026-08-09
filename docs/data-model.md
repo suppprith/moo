@@ -63,6 +63,14 @@ independent of `mode`:
   `{offset, limit, returned, has_more, next_cursor}`; `next_cursor` is an opaque
   base64 handle passed back as `cursor` to fetch the next page.
 
+**Every response accounts for itself.** `meta.timings_ms` is the per-stage
+breakdown (`understand`, `live`, `expand`, `retrieve`, `rerank`, `highlights`,
+`claims`, `graph`, `synthesize`), `meta.elapsed_ms` the total, and `meta.cost`
+what the call spent on models: `llm_calls` issued, `llm_attempts` wanted,
+`cache_hits`/`cache_misses`, `prompt_chars`, plus `by_stage` when a stage called
+a model. The same numbers drive the latency budgets in
+[latency and cost](performance.md).
+
 **Opaque handles** ([`app/ids.py`](../api/app/ids.py)) address rows across the
 agent surface: `chk_<id>` (chunk / a search "source"), `clm_<id>` (claim),
 `doc_<id>` (document), `ent_<id>` (entity). Handles are stable (rowid-backed) and

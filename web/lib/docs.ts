@@ -59,6 +59,13 @@ export const DOC_PAGES: DocPage[] = [
     group: "Operate",
   },
   {
+    slug: "performance",
+    title: "Latency and cost",
+    blurb: "Per-stage timings, the budgets, and what a cold query spends on models.",
+    file: "performance.md",
+    group: "Operate",
+  },
+  {
     slug: "gaps",
     title: "Where moo stands",
     blurb: "The honest gap analysis against Tavily, Exa and Firecrawl.",

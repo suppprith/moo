@@ -29,6 +29,10 @@ the payload for the consumer:
 - ``offset`` / cursor — paginate the ``sources`` list; ``meta.page`` carries the
   next cursor.
 
+Every call reports what it spent: ``meta.timings_ms`` per stage and ``meta.cost``
+(model calls, cache hits, and the input the calls carried), logged per request
+against the mode's latency budget.
+
 CLI:  ``uv run python -m app.search "Postgres vs MySQL" --mode full``
 """
 
@@ -39,10 +43,10 @@ import base64
 import json
 import logging
 import sqlite3
-import time
 
-from . import ids
+from . import ids, llm
 from .retrieve import retrieve
+from .timing import Timings, budget_for
 
 log = logging.getLogger("moo.search")
 
@@ -257,7 +261,8 @@ def search(
     if offset < 0:
         raise ValueError("offset must be >= 0")
     selected = _resolve_fields(fields, mode)
-    started = time.perf_counter()
+    t = Timings(counter=llm.attempts)
+    llm_before = llm.get_stats()
 
     from . import queryops
 
@@ -266,7 +271,8 @@ def search(
 
     from .understand import understand
 
-    u = understand(retrieval_query, conn)
+    with t.stage("understand"):
+        u = understand(retrieval_query, conn)
 
     live_report = None
     if live is not False:
@@ -278,46 +284,49 @@ def search(
         if provider is not None:
             from .live.pipeline import live_fetch
 
-            try:
-                live_report = live_fetch(
-                    conn, retrieval_query, max_pages=LIVE_PAGES[mode],
-                    provider=provider, fetcher=live_fetcher,
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning("live fetch failed, serving from store: %s", exc)
+            with t.stage("live"):
+                try:
+                    live_report = live_fetch(
+                        conn, retrieval_query, max_pages=LIVE_PAGES[mode],
+                        provider=provider, fetcher=live_fetcher,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("live fetch failed, serving from store: %s", exc)
 
     from .routing import route
 
     routing = route(retrieval_query, u.intent)
 
-    if not routing.fan_out:
-        variants = []
-    elif mode == "raw":
-        from .expand import heuristic_expand
+    with t.stage("expand"):
+        if not routing.fan_out:
+            variants = []
+        elif mode == "raw":
+            from .expand import heuristic_expand
 
-        variants = heuristic_expand(retrieval_query)
-    else:
-        from .expand import expand
+            variants = heuristic_expand(retrieval_query)
+        else:
+            from .expand import expand
 
-        variants = expand(conn, retrieval_query, use_llm=use_llm)
+            variants = expand(conn, retrieval_query, use_llm=use_llm)
     fetch_k = (offset + k + 1) * (4 if ops.has_post_filters else 1)
-    fetched = retrieve(
-        conn, retrieval_query, k=fetch_k, queries=variants, source_boost=u.source_boost,
-        source_types=ops.source_types, since=ops.since,
-        index_weights=(routing.vector_weight, routing.keyword_weight),
-    )
-    if ops.has_post_filters:
-        fetched = [
-            h for h in fetched
-            if queryops.matches(ops, text=h.text, url=h.url_anchor or h.document_url)
-        ]
+    with t.stage("retrieve"):
+        fetched = retrieve(
+            conn, retrieval_query, k=fetch_k, queries=variants, source_boost=u.source_boost,
+            source_types=ops.source_types, since=ops.since,
+            index_weights=(routing.vector_weight, routing.keyword_weight),
+        )
+        if ops.has_post_filters:
+            fetched = [
+                h for h in fetched
+                if queryops.matches(ops, text=h.text, url=h.url_anchor or h.document_url)
+            ]
 
-    from . import versions as versions_mod
+        from . import versions as versions_mod
 
-    version_constraint = versions_mod.query_constraint(retrieval_query)
-    version_notes: dict[int, dict] = {}
-    if version_constraint is not None:
-        version_notes = versions_mod.apply_constraint(fetched, version_constraint)
+        version_constraint = versions_mod.query_constraint(retrieval_query)
+        version_notes: dict[int, dict] = {}
+        if version_constraint is not None:
+            version_notes = versions_mod.apply_constraint(fetched, version_constraint)
 
     has_more = len(fetched) > offset + k
     hits = fetched[offset : offset + k]
@@ -375,8 +384,9 @@ def search(
 
     if mode == "raw":
         if highlights:
-            _attach_highlights(retrieval_query, hits, response["sources"])
-        return _finalize(response, started, format, fields, selected)
+            with t.stage("highlights"):
+                _attach_highlights(retrieval_query, hits, response["sources"])
+        return _finalize(response, t, llm_before, format, fields, selected)
 
     from .evidence.claims import extract_claims
     from .evidence.confidence import score_claim
@@ -384,39 +394,45 @@ def search(
     from .graph.query import graph_for_query
     from .rerank import rerank
 
-    hits = rerank(conn, retrieval_query, hits, use_llm=use_llm)
+    with t.stage("rerank"):
+        hits = rerank(conn, retrieval_query, hits, use_llm=use_llm)
     response["sources"] = _sources(hits, version_notes)
     if highlights:
-        _attach_highlights(retrieval_query, hits, response["sources"])
+        with t.stage("highlights"):
+            _attach_highlights(retrieval_query, hits, response["sources"])
 
-    claims = extract_claims(conn, retrieval_query, k=k, use_llm=use_llm)
-    claim_ids = [c["id"] for c in claims]
-    for c in claims:
-        link_claim(conn, c["id"], c["text"], use_llm=use_llm)
-    for cid in claim_ids:
-        r = score_claim(conn, cid)
-        conn.execute(
-            "UPDATE claim SET confidence = ?, disputed = ? WHERE id = ?",
-            (r["confidence"], int(r["disputed"]), cid),
-        )
-    conn.commit()
+    with t.stage("claims"):
+        claims = extract_claims(conn, retrieval_query, k=k, use_llm=use_llm)
+        claim_ids = [c["id"] for c in claims]
+        for c in claims:
+            link_claim(conn, c["id"], c["text"], use_llm=use_llm)
+        for cid in claim_ids:
+            r = score_claim(conn, cid)
+            conn.execute(
+                "UPDATE claim SET confidence = ?, disputed = ? WHERE id = ?",
+                (r["confidence"], int(r["disputed"]), cid),
+            )
+        conn.commit()
 
-    from .evidence.temporal import process as temporal_process
+        from .evidence.temporal import process as temporal_process
 
-    temporal_process(conn, claims)
+        temporal_process(conn, claims)
 
-    response["claims"] = _claims_payload(conn, claim_ids)
-    response["graph"] = graph_for_query(conn, retrieval_query)
+        response["claims"] = _claims_payload(conn, claim_ids)
+
+    with t.stage("graph"):
+        response["graph"] = graph_for_query(conn, retrieval_query)
 
     if mode == "full":
         from .synthesize import synthesize
 
-        result = synthesize(conn, retrieval_query, response["claims"], use_llm=use_llm)
+        with t.stage("synthesize"):
+            result = synthesize(conn, retrieval_query, response["claims"], use_llm=use_llm)
         response["answer"] = result["answer"]
         response["citations"] = result["sources"]
         response["meta"]["generator"] = result["generator"]
 
-    return _finalize(response, started, format, fields, selected)
+    return _finalize(response, t, llm_before, format, fields, selected)
 
 
 def _attach_highlights(query: str, hits: list, source_rows: list[dict]) -> None:
@@ -429,12 +445,35 @@ def _attach_highlights(query: str, hits: list, source_rows: list[dict]) -> None:
         row["relevance"] = hl["relevance"]
 
 
+def _cost(t: Timings, before: dict) -> dict:
+    """What this search spent on models. `llm_calls` is real provider requests;
+    `llm_attempts` counts stages that wanted one, so a keyless or fully cached
+    run still reports its model demand (attempts minus calls is what the cache
+    and the heuristic fallbacks absorbed)."""
+    after = llm.get_stats()
+    cost = {
+        "llm_calls": after["calls"] - before["calls"],
+        "llm_attempts": after["attempts"] - before["attempts"],
+        "cache_hits": after["cache_hits"] - before["cache_hits"],
+        "cache_misses": after["cache_misses"] - before["cache_misses"],
+        "prompt_chars": after["prompt_chars"] - before["prompt_chars"],
+    }
+    by_stage = t.llm_by_stage()
+    if by_stage:
+        cost["by_stage"] = by_stage
+    return cost
+
+
 def _finalize(
-    response: dict, started: float, format: str, fields: str | None, selected: set[str]
+    response: dict, t: Timings, llm_before: dict, format: str, fields: str | None,
+    selected: set[str],
 ) -> dict:
-    """Stamp elapsed time, then apply format + field selection. `full` format
+    """Stamp timings + cost, then apply format + field selection. `full` format
     with no explicit `fields` is left untouched (the legacy v1.0 shape)."""
-    response["meta"]["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    mode = response["mode"]
+    response["meta"]["elapsed_ms"] = t.report(f"search mode={mode}", budget_for(mode))
+    response["meta"]["timings_ms"] = t.as_dict()
+    response["meta"]["cost"] = _cost(t, llm_before)
     if any(s.get("suspicious") for s in response.get("sources", [])):
         from .safety import UNTRUSTED_NOTICE
 

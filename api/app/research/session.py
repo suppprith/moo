@@ -243,8 +243,10 @@ def run_research(
         "plan_ms": plan_ms,
         "loop_ms": result["budget"].get("elapsed_ms"),
         "llm_calls": stats["calls"],
+        "llm_attempts": stats["attempts"],
         "cache_hits": stats["cache_hits"],
         "cache_misses": stats["cache_misses"],
+        "prompt_chars": stats["prompt_chars"],
     }
     if live_stats is not None:
         result["cost"]["live"] = {

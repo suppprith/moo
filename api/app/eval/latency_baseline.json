@@ -1,0 +1,149 @@
+{
+  "queries": 14,
+  "modes": {
+    "raw": {
+      "cold": {
+        "queries": 14,
+        "p50_ms": 144.3,
+        "p95_ms": 176.0,
+        "max_ms": 14991.4,
+        "stage_median_ms": {
+          "expand": 0.1,
+          "retrieve": 144.2,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 0,
+        "cache_hits": 0,
+        "prompt_chars": 0
+      },
+      "warm": {
+        "queries": 14,
+        "p50_ms": 138.1,
+        "p95_ms": 187.8,
+        "max_ms": 188.3,
+        "stage_median_ms": {
+          "expand": 0.1,
+          "retrieve": 139.2,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 0,
+        "cache_hits": 0,
+        "prompt_chars": 0
+      },
+      "budget_ms": 1000.0,
+      "within_budget": true,
+      "repeat_is_free": true,
+      "cost": {
+        "llm_attempts_per_query": 0.0,
+        "input_tokens_per_query": 0.0,
+        "max_output_tokens_per_query": 0.0,
+        "usd_per_query_upper_bound": 0.0
+      }
+    },
+    "claims": {
+      "cold": {
+        "queries": 14,
+        "p50_ms": 1940.6,
+        "p95_ms": 2194.2,
+        "max_ms": 2345.0,
+        "stage_median_ms": {
+          "claims": 1800.1,
+          "expand": 0.1,
+          "graph": 0.5,
+          "rerank": 0.2,
+          "retrieve": 156.1,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 192,
+        "cache_hits": 14,
+        "prompt_chars": 859023
+      },
+      "warm": {
+        "queries": 14,
+        "p50_ms": 2149.1,
+        "p95_ms": 2544.8,
+        "max_ms": 2584.7,
+        "stage_median_ms": {
+          "claims": 2012.1,
+          "expand": 0.1,
+          "graph": 0.5,
+          "rerank": 0.2,
+          "retrieve": 176.1,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 192,
+        "cache_hits": 14,
+        "prompt_chars": 859023
+      },
+      "budget_ms": 5000.0,
+      "within_budget": true,
+      "repeat_is_free": false,
+      "cost": {
+        "llm_attempts_per_query": 13.71,
+        "input_tokens_per_query": 15339.7,
+        "max_output_tokens_per_query": 14043.4,
+        "usd_per_query_upper_bound": 0.0
+      }
+    },
+    "full": {
+      "cold": {
+        "queries": 14,
+        "p50_ms": 2182.9,
+        "p95_ms": 2567.6,
+        "max_ms": 2705.4,
+        "stage_median_ms": {
+          "claims": 2049.8,
+          "expand": 0.1,
+          "graph": 0.5,
+          "rerank": 0.2,
+          "retrieve": 171.9,
+          "synthesize": 0.5,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 206,
+        "cache_hits": 14,
+        "prompt_chars": 882329
+      },
+      "warm": {
+        "queries": 14,
+        "p50_ms": 2358.9,
+        "p95_ms": 2646.0,
+        "max_ms": 2763.8,
+        "stage_median_ms": {
+          "claims": 2167.3,
+          "expand": 0.1,
+          "graph": 0.6,
+          "rerank": 0.2,
+          "retrieve": 189.8,
+          "synthesize": 0.6,
+          "understand": 0.1
+        },
+        "llm_calls": 0,
+        "llm_attempts": 206,
+        "cache_hits": 14,
+        "prompt_chars": 882329
+      },
+      "budget_ms": 8000.0,
+      "within_budget": true,
+      "repeat_is_free": false,
+      "cost": {
+        "llm_attempts_per_query": 14.71,
+        "input_tokens_per_query": 15755.9,
+        "max_output_tokens_per_query": 15067.4,
+        "usd_per_query_upper_bound": 0.0
+      }
+    }
+  },
+  "live": false,
+  "use_llm": true,
+  "provider": {
+    "llm": false,
+    "model": "gemini-2.5-flash",
+    "stubbed": false
+  }
+}

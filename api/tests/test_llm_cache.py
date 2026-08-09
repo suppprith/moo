@@ -43,4 +43,32 @@ def test_reset_and_get_stats():
     conn = _conn()
     llm.cache_get(conn, "missing")
     llm.reset_stats()
-    assert llm.get_stats() == {"calls": 0, "cache_hits": 0, "cache_misses": 0}
+    assert llm.get_stats() == dict.fromkeys(llm._STAT_FIELDS, 0)
+
+
+def test_attempts_counted_without_a_provider(monkeypatch):
+    monkeypatch.setattr(llm, "_resolve_config", lambda: None)
+    llm.reset_stats()
+    assert llm.generate_json("a prompt", schema={}) is None
+    stats = llm.get_stats()
+    assert stats["attempts"] == 1 and stats["calls"] == 0
+    assert stats["prompt_chars"] > len("a prompt")
+    assert llm.attempts() == 1
+
+
+def test_stats_are_per_thread():
+    import threading
+
+    llm.reset_stats()
+    llm.cache_get(_conn(), "missing")
+    other: dict = {}
+
+    def worker():
+        llm.reset_stats()
+        other.update(llm.get_stats())
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join()
+    assert other["cache_misses"] == 0
+    assert llm.get_stats()["cache_misses"] == 1
