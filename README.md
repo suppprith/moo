@@ -19,6 +19,20 @@ You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/suppprith/moo.git
 cd moo/api
 uv sync
+uv run moo demo
+```
+
+`moo demo` is the fastest way to see whether this is worth your time: it fills a
+small store by fetching thirteen primary sources directly — no search provider,
+no API key, nothing to sign up for — then runs one question through the whole
+pipeline and shows the cited answer, the claims with their confidence, and which
+sources backed them. Measured here: **89 seconds** from an empty database, 17
+once it is warm. It also says when moo flagged nothing as disputed, because on a
+thirteen-page store it usually doesn't.
+
+Then ask it your own questions:
+
+```bash
 uv run moo setup
 uv run moo "how does sqlite wal mode work"
 ```
@@ -215,6 +229,8 @@ moo "why do my containers randomly exit"        # cited answer as markdown
 moo "postgres 16 parallel vacuum" --mode raw    # ranked sources, fast
 moo "redis persistence" --json | jq '.claims'   # pipe the full response
 moo "sqlite wal mode" --open 1                  # open the top source
+moo demo                                        # seeded corpus, one query end to end
+moo setup --status                              # what moo thinks is configured
 ```
 
 Install with `uv tool install ./api` or `pipx install ./api`, or skip installing
@@ -349,6 +365,26 @@ standing version: it scores moo on every run, adds Exa and Tavily as columns whe
 their keys are set, and the gate fails a commit that drops moo below its own last
 numbers.
 
+Recorded baseline — task set v1.1, thirteen tasks, **keyless and store-only**
+(no LLM key, no search provider, answering out of a local store):
+
+| metric | `search` | `deep_research` |
+| --- | ---: | ---: |
+| coverage | 0.24 | 0.20 |
+| citation accuracy | — | 1.00 |
+| source recall | 0.00 | 0.22 |
+| contradiction recall | 0.00 | 0.00 |
+| tokens | 933 | 1,799 |
+
+Read those numbers with their conditions attached, because the conditions are
+most of the story. Coverage is low because eight of the thirteen tasks are about
+things the local store has no pages on — that is what live retrieval is for.
+Contradiction recall is zero because flagging a dispute needs two independent
+sources on the same point, and this store rarely has them; the previous
+classifier reported 305 contradictions on the same corpus and every one was
+spurious, so zero is the improvement. Citation accuracy of 1.00 is the number
+that holds regardless: nothing is asserted without a source it can be traced to.
+
 **The retrieval eval** grades ranked chunks against versioned relevance
 judgments ([`relevance.json`](api/app/eval/relevance.json), documents named by
 URL substring so a rechunk does not invalidate them) and reports precision,
@@ -380,12 +416,15 @@ warning is the failure being counted, and it is what a plain web search does.
 `--gate` exits non-zero unless moo clears 70% and leads every competitor that ran
 by a wide margin; `--transcript` writes the per-trap record, quotes included.
 
-Right now it scores 0% here, and the saved run says why:
+The gate has three outcomes rather than two, and right now it returns the third:
+**not evaluated**. Every trap asks what the live web says today, so with no
+discovery provider configured nothing is fetched, every engine scores 0%, and
+the run proves nothing either way —
 [`stale_trap_baseline.json`](api/app/eval/stale_trap_baseline.json) records
-`live_provider: null`, so there was nothing to retrieve. The traps span Python,
-React, Kubernetes and nginx while the local store holds database and framework
-docs. The gate becomes meaningful the moment a discovery provider is configured,
-which is the point of running it early.
+`live_provider: null` and says exactly that. Reporting it as a failure would cry
+wolf and reporting it as a pass would be a lie. Configure a provider and the same
+command returns a real verdict; `--gate --strict` is the launch check, where "we
+never ran it" must not read as success.
 
 ## Layout
 

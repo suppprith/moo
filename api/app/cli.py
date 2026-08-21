@@ -1,6 +1,7 @@
 """``moo`` — search the web from your terminal.
 
     moo setup                                    # first run: keys + MCP config
+    moo demo                                     # seeded corpus + one query end to end
     moo "why do my containers randomly exit"
 
 Prints a cited answer as markdown (mode ``full``), or ranked sources
@@ -136,6 +137,10 @@ def main(argv: list[str] | None = None) -> int:
         from .setup_wizard import main as setup_main
 
         return setup_main(args_in[1:])
+    if args_in and args_in[0] == "demo":
+        from .demo import main as demo_main
+
+        return demo_main(args_in[1:])
 
     parser = argparse.ArgumentParser(
         prog="moo", description="Live web search for software questions, with receipts.",
