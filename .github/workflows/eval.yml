@@ -1,0 +1,137 @@
+name: eval
+
+# The competitive-eval flywheel as a standing job. Two halves, deliberately:
+#
+#   `checks`   runs on every relevant push/PR. Pure-function scoring, gate logic
+#              and report rendering are unit-tested — no models, no network, so
+#              a broken gate is caught in seconds.
+#   `flywheel` runs on a schedule (and on demand). Scores moo against Exa/Tavily
+#              on the golden task set, fails on a regression versus moo's own
+#              last run of the same task-set version, and commits the refreshed
+#              trend report.
+#
+# The scheduled half needs a live search provider to mean anything: with no
+# provider moo answers store-only out of an empty CI database and every number
+# is zero. So it is gated on MOO_BRAVE_API_KEY (or MOO_SEARXNG_URL) existing and
+# skips loudly rather than publishing meaningless numbers. Competitor columns
+# appear when EXA_API_KEY / TAVILY_API_KEY are set; without them the run is moo
+# against its own history, which is still exactly what the gate needs.
+
+on:
+  push:
+    paths:
+      - "api/app/eval/**"
+      - "api/tests/test_flywheel.py"
+      - "api/tests/test_benchmark.py"
+      - ".github/workflows/eval.yml"
+  pull_request:
+    paths:
+      - "api/app/eval/**"
+      - "api/tests/test_flywheel.py"
+      - "api/tests/test_benchmark.py"
+      - ".github/workflows/eval.yml"
+  schedule:
+    - cron: "17 6 * * 1" # Mondays, 06:17 UTC
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      - name: Golden task set is valid
+        run: |
+          python - <<'PY'
+          import json, pathlib, collections
+          data = json.loads(pathlib.Path("app/eval/deep_research_tasks.json").read_text(encoding="utf-8"))
+          assert data.get("version"), "task set needs a version"
+          ids = [t["id"] for t in data["tasks"]]
+          dupes = [i for i, n in collections.Counter(ids).items() if n > 1]
+          assert not dupes, f"duplicate task ids: {dupes}"
+          for task in data["tasks"]:
+              assert task.get("question"), f"{task['id']}: no question"
+              assert task.get("rubric_points"), f"{task['id']}: no rubric points"
+              for point in task["rubric_points"] + task.get("key_source_hints", []):
+                  assert point == point.lower(), f"{task['id']}: {point!r} must be lowercase"
+          print(f"task set v{data['version']}: {len(ids)} tasks OK")
+          PY
+      - name: Gate + report unit tests
+        run: python -m pytest tests/test_flywheel.py tests/test_benchmark.py -q
+
+  flywheel:
+    # Scheduled and manual only: a per-PR head-to-head would burn competitor
+    # credits on every commit and tell us nothing a unit test doesn't.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      MOO_BRAVE_API_KEY: ${{ secrets.MOO_BRAVE_API_KEY }}
+      MOO_SEARXNG_URL: ${{ secrets.MOO_SEARXNG_URL }}
+      MOO_LLM_PROVIDER: ${{ secrets.MOO_LLM_PROVIDER }}
+      MOO_LLM_API_KEY: ${{ secrets.MOO_LLM_API_KEY }}
+      EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check a search provider is configured
+        id: provider
+        run: |
+          if [ -n "$MOO_BRAVE_API_KEY" ] || [ -n "$MOO_SEARXNG_URL" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::no MOO_BRAVE_API_KEY or MOO_SEARXNG_URL secret — skipping the head-to-head (store-only scores would all be zero)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@v5
+        if: steps.provider.outputs.ok == 'true'
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        if: steps.provider.outputs.ok == 'true'
+        with:
+          python-version: "3.11"
+
+      # Trend data is machine-local by design (gitignored), so CI carries it
+      # between runs in the cache. A cache miss costs one baseline run, not a
+      # false regression: the gate passes when there is nothing to compare to.
+      - name: Restore eval history
+        if: steps.provider.outputs.ok == 'true'
+        uses: actions/cache@v4
+        with:
+          path: api/data/eval_history.jsonl
+          key: eval-history-${{ github.run_id }}
+          restore-keys: eval-history-
+
+      - name: Run flywheel + regression gate
+        if: steps.provider.outputs.ok == 'true'
+        working-directory: api
+        run: uv run python -m app.eval.flywheel --gate --report ../docs/eval-trends.md
+
+      - name: Commit the refreshed trend report
+        if: steps.provider.outputs.ok == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          if git diff --quiet -- docs/eval-trends.md; then
+            echo "trend report unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/eval-trends.md
+          git commit -m "Record this week's eval trends"
+          git push
+
+      - name: Upload the report
+        if: steps.provider.outputs.ok == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-trends
+          path: docs/eval-trends.md
+          if-no-files-found: ignore

@@ -1,10 +1,24 @@
 {
-  "version": "1.0",
-  "domain": "databases",
+  "version": "1.1",
+  "domain": "software engineering & computer science",
+  "about": "The golden task set the deep-research benchmark and the competitive flywheel both score against. A task is a question a working engineer would actually ask, plus three checkable expectations: rubric_points (terms any correct answer must contain), key_source_hints (hosts a good answer should cite), and disputed_hints (the terms sources genuinely disagree on, which is what contradiction_recall measures). All matching is lowercase substring matching, so points are kept short and unambiguous.",
+  "growth_process": {
+    "why_versioned": "Scores are only comparable within a version. The flywheel records task_set_version with every run and its regression gate only compares runs of the same version, so growing the set never fires a false regression.",
+    "when_to_add": "Add a task when a real query exposes a gap (a domain moo answers badly, a question where sources disagree and moo missed it, an agent query from the feedback loop). Prefer questions with a documented answer on a primary source over folklore.",
+    "how_to_add": [
+      "Append the task with a stable kebab-case id; never renumber or reuse an id.",
+      "Rubric points: 3-5 lowercase terms that a correct answer contains and a wrong one does not. Avoid words that appear in any answer ('the', 'database').",
+      "key_source_hints: host substrings of the primary sources (docs, spec, release notes), not blog aggregators.",
+      "disputed_hints: only terms where sources genuinely conflict. Leave empty rather than inventing a dispute — an empty list scores null, not zero.",
+      "Bump version: patch-style additions bump the minor version (1.1 -> 1.2). Re-run the benchmark and record a new baseline; the old baseline stays valid for its own version."
+    ],
+    "keep_it_honest": "Tasks are authored from the question, never from moo's output. If a task is added because moo already answers it well, it measures nothing."
+  },
   "tasks": [
     {
       "id": "pg-vs-mysql-joins",
       "question": "Postgres vs MySQL for complex analytical joins",
+      "domain": "databases",
       "rubric_points": ["postgres", "mysql", "join", "query", "index"],
       "key_source_hints": ["postgresql.org", "dev.mysql.com", "stackoverflow.com"],
       "disputed_hints": ["faster", "performance"]
@@ -12,6 +26,7 @@
     {
       "id": "redis-rdb-vs-aof",
       "question": "When should I use Redis RDB versus AOF persistence",
+      "domain": "databases",
       "rubric_points": ["rdb", "aof", "snapshot", "durability", "fsync"],
       "key_source_hints": ["redis.io"],
       "disputed_hints": ["durability", "performance"]
@@ -19,6 +34,7 @@
     {
       "id": "pg-connections-exhausted",
       "question": "Why do my Postgres connections get exhausted under load",
+      "domain": "databases",
       "rubric_points": ["connection", "pool", "max_connections", "pgbouncer"],
       "key_source_hints": ["postgresql.org", "stackoverflow.com"],
       "disputed_hints": []
@@ -26,6 +42,7 @@
     {
       "id": "sqlite-production",
       "question": "Is SQLite suitable for production web applications",
+      "domain": "databases",
       "rubric_points": ["sqlite", "concurrency", "write", "wal"],
       "key_source_hints": ["sqlite.org"],
       "disputed_hints": ["production", "concurrency"]
@@ -33,9 +50,74 @@
     {
       "id": "mysql-vs-pg-json",
       "question": "MySQL vs Postgres for storing and querying JSON data",
+      "domain": "databases",
       "rubric_points": ["json", "jsonb", "postgres", "mysql"],
       "key_source_hints": ["postgresql.org", "dev.mysql.com"],
       "disputed_hints": ["json"]
+    },
+    {
+      "id": "python-gil-threads",
+      "question": "Does Python's GIL still limit multithreaded CPU-bound work",
+      "domain": "languages",
+      "rubric_points": ["gil", "thread", "cpu", "multiprocessing"],
+      "key_source_hints": ["docs.python.org", "peps.python.org"],
+      "disputed_hints": ["free-threaded", "performance"]
+    },
+    {
+      "id": "git-rebase-vs-merge",
+      "question": "When should I rebase instead of merge in git",
+      "domain": "tooling",
+      "rubric_points": ["rebase", "merge", "history", "conflict"],
+      "key_source_hints": ["git-scm.com", "stackoverflow.com"],
+      "disputed_hints": ["rebase", "history"]
+    },
+    {
+      "id": "node-esm-cjs",
+      "question": "How do I use ESM and CommonJS together in a Node.js package",
+      "domain": "languages",
+      "rubric_points": ["esm", "commonjs", "import", "require", "package.json"],
+      "key_source_hints": ["nodejs.org"],
+      "disputed_hints": ["require", "dual"]
+    },
+    {
+      "id": "http-cache-control",
+      "question": "How should I set Cache-Control headers for static assets",
+      "domain": "web",
+      "rubric_points": ["cache-control", "max-age", "etag", "immutable"],
+      "key_source_hints": ["developer.mozilla.org", "rfc-editor.org"],
+      "disputed_hints": ["etag", "immutable"]
+    },
+    {
+      "id": "docker-image-size",
+      "question": "How do I reduce the size of a Docker image for a Python app",
+      "domain": "infrastructure",
+      "rubric_points": ["layer", "multi-stage", "slim", "alpine"],
+      "key_source_hints": ["docs.docker.com"],
+      "disputed_hints": ["alpine", "musl"]
+    },
+    {
+      "id": "k8s-liveness-readiness",
+      "question": "What is the difference between Kubernetes liveness and readiness probes",
+      "domain": "infrastructure",
+      "rubric_points": ["liveness", "readiness", "probe", "restart"],
+      "key_source_hints": ["kubernetes.io"],
+      "disputed_hints": ["startup"]
+    },
+    {
+      "id": "rust-arc-vs-rc",
+      "question": "When do I need Arc instead of Rc in Rust",
+      "domain": "languages",
+      "rubric_points": ["arc", "rc", "thread", "send"],
+      "key_source_hints": ["doc.rust-lang.org"],
+      "disputed_hints": ["overhead"]
+    },
+    {
+      "id": "react-usememo",
+      "question": "When is useMemo actually worth using in React",
+      "domain": "web",
+      "rubric_points": ["usememo", "render", "dependency", "memo"],
+      "key_source_hints": ["react.dev"],
+      "disputed_hints": ["premature", "overhead"]
     }
   ]
 }

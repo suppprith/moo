@@ -93,8 +93,8 @@ def test_run_flywheel_with_fake_engines():
     assert record["at"] and record["task_set_version"]
 
 
-def _record(coverage, recall):
-    return {"at": "t", "task_set_version": "1.0",
+def _record(coverage, recall, version="1.0", at="t"):
+    return {"at": at, "task_set_version": version, "n_tasks": 5,
             "engines": {"moo": {"coverage": coverage, "source_recall": recall,
                                 "latency_ms": 1, "tasks": 5, "errors": 0}}}
 
@@ -129,3 +129,60 @@ def test_gate_fails_on_regression():
 
 def test_gate_tolerates_small_noise():
     assert flywheel.check_regression(_record(0.48, 0.5), [_record(0.5, 0.5)]) == []
+
+
+def test_gate_ignores_other_task_set_versions():
+    """A grown golden set scores differently; that is not a regression."""
+    history = [_record(0.9, 0.9, version="1.0")]
+    assert flywheel.check_regression(_record(0.3, 0.3, version="1.1"), history) == []
+
+
+def test_gate_compares_within_its_own_version():
+    history = [_record(0.9, 0.9, version="1.0"), _record(0.5, 0.5, version="1.1")]
+    assert flywheel.check_regression(_record(0.5, 0.5, version="1.1"), history) == []
+    failures = flywheel.check_regression(_record(0.2, 0.5, version="1.1"), history)
+    assert len(failures) == 1 and "coverage regressed" in failures[0]
+
+
+def test_report_renders_latest_and_trend():
+    history = [_record(0.4, 0.4, at="2026-01-01T00:00:00+00:00"),
+               _record(0.6, 0.5, at="2026-01-02T00:00:00+00:00")]
+    md = flywheel.render_report(history)
+    assert "## Latest head-to-head" in md
+    assert "## coverage over time" in md
+    assert "2026-01-01T00:00:00+00:00" in md and "2026-01-02T00:00:00+00:00" in md
+    assert "0.600" in md
+
+
+def test_report_only_shows_current_task_set_version():
+    history = [_record(0.9, 0.9, version="1.0", at="old"),
+               _record(0.4, 0.4, version="1.1", at="new")]
+    md = flywheel.render_report(history)
+    assert "new" in md and "| old |" not in md
+    assert "v1.1" in md
+
+
+def test_report_states_run_conditions():
+    keyless = _record(0.4, 0.4)
+    keyless["conditions"] = {"live_search": False, "llm": False}
+    md = flywheel.render_report([keyless])
+    assert "store/cache only" in md and "heuristic fallbacks" in md
+
+    live = _record(0.4, 0.4)
+    live["conditions"] = {"live_search": True, "llm": True}
+    assert "live crawl ON" in flywheel.render_report([live])
+
+
+def test_report_renders_latency_without_false_precision():
+    rec = _record(0.4, 0.4)
+    rec["engines"]["moo"]["latency_ms"] = 2231.1
+    assert "| 2,231 |" in flywheel.render_report([rec])
+
+
+def test_report_with_no_history_is_still_valid():
+    assert "No runs recorded yet" in flywheel.render_report([])
+
+
+def test_write_report_creates_parent(tmp_path):
+    path = flywheel.write_report([_record(0.5, 0.5)], tmp_path / "sub" / "eval-trends.md")
+    assert path.exists() and "Latest head-to-head" in path.read_text(encoding="utf-8")

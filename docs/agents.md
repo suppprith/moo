@@ -118,7 +118,44 @@ single-shot `search` vs. `deep_research`:
 | tokens | 734 | 1676 |
 
 deep_research wins on source recall and grounding; contradiction recall is the
-gap to close (needs the LLM evidence linker + a broader corpus).
+gap to close (needs the LLM evidence linker + a broader corpus). That baseline
+was recorded against task set **v1.0** (5 database questions); the set has since
+grown, and scores are only comparable within a version.
+
+## The eval flywheel
+
+One benchmark run proves nothing about tomorrow's build, so the head-to-head is
+a standing job rather than a one-off:
+
+```bash
+uv run python -m app.eval.flywheel --gate --report ../docs/eval-trends.md
+```
+
+Every run scores each available engine — moo always, Exa and Tavily when
+`EXA_API_KEY` / `TAVILY_API_KEY` are set — on the golden task set, appends a
+timestamped record to `api/data/eval_history.jsonl` (machine-local, gitignored),
+and rewrites the committed report at [`eval-trends.md`](eval-trends.md). The
+report records the conditions of the run, because the same task set scores very
+differently store-only versus live, and a trend line that doesn't say which one
+it is means nothing.
+
+`--gate` exits non-zero when moo drops below 90% of its own previous score on
+coverage or source recall. It compares only against runs of the **same task-set
+version**, so growing the golden set can never fire a false regression. CI runs
+the gate logic as unit tests on every change and the real head-to-head on a
+weekly schedule ([`eval.yml`](../.github/workflows/eval.yml)).
+
+### Growing the golden set
+
+`app/eval/deep_research_tasks.json` is meant to grow: add a task when a real
+query exposes a gap — a domain moo answers badly, or a question where sources
+disagree and moo missed it. The rules live in the file's `growth_process` block;
+the short version is: stable kebab-case ids that are never reused, 3–5 lowercase
+rubric terms a correct answer contains and a wrong one doesn't, primary-source
+hosts in `key_source_hints`, and disputes only where sources genuinely conflict
+(an empty `disputed_hints` scores null, not zero). Tasks are authored from the
+question, never from moo's output — a task added because moo already passes it
+measures nothing. Adding tasks bumps the minor version and starts a new baseline.
 
 ## Reproducible demo
 

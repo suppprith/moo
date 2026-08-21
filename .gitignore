@@ -39,3 +39,6 @@ models/
 .idea/
 .DS_Store
 Thumbs.db
+
+# machine-local eval trend data; the rendered report (docs/eval-trends.md) is committed
+eval_history.jsonl
