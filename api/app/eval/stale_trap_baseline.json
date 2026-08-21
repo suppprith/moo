@@ -11,7 +11,7 @@
         "structural_flag_rate": 0.0,
         "silent_stale_rate": 0.0,
         "two_sided_rate": 0.0,
-        "latency_ms": 1719.6
+        "latency_ms": 2330.5
       },
       "rows": [
         {
@@ -405,19 +405,15 @@
     "llm": false
   },
   "gate": {
+    "status": "not_evaluated",
     "passed": false,
     "pass_bar": 0.7,
     "margin": 0.3,
     "checks": [
       {
-        "name": "moo pass rate",
-        "passed": false,
-        "detail": "best moo engine moo_fast flagged 0% of traps (bar 70%)"
-      },
-      {
-        "name": "margin over competitors",
+        "name": "live retrieval",
         "passed": null,
-        "detail": "no competitor keys set, head-to-head not evaluated"
+        "detail": "no search provider configured, so nothing was fetched \u2014 these traps ask what the live web says today, and a 0% here means the run proves nothing either way"
       }
     ]
   }

@@ -7,8 +7,9 @@ name: eval
 #              a broken gate is caught in seconds.
 #   `flywheel` runs on a schedule (and on demand). Scores moo against Exa/Tavily
 #              on the golden task set, fails on a regression versus moo's own
-#              last run of the same task-set version, and commits the refreshed
-#              trend report.
+#              last run of the same task-set version, runs the USP acceptance
+#              gate (does moo still catch stale answers the others repeat?), and
+#              commits the refreshed reports.
 #
 # The scheduled half needs a live search provider to mean anything: with no
 # provider moo answers store-only out of an empty CI database and every number
@@ -65,6 +66,9 @@ jobs:
       - name: Gate + report unit tests
         run: python -m pytest tests/test_flywheel.py tests/test_benchmark.py -q
 
+      - name: USP gate logic + trap set
+        run: python -m pytest tests/test_stale_traps.py -q
+
   flywheel:
     # Scheduled and manual only: a per-PR head-to-head would burn competitor
     # credits on every commit and tell us nothing a unit test doesn't.
@@ -115,23 +119,38 @@ jobs:
         working-directory: api
         run: uv run python -m app.eval.flywheel --gate --report ../docs/eval-trends.md
 
-      - name: Commit the refreshed trend report
-        if: steps.provider.outputs.ok == 'true' && github.ref == 'refs/heads/main'
+      # The USP acceptance gate: moo must catch stale answers that the others
+      # repeat. --strict because a run that could not be evaluated must not read
+      # as success here — this job only runs when a provider is configured, so
+      # "not evaluated" would mean something is broken.
+      - name: USP acceptance gate (stale-answer traps)
+        if: always() && steps.provider.outputs.ok == 'true'
+        working-directory: api
         run: |
-          if git diff --quiet -- docs/eval-trends.md; then
-            echo "trend report unchanged"
+          uv run python -m app.eval.stale_traps --gate --strict \
+            --save app/eval/stale_trap_baseline.json \
+            --transcript ../docs/stale-answer-demo.md
+
+      - name: Commit the refreshed reports
+        if: steps.provider.outputs.ok == 'true' && github.ref == 'refs/heads/main' && always()
+        run: |
+          paths="docs/eval-trends.md docs/stale-answer-demo.md api/app/eval/stale_trap_baseline.json"
+          if git diff --quiet -- $paths; then
+            echo "reports unchanged"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/eval-trends.md
-          git commit -m "Record this week's eval trends"
+          git add $paths
+          git commit -m "Record this week's eval trends and USP gate run"
           git push
 
-      - name: Upload the report
+      - name: Upload the reports
         if: steps.provider.outputs.ok == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-trends
-          path: docs/eval-trends.md
+          name: eval-reports
+          path: |
+            docs/eval-trends.md
+            docs/stale-answer-demo.md
           if-no-files-found: ignore

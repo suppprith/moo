@@ -5,6 +5,7 @@ import pytest
 from app.eval import stale_traps
 from app.eval.stale_traps import (
     engine_text,
+    format_gate,
     format_transcript,
     gate,
     load_traps,
@@ -160,6 +161,30 @@ def test_gate_uses_the_better_moo_engine():
     verdict = gate(result)
     assert verdict["passed"] is True
     assert "moo_deep" in verdict["checks"][0]["detail"]
+
+
+def test_gate_reports_pass_and_fail_as_a_status():
+    assert gate(_result(0.8))["status"] == "pass"
+    assert gate(_result(0.3))["status"] == "fail"
+
+
+def test_a_run_with_no_search_provider_is_not_a_failed_usp():
+    """Every trap asks what the live web says today. With nothing fetched, 0%
+    means the gate never ran — calling that a failure would cry wolf."""
+    result = _result(0.0)
+    result["config"] = {"engines": ["moo_fast"], "live_provider": None, "llm": False}
+    verdict = gate(result)
+
+    assert verdict["status"] == "not_evaluated"
+    assert verdict["passed"] is False
+    assert "nothing was fetched" in verdict["checks"][0]["detail"]
+    assert "NOT EVALUATED" in format_gate(verdict)
+
+
+def test_a_configured_provider_is_graded_normally():
+    result = _result(0.8)
+    result["config"] = {"engines": ["moo_fast"], "live_provider": "BraveProvider", "llm": True}
+    assert gate(result)["status"] == "pass"
 
 
 def test_transcript_records_what_each_engine_did():

@@ -22,7 +22,13 @@ without keys or network. Competitor columns appear when their keys are set.
     uv run python -m app.eval.stale_traps                  # every available engine
     uv run python -m app.eval.stale_traps --engines moo_fast --limit 5
     uv run python -m app.eval.stale_traps --gate           # exit 1 if the USP fails
+    uv run python -m app.eval.stale_traps --gate --strict  # ...or if it never ran
     uv run python -m app.eval.stale_traps --transcript docs/stale-answer-demo.md
+
+The gate has three outcomes, not two: pass, fail, and **not evaluated**. Every
+trap asks what the live web says today, so without a search provider nothing is
+fetched and every engine scores 0% — which says nothing about the USP. Reporting
+that as a failure would cry wolf; reporting it as a pass would be a lie.
 """
 
 from __future__ import annotations
@@ -193,7 +199,29 @@ def gate(result: dict, *, pass_bar: float = PASS_BAR,
     """Decide whether the USP survived. Two checks: moo clears the bar on its own,
     and it beats every competitor that ran by a wide margin. With no competitor
     keys the second check is reported as not evaluated rather than silently
-    passing."""
+    passing.
+
+    There is a third outcome besides pass and fail. Every trap asks what the live
+    web says today, so a run with no search provider retrieves nothing and scores
+    0% — which is not the USP failing, it is the USP not being tested. That run
+    returns ``status="not_evaluated"``: a launch gate that cannot tell "we broke
+    it" from "we never ran it" is not a gate."""
+    config = result.get("config") or {}
+    if config and not config.get("live_provider"):
+        return {
+            "status": "not_evaluated",
+            "passed": False,
+            "pass_bar": pass_bar,
+            "margin": margin,
+            "checks": [{
+                "name": "live retrieval",
+                "passed": None,
+                "detail": "no search provider configured, so nothing was fetched — "
+                          "these traps ask what the live web says today, and a 0% here "
+                          "means the run proves nothing either way",
+            }],
+        }
+
     engines = result.get("engines", {})
     moo = {name: data["summary"]["pass_rate"] for name, data in engines.items()
            if name in MOO_ENGINES and data["summary"]["pass_rate"] is not None}
@@ -229,8 +257,10 @@ def gate(result: dict, *, pass_bar: float = PASS_BAR,
                       f"the USP wording has to change before launch",
         })
 
+    passed = all(c["passed"] for c in checks if c["passed"] is not None)
     return {
-        "passed": all(c["passed"] for c in checks if c["passed"] is not None),
+        "status": "pass" if passed else "fail",
+        "passed": passed,
         "pass_bar": pass_bar,
         "margin": margin,
         "checks": checks,
@@ -255,8 +285,12 @@ def _pct(value: float | None) -> str:
     return "-" if value is None else f"{value:.0%}"
 
 
+_GATE_WORD = {"pass": "PASS", "fail": "FAIL", "not_evaluated": "NOT EVALUATED"}
+
+
 def format_gate(verdict: dict) -> str:
-    lines = ["", "USP gate: " + ("PASS" if verdict["passed"] else "FAIL")]
+    status = verdict.get("status") or ("pass" if verdict.get("passed") else "fail")
+    lines = ["", "USP gate: " + _GATE_WORD.get(status, status.upper())]
     for check in verdict["checks"]:
         mark = {True: "pass", False: "FAIL", None: "n/a "}[check["passed"]]
         lines.append(f"  [{mark}] {check['name']}: {check['detail']}")
@@ -362,6 +396,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-llm", action="store_true")
     parser.add_argument("--tasks", default=str(TASKS_PATH))
     parser.add_argument("--gate", action="store_true", help="exit 1 if the USP gate fails")
+    parser.add_argument("--strict", action="store_true",
+                        help="with --gate, also exit 1 when the gate could not be "
+                             "evaluated (no search provider). Use this for the launch "
+                             "check, where 'we never ran it' must not read as success")
     parser.add_argument("--save", default=None, help="write the full result JSON here")
     parser.add_argument("--transcript", default=None, help="write the markdown transcript here")
     args = parser.parse_args(argv)
@@ -394,7 +432,16 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.transcript).write_text(format_transcript(result, traps, verdict),
                                          encoding="utf-8")
         print(f"transcript -> {args.transcript}")
-    return 1 if (args.gate and not verdict["passed"]) else 0
+
+    if not args.gate:
+        return 0
+    status = verdict.get("status", "fail")
+    if status == "fail":
+        return 1
+    if status == "not_evaluated":
+        print("\nset MOO_SEARXNG_URL or MOO_BRAVE_API_KEY to actually test the USP")
+        return 1 if args.strict else 0
+    return 0
 
 
 if __name__ == "__main__":

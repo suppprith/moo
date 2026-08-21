@@ -185,6 +185,32 @@ version**, so growing the golden set can never fire a false regression. CI runs
 the gate logic as unit tests on every change and the real head-to-head on a
 weekly schedule ([`eval.yml`](../.github/workflows/eval.yml)).
 
+### The USP acceptance gate
+
+A separate harness tests moo's one falsifiable claim: given a query whose
+popular answer is out of date, moo returns the current one **and** marks the old
+one superseded, where a general web search repeats the stale answer with no
+warning.
+
+```bash
+uv run python -m app.eval.stale_traps --gate --transcript ../docs/stale-answer-demo.md
+```
+
+`stale_trap_tasks.json` holds 18 verified traps — deprecated APIs, changed
+defaults, removed flags — each with the stale answer, the current one, and where
+the change is documented. An engine passes a trap by surfacing the current answer
+and flagging the old one, either structurally (a disputed point, a superseded
+claim, a version-outdated source — only moo emits these) or textually (naming the
+old thing next to a staleness cue, which any engine can do and which counts
+honestly when a competitor does it).
+
+The gate has **three** outcomes, not two. Every trap asks what the live web says
+today, so a run with no search provider fetches nothing, scores 0%, and proves
+nothing — that returns `not_evaluated` rather than `fail`. A launch gate that
+cannot tell "we broke it" from "we never ran it" is not a gate. `--strict` turns
+a non-evaluated run into a failure, which is what CI uses, since CI only runs this
+when a provider is configured.
+
 ### Growing the golden set
 
 `app/eval/deep_research_tasks.json` is meant to grow: add a task when a real
