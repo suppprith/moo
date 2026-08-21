@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 import queue
 import threading
 
-from . import accounts, auth, credits, ids, metrics, pages
+from . import accounts, auth, credits, feedback, ids, metrics, pages
 from .db import get_connection
 from .errors import ApiError, code_for_status, envelope, new_request_id
 from .extract import MAX_URLS as EXTRACT_MAX_URLS, extract_urls
@@ -327,6 +327,34 @@ def account_usage(request: Request) -> dict:
         if row is None:
             raise ApiError("unauthorized", "missing or invalid API key")
         return credits.account_view(conn, row)
+    finally:
+        conn.close()
+
+
+class FeedbackRequest(BaseModel):
+    handles: list[str] = Field(
+        ..., min_length=1, max_length=feedback.MAX_TARGETS,
+        description="`doc_`/`chk_` handles from a previous response",
+    )
+    signal: Literal["cited", "fetched", "helpful", "unhelpful"] = "cited"
+
+
+@app.post("/v1/feedback")
+def feedback_post(req: FeedbackRequest) -> dict:
+    """Tell moo which returned sources were actually useful, so ranking learns
+    what agents cite for software questions.
+
+    Send handles only — never the query, and never anything about the caller.
+    Counters are per source, local to this instance, and off unless
+    `MOO_FEEDBACK=1`; see docs/privacy.md for exactly what is and isn't kept."""
+    if not feedback.enabled():
+        raise ApiError(
+            "invalid_request",
+            "feedback capture is off on this instance; set MOO_FEEDBACK=1 to collect it",
+        )
+    conn = get_connection()
+    try:
+        return feedback.record(conn, req.handles, req.signal)
     finally:
         conn.close()
 

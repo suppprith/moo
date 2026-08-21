@@ -19,7 +19,7 @@ def _no_real_db(monkeypatch):
 
 
 _TOOLS = {"search", "extract", "fetch_source", "get_claim", "list_contradictions",
-          "expand_graph", "deep_research", "research_status"}
+          "expand_graph", "deep_research", "research_status", "report_useful"}
 
 
 def test_server_smoke_lists_tools():

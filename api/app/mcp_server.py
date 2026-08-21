@@ -128,6 +128,33 @@ def fetch_source(handle: str, max_tokens: int = budget.DEFAULT_MAX_TOKENS) -> di
 
 
 @mcp.tool()
+def report_useful(
+    handles: list[str],
+    signal: Literal["cited", "fetched", "helpful", "unhelpful"] = "cited",
+) -> dict:
+    """Tell moo which of the sources it returned you actually used, so its
+    ranking learns what is worth reading for software questions.
+
+    Pass the `doc_`/`chk_` handles you cited or relied on — after you have
+    written your answer, not before. Send handles only: never the question, and
+    nothing about yourself. moo keeps a per-source counter, locally, and nothing
+    else; there is no row to tie a signal back to a query.
+
+    Returns `{recorded: 0, disabled: true}` when the instance is not collecting
+    (the default). That is not an error — just carry on.
+    """
+    from . import feedback
+
+    if not feedback.enabled():
+        return {"recorded": 0, "signal": signal, "disabled": True}
+    conn = _plain_conn()
+    try:
+        return feedback.record(conn, handles, signal)
+    finally:
+        conn.close()
+
+
+@mcp.tool()
 def extract(
     urls: list[str],
     depth: Literal["raw", "claims"] = "raw",

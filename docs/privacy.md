@@ -1,9 +1,13 @@
 # Privacy
 
-Your queries are not stored. Not for training, not for analytics, not for a
-ranking flywheel, not for a "we may retain content to improve the service"
-clause. This page says exactly what does get stored, so you can check it against
-the code rather than trusting a promise.
+Your queries are not stored. Not for training, not for analytics, not for
+ranking, not for a "we may retain content to improve the service" clause. This
+page says exactly what does get stored, so you can check it against the code
+rather than trusting a promise.
+
+One feature does feed ranking — the usefulness signal below — and it is off
+unless you turn it on, keeps counters per source rather than per request, and
+still never sees a query.
 
 ## Searches
 
@@ -39,6 +43,39 @@ documents, not anything about you. Which pages get fetched follows from the
 query, which is why the cache is worth understanding: on a shared instance, the
 set of cached pages is a weak signal about what has been searched. On your own
 instance, it is only ever your own.
+
+## The usefulness signal
+
+An agent can tell moo which of the sources it returned were actually cited
+(`POST /v1/feedback`, or the `report_useful` MCP tool), so ranking learns which
+pages are worth reading for software questions. This is **off by default** and
+turns on with `MOO_FEEDBACK=1`.
+
+What a signal writes is one counter per source:
+
+| column | holds |
+| --- | --- |
+| `kind`, `target_id` | which chunk or document |
+| `signal` | `cited`, `fetched`, `helpful`, `unhelpful` |
+| `count` | how many times |
+| `last_seen` | a **date**, not a timestamp |
+
+What the table cannot hold, because the columns do not exist: the query or any
+part or hash of it, the API key, a session or request id, an address, or a time
+of day. There is no row per event, so it cannot be replayed as a sequence — it
+says "this page was cited forty times", never "someone asked X then read Y".
+Nothing about the caller reaches the module that writes it.
+
+Turning it on is still a real choice, and here is the honest cost: on a
+single-user instance, a count of 1 against an obscure page does say that you
+read that page. Aggregate counters blur into anonymity with many users and not
+with one. That is why the default is off rather than on, and why the counters
+never leave your machine — nothing is uploaded, pooled across installs, or
+shared.
+
+`uv run python -m app.feedback` prints everything the store has learned, and
+`--forget` deletes all of it. Ranking reads the table only while capture is on,
+so a store that never opted in ranks exactly as it did before this existed.
 
 ## Accounts
 

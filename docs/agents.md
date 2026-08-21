@@ -57,6 +57,7 @@ OpenAI-style tool defs at `/v1/tools`). See the
 | `expand_graph` | `node` | Entity neighborhood (by `ent_` handle or name): typed relations, claim-annotated. |
 | `deep_research` | `question, k, max_steps, max_seconds, max_tokens, output_schema` | `{run_id, status, partial, executive_answer, findings[], disputed_points[], open_questions[], sources[], groundedness}`. Streams MCP progress. Pass `output_schema` (JSON schema) for a caller-shaped `structured` section: `structured.grounding` traces every field to `clm_` handles; untraceable fields come back null (`ungrounded_fields`), never fabricated. |
 | `research_status` | `run_id, max_tokens` | Re-fetch a run's status + report (poll a long run or re-read a finished one). |
+| `report_useful` | `handles[], signal=cited\|fetched\|helpful\|unhelpful` | Report which returned sources you actually used, after answering. Nudges ranking toward what agents cite for software questions. Off unless the instance sets `MOO_FEEDBACK=1`, in which case it returns `{disabled: true}` and is safe to call anyway. Handles only — no query, nothing about the caller ([privacy](privacy.md#the-usefulness-signal)). HTTP twin: `POST /v1/feedback`. |
 
 Every handle is opaque and stable (`chk_`/`clm_`/`doc_`/`ent_`); pass it back to
 `fetch_source`/`get_claim`/`expand_graph` to drill in. Results respect

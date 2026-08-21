@@ -34,6 +34,36 @@
         "title": "ExtractRequest",
         "type": "object"
       },
+      "FeedbackRequest": {
+        "properties": {
+          "handles": {
+            "description": "`doc_`/`chk_` handles from a previous response",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Handles",
+            "type": "array"
+          },
+          "signal": {
+            "default": "cited",
+            "enum": [
+              "cited",
+              "fetched",
+              "helpful",
+              "unhelpful"
+            ],
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handles"
+        ],
+        "title": "FeedbackRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -983,6 +1013,47 @@
           }
         },
         "summary": "Extract Post"
+      }
+    },
+    "/v1/feedback": {
+      "post": {
+        "description": "Tell moo which returned sources were actually useful, so ranking learns\nwhat agents cite for software questions.\n\nSend handles only \u2014 never the query, and never anything about the caller.\nCounters are per source, local to this instance, and off unless\n`MOO_FEEDBACK=1`; see docs/privacy.md for exactly what is and isn't kept.",
+        "operationId": "feedback_post_v1_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Feedback Post V1 Feedback Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feedback Post"
       }
     },
     "/v1/tools": {

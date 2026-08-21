@@ -84,6 +84,7 @@ class RetrievedChunk:
     suspicious: bool = False
     rank_signals: dict | None = None
     alternates: list[int] = field(default_factory=list)
+    usefulness: float = 0.0  # net opt-in signal; 0.0 on stores that never collected
 
 
 def _rrf_merge(
@@ -113,6 +114,7 @@ def _hydrate(conn: sqlite3.Connection, chunk_ids: list[int]) -> dict[int, sqlite
     rows = conn.execute(
         f"""
         SELECT ch.id, ch.text, ch.heading, ch.url_anchor, ch.canonical_chunk_id,
+               ch.document_id,
                d.source_type, d.url AS document_url, d.title, d.published_at,
                d.author_role, d.popularity, d.trust_score, d.fetched_at,
                json_extract(d.metadata, '$.suspicious') AS suspicious_cats
@@ -163,19 +165,27 @@ def _recency_factor(published_at: str | None) -> float:
 
 
 def fuse(hit: RetrievedChunk) -> None:
-    """Blend trust, corroboration and recency into the hit's score, in place,
-    recording the components on ``rank_signals``."""
+    """Blend trust, corroboration, recency and usefulness into the hit's score,
+    in place, recording the components on ``rank_signals``.
+
+    Usefulness is the opt-in signal from :mod:`app.feedback` and is exactly 1.0
+    unless this store collected some, so a store that never opted in ranks
+    bit-for-bit as it did before the signal existed."""
+    from .feedback import usefulness_factor
+
     rrf = hit.score
     trust = hit.trust_score if hit.trust_score is not None else 0.5
     trust_f = 1.0 + W_TRUST * (trust - 0.5)
     corroboration_f = 1.0 + W_CORROBORATION * math.log2(1 + len(hit.alternates))
     recency_f = _recency_factor(hit.published_at)
-    hit.score = rrf * trust_f * corroboration_f * recency_f
+    usefulness_f = usefulness_factor(hit.usefulness)
+    hit.score = rrf * trust_f * corroboration_f * recency_f * usefulness_f
     hit.rank_signals = {
         "rrf": round(rrf, 6),
         "trust": round(trust_f, 4),
         "corroboration": round(corroboration_f, 4),
         "recency": round(recency_f, 4),
+        "usefulness": round(usefulness_f, 4),
         "fused": round(hit.score, 6),
     }
 
@@ -248,7 +258,12 @@ def retrieve(
             break
 
     if fuse_signals:
+        from .feedback import usefulness as usefulness_signal
+
+        doc_of = {cid: rows[cid]["document_id"] for cid in (h.chunk_id for h in out)}
+        priors = usefulness_signal(conn, [h.chunk_id for h in out], doc_of)
         for hit in out:
+            hit.usefulness = priors.get(hit.chunk_id, 0.0)
             fuse(hit)
         out.sort(key=lambda h: -h.score)
     return out[:k]
