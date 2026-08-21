@@ -31,11 +31,10 @@ import logging
 import os
 import sqlite3
 import threading
-from pathlib import Path
+
+from .env import load_dotenv
 
 log = logging.getLogger("moo.llm")
-
-_API_DIR = Path(__file__).resolve().parent.parent
 
 _DEFAULT_MODELS = {
     "gemini": "gemini-2.5-flash",
@@ -54,22 +53,6 @@ _KEYLESS_OK = {"ollama", "openai-compatible"}
 _FALLBACK_MODEL = _DEFAULT_MODELS["gemini"]
 
 
-def _load_dotenv() -> None:
-    """Best-effort: populate env from api/.env if not already set."""
-    env_path = _API_DIR / ".env"
-    if not env_path.exists():
-        return
-    try:
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key, value = key.strip(), value.strip().strip("'\"")
-            if key and key not in os.environ:
-                os.environ[key] = value
-    except OSError:
-        pass
 
 
 _config: dict | None = None
@@ -95,7 +78,7 @@ def _resolve_config() -> dict | None:
     if _config_checked:
         return _config
     _config_checked = True
-    _load_dotenv()
+    load_dotenv()
 
     provider = (os.environ.get("MOO_LLM_PROVIDER") or "").strip().lower() or _infer_provider()
     if provider is None:

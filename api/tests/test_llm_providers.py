@@ -12,7 +12,7 @@ _ENV = ["MOO_LLM_PROVIDER", "MOO_LLM_API_KEY", "MOO_LLM_MODEL", "MOO_LLM_BASE_UR
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    monkeypatch.setattr(llm, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(llm, "load_dotenv", lambda: 0)
     for v in _ENV:
         monkeypatch.delenv(v, raising=False)
     llm._reset_config()

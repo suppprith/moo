@@ -19,12 +19,20 @@ You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/suppprith/moo.git
 cd moo/api
 uv sync
+uv run moo setup
+uv run moo "how does sqlite wal mode work"
 ```
 
-That is the whole install. The database is created and migrated on first run, so
-there is no init step to forget.
+That is the whole install. `moo setup` asks two optional questions, writes
+`api/.env`, and prints the line that connects your agent; the database is created
+and migrated on first use, so there is no init step to forget. Skipping setup
+entirely is a supported answer — moo runs keyless.
 
-Two optional pieces make moo better. Neither is required to run it.
+On this machine the first query returns in about 18 seconds and later ones in
+about 15, most of it loading the embedding model; the very first run also
+downloads that model (~130 MB) once.
+
+The two optional pieces, if you want them:
 
 **A discovery provider** switches on live retrieval. Without one, moo answers out
 of whatever it has already fetched and cached.
@@ -40,16 +48,19 @@ export MOO_BRAVE_API_KEY=BSA...
 
 **An LLM key** sharpens query expansion, claim extraction, evidence linking and
 the written answer. Bring whichever you already have: Gemini, OpenAI, Anthropic,
-Ollama, or any OpenAI-compatible server. Copy `api/.env.example` to `api/.env` and
-fill in one block. With no key at all, every LLM stage falls back to a
-deterministic heuristic, so the pipeline still runs end to end; it just reasons
-less well.
+Ollama, or any OpenAI-compatible server. With no key at all, every LLM stage falls
+back to a deterministic heuristic, so the pipeline still runs end to end; it just
+reasons less well.
 
-Check that it works:
+Either can be set through `moo setup`, exported in your shell, or written into
+`api/.env` (copy `api/.env.example`) — the file is read before anything asks what
+is configured, and a real environment variable always wins over it.
+
+Check what moo thinks it has, and that it works:
 
 ```bash
+uv run moo setup --status
 uv run pytest
-uv run moo "how does sqlite wal mode work"
 ```
 
 ## Connect an agent (MCP)
@@ -59,7 +70,8 @@ uv run python -m app.mcp_server          # stdio, zero install
 uv tool install .                        # or install it, then: moo-mcp [--http]
 ```
 
-**Claude Code**
+**Claude Code** — `uv run moo setup --print-config` prints this line with your
+own path already filled in:
 
 ```bash
 claude mcp add moo -- uv run --directory "/abs/path/to/moo/api" python -m app.mcp_server

@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 
 from .db import DEFAULT_DB_PATH, migrate
+from .env import load_dotenv
 
 log = logging.getLogger("moo.bootstrap")
 
@@ -63,7 +64,12 @@ def warm_models(model_name: str | None = None) -> bool:
 
 def ensure_ready(db_path: Path | str = DEFAULT_DB_PATH, *, quiet: bool = False) -> dict:
     """Create/migrate the database and surface config hints. Idempotent —
-    safe to call on every start. Returns {migrations_applied, hints}."""
+    safe to call on every start. Returns {migrations_applied, hints}.
+
+    The env file is read first, before anything asks what is configured:
+    otherwise a key sitting in ``api/.env`` is invisible to whichever stage
+    happens to run first, and the hints below contradict the file."""
+    load_dotenv()
     applied = migrate(db_path)
     hints = config_hints()
     if not quiet:

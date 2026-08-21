@@ -1,5 +1,6 @@
 """``moo`` — search the web from your terminal.
 
+    moo setup                                    # first run: keys + MCP config
     moo "why do my containers randomly exit"
 
 Prints a cited answer as markdown (mode ``full``), or ranked sources
@@ -22,6 +23,16 @@ import json
 import os
 import sys
 import webbrowser
+
+
+def use_utf8_stdout() -> None:
+    """Windows consoles default to a codepage that mangles the em dashes and
+    box characters moo prints; best effort, never fatal."""
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _c(code: str, s: str, color: bool) -> str:
@@ -117,6 +128,15 @@ def _search_inprocess(args) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # `moo setup` is the only subcommand: everything else is a query, and
+    # making the query a subcommand would cost every user a word forever.
+    use_utf8_stdout()
+    args_in = sys.argv[1:] if argv is None else list(argv)
+    if args_in and args_in[0] == "setup":
+        from .setup_wizard import main as setup_main
+
+        return setup_main(args_in[1:])
+
     parser = argparse.ArgumentParser(
         prog="moo", description="Live web search for software questions, with receipts.",
         epilog='query operators: type:docs,so,issue,pr,blog,github | site:host.com | '
@@ -132,13 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-live", action="store_true", help="local store only (skip live fetch)")
     parser.add_argument("--url", default=os.environ.get("MOO_URL"),
                         help="running moo instance to query (default: run in-process)")
-    args = parser.parse_args(argv)
-
-    if sys.platform == "win32":
-        try:
-            sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:  # noqa: BLE001
-            pass
+    args = parser.parse_args(args_in)
 
     try:
         response = _search_http(args.url, args) if args.url else _search_inprocess(args)
