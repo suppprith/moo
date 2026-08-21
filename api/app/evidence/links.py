@@ -6,8 +6,14 @@ detection is the differentiator — contradicting evidence is stored, never
 dropped, so the UI can surface disagreement instead of averaging it away.
 
 Primary path is a batched Gemini call per claim; a heuristic fallback uses
-embedding similarity plus contrast/causal lexical cues so the edge graph
-exists without credentials (coarser, but contradictions still surface).
+embedding similarity plus polarity opposition (:mod:`.opposition`) so the edge
+graph exists without credentials — coarser, but a contradiction edge means the
+source actually says the opposite, not merely that it contains the word "not".
+
+The keyless path compares **assertion to assertion**: a candidate chunk is
+tested through the claims already extracted from it, falling back to its
+sentences. Comparing a claim against 600 characters of prose was the old bug —
+somewhere in that much text there is always a negation.
 
 Run:  ``uv run python -m app.evidence.links``  (link all claims)
 """
@@ -24,19 +30,17 @@ import numpy as np
 from .. import llm
 from ..embed import embed_texts
 from ..retrieve import retrieve
+from . import opposition
+from .claims import _sentences
 
 log = logging.getLogger("moo.links")
 
 PER_CLAIM = 6
-MIN_RELATED = 0.30
-SUPPORT_SIM = 0.55
+STRONG_SUPPORT_SIM = 0.55  # this close, the chunk is restating the claim
+EXPLAIN_SIM = 0.40         # this close and giving a reason, it explains it
+SUPPORT_SIM = 0.45         # weaker restatement, once explanation is ruled out
+MAX_ASSERTIONS = 8
 
-_CONTRAST = re.compile(
-    r"\b(but|however|unlike|whereas|instead|although|though|conversely|"
-    r"on the other hand|not|isn't|aren't|won't|doesn't|don't|can't|never|"
-    r"worse|slower|avoid|myth|actually)\b",
-    re.I,
-)
 _CAUSAL = re.compile(
     r"\b(because|due to|since|reason|caused by|so that|as a result|explains?)\b", re.I
 )
@@ -77,16 +81,36 @@ Chunks:
 {chunks}"""
 
 
-def _classify_heuristic(chunk_text: str, sim: float) -> tuple[str, float] | None:
-    contrast = bool(_CONTRAST.search(chunk_text))
-    causal = bool(_CAUSAL.search(chunk_text))
-    if sim >= SUPPORT_SIM and not contrast:
+def _assertions(chunk_text: str, claim_texts: list[str] | None = None) -> list[str]:
+    """What this chunk actually asserts. Prefer the claims already extracted
+    from it — they are single assertions — and fall back to its sentences."""
+    if claim_texts:
+        return claim_texts[:MAX_ASSERTIONS]
+    return _sentences(chunk_text)[:MAX_ASSERTIONS] or [chunk_text]
+
+
+def _classify_heuristic(
+    claim_text: str, chunk_text: str, sim: float, claim_texts: list[str] | None = None,
+    *, allow_contradiction: bool = True,
+) -> tuple[str, float] | None:
+    """Relate one candidate chunk to the claim, without a model.
+
+    Contradiction is checked assertion by assertion: the chunk contradicts the
+    claim when something it asserts is the *opposite* of the claim, not when it
+    happens to contain a contrast word. ``allow_contradiction=False`` is for
+    chunks from the claim's own document — a page that qualifies its own
+    statement ("...but not on Windows") is one voice, not a disagreement, and
+    counting it as one lets a single source manufacture a dispute."""
+    if allow_contradiction:
+        for assertion in _assertions(chunk_text, claim_texts):
+            opposed = opposition.opposes(claim_text, assertion, sim=sim)
+            if opposed:
+                return "contradicts", opposed[1]
+    if sim >= STRONG_SUPPORT_SIM:
         return "supports", round(sim, 3)
-    if contrast and MIN_RELATED <= sim < 0.65:
-        return "contradicts", round(0.35 + 0.35 * sim, 3)
-    if causal and sim >= 0.40:
+    if _CAUSAL.search(chunk_text) and sim >= EXPLAIN_SIM:
         return "explains", round(0.3 + 0.4 * sim, 3)
-    if sim >= 0.45:
+    if sim >= SUPPORT_SIM:
         return "supports", round(sim, 3)
     return None
 
@@ -102,6 +126,41 @@ def _candidates(conn: sqlite3.Connection, claim_text: str, claim_id: int) -> lis
     seen = {cid for cid, _ in pairs}
     pairs.extend((r["id"], r["text"]) for r in own if r["id"] not in seen)
     return pairs
+
+
+def _claims_by_chunk(
+    conn: sqlite3.Connection, chunk_ids: list[int], *, exclude_claim_id: int | None = None
+) -> dict[int, list[str]]:
+    """The claims already extracted from each candidate chunk, so opposition is
+    judged assertion against assertion. The claim being linked is excluded — a
+    claim never contradicts itself through its own source."""
+    if not chunk_ids:
+        return {}
+    qmarks = ",".join("?" * len(chunk_ids))
+    params: list = list(chunk_ids)
+    sql = (
+        f"SELECT cc.chunk_id, c.text FROM claim_chunk cc JOIN claim c ON c.id = cc.claim_id "
+        f"WHERE cc.chunk_id IN ({qmarks})"
+    )
+    if exclude_claim_id is not None:
+        sql += " AND c.id != ?"
+        params.append(exclude_claim_id)
+    out: dict[int, list[str]] = {}
+    for row in conn.execute(sql, params):
+        out.setdefault(row["chunk_id"], []).append(row["text"])
+    return out
+
+
+def _claim_documents(conn: sqlite3.Connection, claim_id: int) -> set[int]:
+    """The documents this claim was extracted from."""
+    return {
+        r["document_id"]
+        for r in conn.execute(
+            "SELECT ch.document_id FROM claim_chunk cc JOIN chunk ch ON ch.id = cc.chunk_id "
+            "WHERE cc.claim_id = ?",
+            (claim_id,),
+        )
+    }
 
 
 def _llm_edges(
@@ -128,19 +187,24 @@ def link_claim(conn: sqlite3.Connection, claim_id: int, claim_text: str, *, use_
         cvec = embed_texts([claim_text])[0]
         ids = [cid for cid, _ in candidates]
         qmarks = ",".join("?" * len(ids))
-        emb = {
-            r["id"]: np.frombuffer(r["embedding"], dtype=np.float32)
-            for r in conn.execute(
-                f"SELECT id, embedding FROM chunk WHERE id IN ({qmarks}) AND embedding IS NOT NULL",
-                ids,
-            )
-        }
+        emb, doc_of = {}, {}
+        for r in conn.execute(
+            f"SELECT id, document_id, embedding FROM chunk WHERE id IN ({qmarks})", ids
+        ):
+            doc_of[r["id"]] = r["document_id"]
+            if r["embedding"] is not None:
+                emb[r["id"]] = np.frombuffer(r["embedding"], dtype=np.float32)
+        chunk_claims = _claims_by_chunk(conn, ids, exclude_claim_id=claim_id)
+        own_docs = _claim_documents(conn, claim_id)
         edges = []
         for cid, text in candidates:
             if cid not in emb:
                 continue
             sim = float(cvec @ emb[cid])
-            result = _classify_heuristic(text, sim)
+            result = _classify_heuristic(
+                claim_text, text, sim, chunk_claims.get(cid),
+                allow_contradiction=doc_of.get(cid) not in own_docs,
+            )
             if result:
                 rel, strength = result
                 edges.append({"chunk_id": cid, "relation": rel, "strength": strength})
@@ -157,7 +221,15 @@ def link_claim(conn: sqlite3.Connection, claim_id: int, claim_text: str, *, use_
     return counts
 
 
-def link_all(conn: sqlite3.Connection, *, use_llm: bool = True) -> dict[str, int]:
+def link_all(conn: sqlite3.Connection, *, use_llm: bool = True,
+             rebuild: bool = False) -> dict[str, int]:
+    """Link every claim. ``rebuild`` drops the existing edges first — edges are
+    written with INSERT OR IGNORE, so without it a store keeps whatever a
+    previous (or worse) classifier decided."""
+    if rebuild:
+        deleted = conn.execute("DELETE FROM evidence").rowcount
+        conn.commit()
+        log.info("cleared %d existing evidence edge(s)", deleted)
     claims = conn.execute("SELECT id, text FROM claim").fetchall()
     totals: dict[str, int] = {}
     for c in claims:
@@ -169,13 +241,15 @@ def link_all(conn: sqlite3.Connection, *, use_llm: bool = True) -> dict[str, int
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.evidence.links", description="Link evidence edges")
     parser.add_argument("--no-llm", action="store_true")
+    parser.add_argument("--rebuild", action="store_true",
+                        help="delete existing evidence edges before relinking")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 
     from ..index.vector import connect
 
     conn = connect()
-    totals = link_all(conn, use_llm=not args.no_llm)
+    totals = link_all(conn, use_llm=not args.no_llm, rebuild=args.rebuild)
     print(f"evidence edges: {totals or 'none'}")
     conn.close()
     return 0

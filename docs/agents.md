@@ -103,24 +103,64 @@ Nothing in a report is asserted without a traceable source. Claims are grounded
 in their source chunks at extraction; the report carries a `groundedness` summary
 and flags any finding that fails citation integrity. Uncited claims never ship.
 
+## How a contradiction is detected
+
+A contradiction edge means a source *asserts the opposite*, and the bar is the
+same with or without an LLM key. With a key, the evidence linker classifies each
+candidate chunk against the claim. Without one, the keyless path checks polarity
+opposition ([`opposition.py`](../api/app/evidence/opposition.py)) and requires
+three things to line up:
+
+1. **same subject** — embedding similarity above a floor, so opposite polarity
+   about two different topics is not mistaken for disagreement;
+2. **opposite assertion** — a negation mismatch on a restated claim, or an
+   antonym conflict (faster/slower, recommended/deprecated), compared
+   **assertion against assertion** using the claims already extracted from the
+   candidate chunk rather than against a paragraph of prose;
+3. **two independent voices** — a page qualifying its own statement is one
+   voice; contradiction edges are only drawn across documents, and a claim is
+   flagged `disputed` only with mass on both sides from independent sources.
+
+None of that is negotiable for a metric's sake. The rule this replaced fired on
+any contrast word ("but", "not", "however") in a related chunk, which is most
+technical prose: it produced 305 contradiction edges over a 79-document store,
+of which none was a real disagreement. Detecting fewer, real contradictions is
+the point — a store full of fake disputes is worse than an empty one, because an
+agent cannot tell them apart.
+
 ## Benchmark
 
 `app/eval/deep_research_tasks.json` + `uv run python -m app.eval.benchmark`.
-Recorded baseline (heuristic, no LLM key — [`baseline.json`](../api/app/eval/baseline.json)),
-single-shot `search` vs. `deep_research`:
+Recorded baseline (task set **v1.1**, 13 tasks, heuristic — no LLM key, no search
+provider, answering out of a 79-document local store —
+[`baseline.json`](../api/app/eval/baseline.json)), single-shot `search` vs.
+`deep_research`:
 
 | metric | search | deep_research |
 | --- | --- | --- |
-| coverage | 0.40 | 0.42 |
+| coverage | 0.24 | 0.20 |
 | citation_accuracy | — | 1.00 |
-| source_recall | 0.00 | 0.47 |
+| source_recall | 0.00 | 0.22 |
 | contradiction_recall | 0.00 | 0.00 |
-| tokens | 734 | 1676 |
+| tokens | 933 | 1799 |
 
-deep_research wins on source recall and grounding; contradiction recall is the
-gap to close (needs the LLM evidence linker + a broader corpus). That baseline
-was recorded against task set **v1.0** (5 database questions); the set has since
-grown, and scores are only comparable within a version.
+deep_research wins on source recall and grounding. Two numbers need saying
+plainly rather than being explained away:
+
+- **Coverage is low because eight of the thirteen tasks are outside what that
+  local store contains** (Node, Rust, Kubernetes, HTTP caching). Keyless and
+  provider-less, moo answers from what it has already fetched; the live-crawl
+  path is what those tasks are for, and it needs a search provider.
+- **contradiction_recall is 0.00, and it was 0.00 before too** — but for a
+  different reason than it looked. The old keyless classifier reported 305
+  contradiction edges over this store and 35 disputed claims; on inspection
+  every one was a false positive (see "How a contradiction is detected"). The
+  current rule reports none, which is the honest count for a store where no two
+  independent sources address the same question. Moving this metric needs more
+  sources per question — the live path or an LLM key — not a looser rule.
+
+Scores are only comparable within a task-set version; the v1.0 baseline (5
+database questions) is in git history.
 
 ## The eval flywheel
 

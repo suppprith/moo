@@ -1,26 +1,26 @@
 {
-  "n_tasks": 5,
+  "n_tasks": 13,
   "k": 5,
   "max_steps": 3,
   "rows": [
     {
       "id": "pg-vs-mysql-joins",
       "deep_research": {
-        "coverage": 0.6,
+        "coverage": 0.4,
         "citation_accuracy": 1.0,
         "source_recall": 0.333,
         "contradiction_recall": 0.0,
-        "tokens": 1453,
+        "tokens": 1423,
         "steps": 3,
-        "elapsed_ms": 26075.1,
+        "elapsed_ms": 14839.4,
         "status": "partial"
       },
       "search": {
-        "coverage": 0.6,
+        "coverage": 0.4,
         "citation_accuracy": null,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 548
+        "tokens": 721
       }
     },
     {
@@ -30,9 +30,9 @@
         "citation_accuracy": 1.0,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 2011,
+        "tokens": 1624,
         "steps": 3,
-        "elapsed_ms": 3761.5,
+        "elapsed_ms": 1842.2,
         "status": "partial"
       },
       "search": {
@@ -40,7 +40,7 @@
         "citation_accuracy": null,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 803
+        "tokens": 801
       }
     },
     {
@@ -50,9 +50,9 @@
         "citation_accuracy": 1.0,
         "source_recall": 1.0,
         "contradiction_recall": null,
-        "tokens": 1966,
+        "tokens": 1956,
         "steps": 3,
-        "elapsed_ms": 2376.3,
+        "elapsed_ms": 2396.8,
         "status": "partial"
       },
       "search": {
@@ -60,7 +60,7 @@
         "citation_accuracy": null,
         "source_recall": 0.0,
         "contradiction_recall": null,
-        "tokens": 907
+        "tokens": 1044
       }
     },
     {
@@ -70,17 +70,17 @@
         "citation_accuracy": 1.0,
         "source_recall": 1.0,
         "contradiction_recall": 0.0,
-        "tokens": 2029,
+        "tokens": 1762,
         "steps": 3,
-        "elapsed_ms": 3754.8,
+        "elapsed_ms": 3574.7,
         "status": "partial"
       },
       "search": {
-        "coverage": 0.25,
+        "coverage": 1.0,
         "citation_accuracy": null,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 783
+        "tokens": 998
       }
     },
     {
@@ -90,9 +90,9 @@
         "citation_accuracy": 1.0,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 920,
+        "tokens": 1425,
         "steps": 3,
-        "elapsed_ms": 539.1,
+        "elapsed_ms": 985.0,
         "status": "partial"
       },
       "search": {
@@ -100,25 +100,185 @@
         "citation_accuracy": null,
         "source_recall": 0.0,
         "contradiction_recall": 0.0,
-        "tokens": 630
+        "tokens": 966
+      }
+    },
+    {
+      "id": "python-gil-threads",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1670,
+        "steps": 3,
+        "elapsed_ms": 4215.2,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 995
+      }
+    },
+    {
+      "id": "git-rebase-vs-merge",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.5,
+        "contradiction_recall": 0.0,
+        "tokens": 2416,
+        "steps": 3,
+        "elapsed_ms": 4288.9,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 976
+      }
+    },
+    {
+      "id": "node-esm-cjs",
+      "deep_research": {
+        "coverage": 0.2,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 2126,
+        "steps": 3,
+        "elapsed_ms": 3876.5,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 948
+      }
+    },
+    {
+      "id": "http-cache-control",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1936,
+        "steps": 3,
+        "elapsed_ms": 3334.4,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 955
+      }
+    },
+    {
+      "id": "docker-image-size",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 2180,
+        "steps": 3,
+        "elapsed_ms": 3789.4,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 746
+      }
+    },
+    {
+      "id": "k8s-liveness-readiness",
+      "deep_research": {
+        "coverage": 0.0,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1588,
+        "steps": 3,
+        "elapsed_ms": 3800.1,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.0,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1032
+      }
+    },
+    {
+      "id": "rust-arc-vs-rc",
+      "deep_research": {
+        "coverage": 0.25,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1843,
+        "steps": 3,
+        "elapsed_ms": 3655.9,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.25,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1014
+      }
+    },
+    {
+      "id": "react-usememo",
+      "deep_research": {
+        "coverage": 0.25,
+        "citation_accuracy": 1.0,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 1442,
+        "steps": 3,
+        "elapsed_ms": 4169.8,
+        "status": "partial"
+      },
+      "search": {
+        "coverage": 0.25,
+        "citation_accuracy": null,
+        "source_recall": 0.0,
+        "contradiction_recall": 0.0,
+        "tokens": 928
       }
     }
   ],
   "summary": {
     "deep_research": {
-      "coverage": 0.42,
+      "coverage": 0.2,
       "citation_accuracy": 1.0,
-      "source_recall": 0.467,
+      "source_recall": 0.218,
       "contradiction_recall": 0.0,
-      "tokens": 1675.8
+      "tokens": 1799.308
     },
     "search": {
-      "coverage": 0.4,
+      "coverage": 0.235,
       "citation_accuracy": null,
       "source_recall": 0.0,
       "contradiction_recall": 0.0,
-      "tokens": 734.2
+      "tokens": 932.615
     }
   },
-  "task_set_version": "1.0"
+  "task_set_version": "1.1"
 }
