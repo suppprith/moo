@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DocsSidebar } from "@/components/DocsSidebar";
 import { SiteNav } from "@/components/SiteNav";
-import { DOC_GROUPS, DOC_PAGES, findDoc, loadDoc } from "@/lib/docs";
+import { DOC_PAGES, findDoc, loadDoc } from "@/lib/docs";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -29,22 +29,7 @@ export default async function DocPage({ params }: Params) {
     <div className="site">
       <SiteNav current="docs" />
       <div className="docs-layout">
-        <aside className="docs-sidebar">
-          {DOC_GROUPS.map((group) => (
-            <div className="docs-group" key={group}>
-              <div className="docs-group-title">{group}</div>
-              {DOC_PAGES.filter((entry) => entry.group === group).map((entry) => (
-                <Link
-                  className={`docs-link${entry.slug === slug ? " current" : ""}`}
-                  href={`/docs/${entry.slug}`}
-                  key={entry.slug}
-                >
-                  {entry.title}
-                </Link>
-              ))}
-            </div>
-          ))}
-        </aside>
+        <DocsSidebar current={slug} />
         <main className="docs-main">
           <h1 className="page-title">{page.title}</h1>
           <article className="prose">

@@ -86,6 +86,13 @@ export const DOC_PAGES: DocPage[] = [
     file: "saas-gap-analysis.md",
     group: "Operate",
   },
+  {
+    slug: "eval-trends",
+    title: "Eval trends",
+    blurb: "What the last runs scored, per engine and per metric, with conditions.",
+    file: "eval-trends.md",
+    group: "Operate",
+  },
 ];
 
 export const DOC_GROUPS = ["Start here", "Reference", "Operate"] as const;

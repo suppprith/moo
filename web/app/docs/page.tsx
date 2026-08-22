@@ -63,8 +63,9 @@ export default function DocsIndex() {
 
         <h2 className="section-title">API reference</h2>
         <p className="page-lede">
-          The OpenAPI spec is committed and drift-tested. A running instance serves it at{" "}
-          <code>/openapi.json</code>, with an interactive reference at <code>/docs</code> and the
+          <Link href="/docs/api">Every endpoint</Link>, generated from the committed OpenAPI spec,
+          so it cannot describe an API that does not exist. A running instance also serves the spec
+          at <code>/openapi.json</code>, an interactive reference at <code>/docs</code>, and the
           machine-readable descriptor (contract version, handle formats, error taxonomy, MCP tool
           schemas) at <code>/contract</code>.
         </p>
