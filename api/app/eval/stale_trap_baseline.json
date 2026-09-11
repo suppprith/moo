@@ -6,12 +6,12 @@
         "n": 18,
         "errors": 0,
         "pass_rate": 0.0,
-        "current_rate": 0.0,
+        "current_rate": 0.056,
         "flag_rate": 0.0,
         "structural_flag_rate": 0.0,
-        "silent_stale_rate": 0.0,
+        "silent_stale_rate": 0.056,
         "two_sided_rate": 0.0,
-        "latency_ms": 2330.5
+        "latency_ms": 11991.7
       },
       "rows": [
         {
@@ -97,13 +97,15 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
+          "cues": [
+            "outdated"
+          ],
           "quote": null
         },
         {
           "id": "react-reactdom-render",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -117,8 +119,10 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
-          "quote": null
+          "cues": [
+            "not recommended"
+          ],
+          "quote": "it initially looks like this: ``` import { strictmode } from \"react\"; import { createroot } from \"react-dom/client\"; import\u2026 ``` import { strictmode } from \"react\"; import { createroot } from \"react-dom/client\"; import \"./index.css\"; impor"
         },
         {
           "id": "react-component-will-mount",
@@ -157,7 +161,9 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
+          "cues": [
+            "as of "
+          ],
           "quote": null
         },
         {
@@ -177,9 +183,7 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "instead of"
-          ],
+          "cues": [],
           "quote": null
         },
         {
@@ -220,7 +224,8 @@
             "two_sided": 0
           },
           "cues": [
-            "instead of"
+            "legacy",
+            "outdated"
           ],
           "quote": null
         },
@@ -263,18 +268,20 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
+          "cues": [
+            "as of "
+          ],
           "quote": null
         },
         {
           "id": "mysql-query-cache",
           "error": false,
           "surfaces_current": false,
-          "repeats_stale": false,
+          "repeats_stale": true,
           "flags_stale": false,
           "flagged_structurally": false,
           "passes": false,
-          "silent_stale": false,
+          "silent_stale": true,
           "two_sided": false,
           "signals": {
             "disputed": 0,
@@ -283,11 +290,8 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "no longer",
-            "as of "
-          ],
-          "quote": null
+          "cues": [],
+          "quote": "mysql query optimization - geeksforgeeks [mysqld] query_cache_type = 1 query_cache_size = 16m with query caching enabled, frequently executed queries can be served from the ** cache**, leading to faster response times and reduced load on th"
         },
         {
           "id": "postgres-wal-level-archive",
@@ -328,9 +332,7 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "instead of"
-          ],
+          "cues": [],
           "quote": null
         },
         {
@@ -350,7 +352,9 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
+          "cues": [
+            "as of "
+          ],
           "quote": null
         },
         {
@@ -370,7 +374,9 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
+          "cues": [
+            "as of "
+          ],
           "quote": null
         },
         {
@@ -401,19 +407,24 @@
     "engines": [
       "moo_fast"
     ],
-    "live_provider": null,
+    "live_provider": "SearxngProvider",
     "llm": false
   },
   "gate": {
-    "status": "not_evaluated",
+    "status": "fail",
     "passed": false,
     "pass_bar": 0.7,
     "margin": 0.3,
     "checks": [
       {
-        "name": "live retrieval",
+        "name": "moo pass rate",
+        "passed": false,
+        "detail": "best moo engine moo_fast flagged 0% of traps (bar 70%)"
+      },
+      {
+        "name": "margin over competitors",
         "passed": null,
-        "detail": "no search provider configured, so nothing was fetched \u2014 these traps ask what the live web says today, and a 0% here means the run proves nothing either way"
+        "detail": "no competitor keys set, head-to-head not evaluated"
       }
     ]
   }
