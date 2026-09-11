@@ -24,11 +24,11 @@ it. The store lives at `MOO_DB_PATH=/data/moo.sqlite` on a mounted volume; the
 image itself is stateless and can be replaced without losing the evidence graph
 or the page cache.
 
-It is a big image. `sentence-transformers` pulls in torch, which is the price of
-running embeddings locally instead of paying an embedding API per call. If image
-size matters more to you than build simplicity, install a CPU-only torch wheel
-(`--index-url https://download.pytorch.org/whl/cpu`) before `uv sync`; it cuts
-the largest layer by roughly a gigabyte.
+It is still a sizeable image: `sentence-transformers` pulls in torch, which is
+the price of running embeddings locally instead of paying an embedding API per
+call. On Linux the lockfile takes torch from PyTorch's CPU index, so the image
+carries no CUDA libraries. PyPI's Linux torch brings about 3 GB of them, which a
+CPU container never loads and which used to time the build out mid-download.
 
 ## Deploy
 

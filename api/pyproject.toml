@@ -11,6 +11,7 @@ dependencies = [
     "mcp>=1.28.1",
     "sentence-transformers",
     "sqlite-vec>=0.1.9",
+    "torch",
     "trafilatura>=2.1.0",
 ]
 
@@ -44,3 +45,14 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.uv]
 package = true
+
+# Embeddings run on CPU. On Linux, PyPI's torch drags in ~3 GB of CUDA libraries
+# that a container never uses (and that time out mid-build); the CPU index has
+# the same torch without them. macOS and Windows wheels on PyPI are CPU already.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
