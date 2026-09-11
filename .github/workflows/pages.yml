@@ -1,0 +1,65 @@
+# The docs site and playground as a static site on GitHub Pages: free, no
+# server, and it can only show what the API behind it answers. Every route is
+# prerendered at build time; the playground calls the API from the browser.
+#
+# Off until you turn it on, so an ordinary push never fails on a Pages site that
+# does not exist yet:
+#   1. Settings -> Pages -> Source: GitHub Actions
+#   2. repo variable MOO_PAGES=1
+#   3. repo variable MOO_PUBLIC_API_BASE = the hosted API (see docs/hosting.md),
+#      and that API's MOO_CORS_ORIGINS set to https://<owner>.github.io
+# Without step 3 the docs still work; the playground says it cannot reach an API.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "docs/**"
+      - "api/openapi.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: vars.MOO_PAGES == '1'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      MOO_STATIC_EXPORT: "1"
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+      NEXT_PUBLIC_API_BASE: ${{ vars.MOO_PUBLIC_API_BASE }}
+      NEXT_PUBLIC_DEMO_MODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

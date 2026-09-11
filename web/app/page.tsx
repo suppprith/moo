@@ -19,6 +19,8 @@ import { SHORTCUTS, isSystemChord, isTypingTarget, moveSelection } from "@/lib/s
 
 /** A public playground says so: the visitor is on someone else's quota. */
 const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+/** Non-empty when the site is served under a path, as a GitHub project page is. */
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const EXAMPLES = [
   "Postgres vs MySQL for a new web app",
@@ -170,8 +172,8 @@ export default function Home() {
       if (id === "home") return goHomeRef.current();
       if (id === "help") return setHelp(true);
       if (id === "copy") return void copyAnswer();
-      if (id === "docs") return void (window.location.href = "/docs");
-      if (id === "why") return void (window.location.href = "/why");
+      if (id === "docs") return void (window.location.href = `${BASE_PATH}/docs`);
+      if (id === "why") return void (window.location.href = `${BASE_PATH}/why`);
       if (id === "focus") {
         const box = document.querySelector<HTMLInputElement>(".searchbox input");
         box?.focus();

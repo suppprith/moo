@@ -117,7 +117,8 @@ function rewriteLinks(markdown: string): string {
   return markdown.replace(/\]\((?!https?:|#)([^)]+)\)/g, (match, target: string) => {
     const clean = target.replace(/^\.\//, "");
     const sibling = DOC_PAGES.find((page) => clean === page.file || clean.endsWith("/" + page.file));
-    if (sibling) return `](/docs/${sibling.slug})`;
+    // Markdown links are plain anchors, so unlike <Link> they need the base path.
+    if (sibling) return `](${process.env.NEXT_PUBLIC_BASE_PATH || ""}/docs/${sibling.slug})`;
     const repoPath = clean.replace(/^\.\.\//, "");
     return `](${REPO}/${repoPath})`;
   });
