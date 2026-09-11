@@ -38,7 +38,9 @@ ENV MOO_DB_PATH=/data/moo.sqlite \
     MOO_PRELOAD=1 \
     MOO_CORS_ORIGINS="" \
     PORT=8000
-RUN mkdir -p /data
+# Some hosts (Hugging Face Spaces) run the container as uid 1000, not root, so
+# the store and the model cache must be writable by whoever the container is.
+RUN mkdir -p /data && chmod -R a+rwX /data /opt/models
 
 EXPOSE 8000
 

@@ -1,0 +1,56 @@
+# The API on a free Hugging Face Space (Docker SDK, 2 vCPU / 16 GB, no card).
+# It builds the same api/Dockerfile a Fly or VPS deploy uses; this job only
+# assembles the Space repo and pushes it. See docs/hosting.md for what the free
+# tier does and does not keep.
+#
+# Off until you turn it on:
+#   1. create a Docker Space on huggingface.co (blank template)
+#   2. repo secret HF_TOKEN = a write token; repo variable HF_SPACE = <user>/<space>
+#   3. Space settings -> secrets: MOO_SEARXNG_URL or MOO_BRAVE_API_KEY,
+#      MOO_DEMO_RATE_LIMIT_PER_MIN, MOO_CORS_ORIGINS, optionally an LLM key
+
+name: hf-space
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/hf-space.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: hf-space
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: vars.HF_SPACE != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A Space is configured by the YAML header of its README; app_port tells it
+      # where the container listens. Tests and local state stay out of the image.
+      - name: Assemble the Space
+        run: |
+          mkdir space
+          cp -r api/. space/
+          rm -rf space/tests space/.env space/.venv
+          {
+            printf -- '---\ntitle: moo\nemoji: 🐮\ncolorFrom: gray\ncolorTo: yellow\n'
+            printf -- 'sdk: docker\napp_port: 8000\npinned: false\n---\n\n'
+            cat api/README.md
+          } > space/README.md
+
+      - name: Push to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        working-directory: space
+        run: |
+          git init -q -b main
+          git add -A
+          git -c user.name=moo-ci -c user.email=moo-ci@users.noreply.github.com \
+            commit -qm "Deploy ${GITHUB_SHA::7}"
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main

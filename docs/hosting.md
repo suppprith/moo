@@ -48,6 +48,37 @@ Railway, Render, or a plain VPS with `docker compose up -d` behind a reverse
 proxy work the same way; the only requirements are a persistent volume and about
 2 GB of memory for the embedding model. Nothing in moo assumes Fly.
 
+### The free path: a Hugging Face Space and GitHub Pages
+
+For a try-it instance that costs nothing, the API runs as a Docker Space on
+Hugging Face (2 vCPU and 16 GB on the free tier, no card) and the docs site and
+playground run as a static site on GitHub Pages. Both deploys are workflows that
+stay off until you switch them on, so neither fails a push before it exists.
+
+- **API** (`.github/workflows/hf-space.yml`): create a blank Docker Space, add a
+  write token as the repo secret `HF_TOKEN` and the Space's `<user>/<name>` as
+  the repo variable `HF_SPACE`. Every push touching `api/` redeploys it. In the
+  Space's settings, set a search provider (`MOO_SEARXNG_URL` or
+  `MOO_BRAVE_API_KEY`), `MOO_DEMO_RATE_LIMIT_PER_MIN`, and `MOO_CORS_ORIGINS`.
+  The image already runs as a non-root user, which Spaces require.
+- **Site** (`.github/workflows/pages.yml`): set Pages to deploy from GitHub
+  Actions, then the repo variables `MOO_PAGES=1` and `MOO_PUBLIC_API_BASE` (the
+  Space's `https://<user>-<name>.hf.space` URL). The API's `MOO_CORS_ORIGINS`
+  must name `https://<owner>.github.io`, or the browser will refuse the calls.
+
+What the free tier costs you, stated plainly: **the Space's disk is not
+persistent.** A restart, and a Space sleeps after two idle days, loses the page
+cache, the evidence graph, and any key issued with `python -m app.keys`. That
+makes it right for a keyless, rate-limited playground and wrong for paying
+users. Gate it with fixed keys (`MOO_API_KEYS` as a Space secret) if it needs
+gating at all, and move to a host with a volume (Fly, above) when issued keys
+have to survive.
+
+A search provider is the one thing the Space cannot bring itself: SearXNG in the
+same container is not how Spaces work. Point `MOO_SEARXNG_URL` at a SearXNG you
+run elsewhere (the repo's `searxng/settings.yml` is the config it needs), or use
+a Brave key.
+
 Set `MOO_CORS_ORIGINS` to the origins your web UI is served from. Leave it empty
 for an agent-only instance: agents do not need CORS, and browsers are the only
 thing it affects.
