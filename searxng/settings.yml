@@ -1,0 +1,14 @@
+# SearXNG for moo's keyless live search. The stock image serves HTML only;
+# moo reads results as JSON, so that format has to be switched on. The limiter
+# is off because the only caller is your own moo instance on localhost.
+use_default_settings: true
+
+server:
+  secret_key: "change-me-if-you-expose-this"
+  limiter: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json
