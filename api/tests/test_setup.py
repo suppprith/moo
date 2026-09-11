@@ -50,10 +50,24 @@ def test_env_file_is_read_before_anything_asks_what_is_configured(tmp_path, monk
     from app.bootstrap import ensure_ready
     from app.live.providers import resolve_provider
 
-    assert resolve_provider() is None  # nothing has read the file yet
     result = ensure_ready(tmp_path / "moo.sqlite", quiet=True)
     assert resolve_provider() is not None, "ensure_ready must load the env file first"
     assert not any("live web search is OFF" in h for h in result["hints"])
+
+
+def test_provider_reads_the_env_file_without_ensure_ready(tmp_path, monkeypatch):
+    """The eval CLIs never call ensure_ready(). Resolving the provider must read
+    the file itself, or a gate runs store-only and blames a missing provider."""
+    path = tmp_path / ".env"
+    path.write_text("MOO_SEARXNG_URL=http://localhost:8888\n")
+    for name in ("MOO_SEARXNG_URL", "MOO_BRAVE_API_KEY", "MOO_SEARCH_PROVIDER"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(env, "DEFAULT_ENV_PATH", path)
+    monkeypatch.setattr(env, "_loaded", False)
+
+    from app.live.providers import resolve_provider
+
+    assert resolve_provider() is not None
 
 
 def test_write_env_file_updates_in_place_and_keeps_comments(tmp_path):

@@ -28,6 +28,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from ..env import load_dotenv
+
 log = logging.getLogger("moo.live.providers")
 
 DEFAULT_TIMEOUT = 10.0
@@ -155,6 +157,10 @@ class BraveProvider(Provider):
 
 def resolve_provider() -> Provider | None:
     """Build the configured provider from env, or None when live search is off."""
+    # Read api/.env here rather than trusting the entrypoint to: the eval CLIs
+    # never call ensure_ready(), and a gate that silently runs store-only then
+    # reports "no search provider" for a provider that is configured.
+    load_dotenv()
     name = os.environ.get("MOO_SEARCH_PROVIDER", "").strip().lower()
     url = os.environ.get("MOO_SEARXNG_URL") or os.environ.get("MOO_SEARCH_URL")
     key = os.environ.get("MOO_BRAVE_API_KEY") or os.environ.get("MOO_SEARCH_API_KEY")
