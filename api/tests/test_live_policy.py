@@ -94,3 +94,27 @@ def test_non_software_query_out_of_domain():
 
 def test_empty_discovery_is_out_of_domain():
     assert out_of_domain([])
+
+
+BLOG_CANDS = [
+    Candidate("https://blog.tericcabrel.com/nextjs-middleware/", rank=0),
+    Candidate("https://www.contentful.com/blog/next-js-middleware/", rank=1),
+    Candidate("https://supertokens.com/blog/next-js-middleware", rank=2),
+]
+
+
+def test_a_query_naming_a_product_is_in_domain_whatever_the_hosts():
+    assert out_of_domain(BLOG_CANDS)  # the host prior alone says off-topic
+    assert not out_of_domain(BLOG_CANDS, "how do I add middleware in Next.js")
+
+
+def test_naming_nothing_still_falls_back_to_the_hosts():
+    assert out_of_domain(FOOD_CANDS, "best pizza dough recipe")
+
+
+def test_framework_docs_hosts_are_official():
+    for url in ("https://nextjs.org/docs/app/getting-started/proxy",
+                "https://eslint.org/docs/latest/use/configure/",
+                "https://www.typescriptlang.org/tsconfig/",
+                "https://gateway-api.sigs.k8s.io/guides/"):
+        assert classify(url).tier == "docs", url

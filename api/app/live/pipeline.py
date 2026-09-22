@@ -356,7 +356,7 @@ def live_fetch(
         return report
 
     report["domain_confidence"] = round(policy.domain_confidence(cands), 3)
-    if policy.out_of_domain(cands):
+    if policy.out_of_domain(cands, query):
         report["out_of_domain"] = True
         return report
 

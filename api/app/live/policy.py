@@ -69,6 +69,51 @@ _HOSTS: dict[str, tuple[str, str]] = {
     "readthedocs.io": ("docs", "docs"),
     "kernel.org": ("docs", "docs"),
     "wiki.postgresql.org": ("docs", "docs"),
+    "nextjs.org": ("docs", "docs"),
+    "vercel.com": ("docs", "docs"),
+    "legacy.reactjs.org": ("docs", "docs"),
+    "eslint.org": ("docs", "docs"),
+    "typescriptlang.org": ("docs", "docs"),
+    "nginx.org": ("docs", "docs"),
+    "k8s.io": ("docs", "docs"),
+    "helm.sh": ("docs", "docs"),
+    "docs.npmjs.com": ("docs", "docs"),
+    "vite.dev": ("docs", "docs"),
+    "vitejs.dev": ("docs", "docs"),
+    "webpack.js.org": ("docs", "docs"),
+    "tailwindcss.com": ("docs", "docs"),
+    "svelte.dev": ("docs", "docs"),
+    "deno.com": ("docs", "docs"),
+    "bun.sh": ("docs", "docs"),
+    "pnpm.io": ("docs", "docs"),
+    "yarnpkg.com": ("docs", "docs"),
+    "jestjs.io": ("docs", "docs"),
+    "vitest.dev": ("docs", "docs"),
+    "playwright.dev": ("docs", "docs"),
+    "prisma.io": ("docs", "docs"),
+    "php.net": ("docs", "docs"),
+    "ruby-lang.org": ("docs", "docs"),
+    "kotlinlang.org": ("docs", "docs"),
+    "swift.org": ("docs", "docs"),
+    "dart.dev": ("docs", "docs"),
+    "developer.apple.com": ("docs", "docs"),
+    "developer.android.com": ("docs", "docs"),
+    "developers.cloudflare.com": ("docs", "docs"),
+    "docs.ansible.com": ("docs", "docs"),
+    "nixos.org": ("docs", "docs"),
+    "apache.org": ("docs", "docs"),
+    "elastic.co": ("docs", "docs"),
+    "prometheus.io": ("docs", "docs"),
+    "grafana.com": ("docs", "docs"),
+    "istio.io": ("docs", "docs"),
+    "debian.org": ("docs", "docs"),
+    "ubuntu.com": ("docs", "docs"),
+    "archlinux.org": ("docs", "docs"),
+    "pgxn.org": ("registry", "docs"),
+    "discuss.python.org": ("qa", "blog"),
+    "forums.docker.com": ("qa", "blog"),
+    "freecodecamp.org": ("blog", "blog"),
+    "percona.com": ("blog", "blog"),
     "github.com": ("repo", "docs"),
     "gitlab.com": ("repo", "docs"),
     "bitbucket.org": ("repo", "docs"),
@@ -169,5 +214,15 @@ def domain_confidence(cands: list[Candidate], *, top: int = 8) -> float:
     return sum(classify(c.url).prior for c in sample) / len(sample)
 
 
-def out_of_domain(cands: list[Candidate]) -> bool:
+def out_of_domain(cands: list[Candidate], query: str | None = None) -> bool:
+    """True when this isn't a software question. A query that names a software
+    product is one, whatever hosts discovery happened to return: the host
+    table can't list every project's docs site, and a Next.js or ESLint
+    question answered by nextjs.org, eslint.org and a few blogs looked
+    off-topic to the host prior alone."""
+    if query:
+        from ..versions import query_products
+
+        if query_products(query):
+            return False
     return domain_confidence(cands) < OFF_DOMAIN_THRESHOLD
