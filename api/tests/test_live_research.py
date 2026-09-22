@@ -14,6 +14,7 @@ from app.research.session import LIVE_PAGES_TOTAL, run_research
 from tests.test_live_pipeline import (
     DEV_CANDS,
     FOOD_CANDS,
+    LIVE_URLS,
     PAGES,
     FakeFetcher,
     FakeProvider,
@@ -50,7 +51,7 @@ def test_run_research_live_end_to_end(conn):
             (c["id"],),
         )
     }
-    assert urls and urls <= set(PAGES)
+    assert urls and urls <= LIVE_URLS
 
     live = run["cost"]["live"]
     assert live["provider"] == "fake"
@@ -71,7 +72,7 @@ def test_live_report_is_grounded(conn):
     assert g["findings_total"] >= 1
     assert g["ungrounded"] == []
     assert report["sources"], "report has no sources"
-    assert {s["url"].split("#")[0] for s in report["sources"]} <= set(PAGES)
+    assert {s["url"].split("#")[0] for s in report["sources"]} <= LIVE_URLS
 
 
 def test_live_false_disables_fetching(conn):

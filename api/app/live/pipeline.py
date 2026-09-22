@@ -49,7 +49,7 @@ from ..index import keyword, vector
 from ..ingest.base import store
 from ..ingest.fetcher import Fetcher
 from ..ingest.models import RawDoc
-from . import policy
+from . import policy, stackexchange
 from .providers import Provider, get_stats, resolve_provider
 
 log = logging.getLogger("moo.live")
@@ -97,12 +97,7 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
             author = getattr(meta, "author", None)
     except Exception as exc:  # noqa: BLE001
         log.debug("metadata extraction failed for %s: %s", url, exc)
-    metadata: dict = {"live": True, "site": info.host, "tier": info.tier}
-    cats = safety.categories(md)
-    if cats:
-        metadata["suspicious"] = cats
-        log.warning("suspicious content (%s) at %s", ",".join(cats), url)
-    return RawDoc(
+    return _mark_live(RawDoc(
         source_type=info.source_type,
         url=url,
         title=title,
@@ -110,8 +105,18 @@ def _extract(url: str, html: str, info: policy.DomainInfo) -> RawDoc | None:
         author=author,
         published_at=published,
         content_type="text/markdown",
-        metadata=metadata,
-    )
+    ), info)
+
+
+def _mark_live(doc: RawDoc, info: policy.DomainInfo) -> RawDoc:
+    """Stamp a fetched document as live and screen it for injected instructions,
+    however it was fetched."""
+    doc.metadata = {**(doc.metadata or {}), "live": True, "site": info.host, "tier": info.tier}
+    cats = safety.categories(doc.text)
+    if cats:
+        doc.metadata["suspicious"] = cats
+        log.warning("suspicious content (%s) at %s", ",".join(cats), doc.url)
+    return doc
 
 
 def _fetch_extract_all(
@@ -121,9 +126,22 @@ def _fetch_extract_all(
     host. One future per page; a per-host lock serializes same-host requests so
     the Fetcher's politeness (throttle/robots) is preserved exactly. Results
     are collected page-by-page, so a deadline expiry keeps everything already
-    finished (partial results) and abandons only the stragglers."""
-    hosts = {urlsplit(cand.url).netloc for cand, _ in ranked}
+    finished (partial results) and abandons only the stragglers.
+
+    Stack Exchange questions skip the HTML fetch, which those sites refuse: one
+    future per site fetches all of that site's questions through the API."""
+    se_groups: dict[str, list[tuple[int, object, policy.DomainInfo, int]]] = {}
+    pages = []
+    for idx, (cand, info) in enumerate(ranked):
+        ref = stackexchange.question_ref(cand.url)
+        if ref is None:
+            pages.append((idx, cand, info))
+        else:
+            se_groups.setdefault(ref[0], []).append((idx, cand, info, ref[1]))
+
+    hosts = {urlsplit(cand.url).netloc for _, cand, _ in pages}
     host_locks = {h: threading.Lock() for h in hosts}
+    se_lock = threading.Lock()  # every site shares one API host
 
     def page_worker(idx: int, cand, info: policy.DomainInfo):
         lock = host_locks[urlsplit(cand.url).netloc]
@@ -134,15 +152,28 @@ def _fetch_extract_all(
         doc = None
         if res.ok and res.text:
             doc = _extract(cand.url, res.text, info)
-        return (idx, cand, info, doc)
+        return [(idx, cand, info, doc)]
+
+    def site_worker(site: str, group: list):
+        with se_lock:
+            if time.monotonic() > deadline:
+                return None
+            docs = stackexchange.fetch_questions(
+                fetcher, site, [qid for *_, qid in group],
+                urls={qid: cand.url for _, cand, _, qid in group},
+            )
+        return [(idx, cand, info, _mark_live(docs[qid], info) if qid in docs else None)
+                for idx, cand, info, qid in group]
 
     done_items: list[tuple[int, object, policy.DomainInfo, RawDoc | None]] = []
-    executor = ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(ranked)))
+    workers = max(1, min(MAX_WORKERS, len(pages) + len(se_groups)))
+    executor = ThreadPoolExecutor(max_workers=workers)
     try:
         pending: set[Future] = {
-            executor.submit(page_worker, idx, cand, info)
-            for idx, (cand, info) in enumerate(ranked)
+            executor.submit(page_worker, idx, cand, info) for idx, cand, info in pages
         }
+        pending |= {executor.submit(site_worker, site, group)
+                    for site, group in se_groups.items()}
         while pending:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -155,7 +186,7 @@ def _fetch_extract_all(
                     log.warning("page worker failed: %s", exc)
                     continue
                 if item is not None:
-                    done_items.append(item)
+                    done_items.extend(item)
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
 

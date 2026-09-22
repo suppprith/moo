@@ -36,7 +36,8 @@ def test_ttl_expiry_triggers_refetch(conn):
     assert report["fresh"] == 1
     assert report["unchanged"] == 1
     assert fetcher.requests.count(PG_URL) == 2
-    assert fetcher.requests.count(SO_URL) == 1
+    # the Stack Overflow question was fetched once, through the API (2 calls)
+    assert sum("api.stackexchange.com" in r for r in fetcher.requests) == 2
 
 
 def test_ttl_is_tier_aware():

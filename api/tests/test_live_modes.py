@@ -14,6 +14,7 @@ from app.websearch import web_search
 from tests.test_live_pipeline import (
     DEV_CANDS,
     FOOD_CANDS,
+    LIVE_URLS,
     PAGES,
     FakeFetcher,
     FakeProvider,
@@ -54,7 +55,7 @@ def test_fast_mode_live_snippets_zero_llm(conn, llm_calls):
     assert out["meta"]["live"]["provider"] == "fake"
     assert out["meta"]["live"]["out_of_domain"] is False
     urls = {s["document_url"] for s in out["sources"]}
-    assert urls <= set(PAGES)
+    assert urls <= LIVE_URLS
 
 
 def test_deep_mode_live_evidence(conn):

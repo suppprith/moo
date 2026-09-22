@@ -4,6 +4,8 @@ Provider + fetcher are stubbed (no network); everything downstream — document
 upsert, chunking, embedding, vec/FTS index, hybrid retrieval — is real.
 """
 
+import json
+
 import pytest
 
 from app.db import migrate
@@ -30,17 +32,36 @@ When enabled, autovacuum checks for tables that have had a large number of
 inserted, updated or deleted tuples and reclaims space automatically.</p>
 </article></body></html>"""
 
-SO_HTML = """<html><head><title>When does autovacuum run?</title></head><body>
-<article>
-<h1>When does autovacuum actually run?</h1>
-<p>Autovacuum triggers when the number of dead tuples exceeds a threshold
-computed from autovacuum_vacuum_threshold plus autovacuum_vacuum_scale_factor
-times the number of tuples in the table. The default scale factor is 0.2 so a
-table must churn twenty percent of its rows before the autovacuum daemon
-considers it, which is why large tables can bloat before vacuum kicks in.</p>
-</article></body></html>"""
+SO_QUESTION = {
+    "question_id": 12345, "title": "When does autovacuum actually run?",
+    "body": "<p>My table bloats. When does the autovacuum daemon kick in?</p>",
+    "link": SO_URL, "score": 42, "creation_date": 1500000000,
+    "last_activity_date": 1700000000, "tags": ["postgresql"],
+}
+SO_ANSWER = {
+    "question_id": 12345, "answer_id": 99, "score": 80, "is_accepted": True,
+    "creation_date": 1500001000,
+    "body": "<p>Autovacuum triggers when the number of dead tuples exceeds a threshold "
+            "computed from <code>autovacuum_vacuum_threshold</code> plus "
+            "<code>autovacuum_vacuum_scale_factor</code> times the number of tuples in the "
+            "table. The default scale factor is 0.2 so a table must churn twenty percent "
+            "of its rows before the autovacuum daemon considers it, which is why large "
+            "tables can bloat before vacuum kicks in.</p>",
+}
 
-PAGES = {PG_URL: PG_HTML, SO_URL: SO_HTML}
+
+def se_api(url: str) -> str | None:
+    """Stand-in for api.stackexchange.com: Stack Overflow pages are fetched
+    through the API, never as HTML."""
+    if not url.startswith("https://api.stackexchange.com/"):
+        return None
+    if "/answers?" in url:
+        return json.dumps({"items": [SO_ANSWER]})
+    return json.dumps({"items": [SO_QUESTION]})
+
+
+PAGES = {PG_URL: PG_HTML}
+LIVE_URLS = {PG_URL, SO_URL}  # every URL the fake live web serves
 
 
 class FakeProvider(Provider):
@@ -60,7 +81,7 @@ class FakeFetcher:
 
     def get(self, url, **kw):
         self.requests.append(url)
-        html = self.pages.get(url)
+        html = self.pages.get(url) or se_api(url)
         if html is None:
             return FetchResult(url, 404, "", {}, ok=False, error="HTTP 404")
         return FetchResult(url, 200, html, {"Content-Type": "text/html"})
@@ -105,7 +126,8 @@ def test_live_fetch_end_to_end(conn):
     assert report["embedded"] == report["new_chunks"]
 
     types = {r["source_type"] for r in conn.execute("SELECT source_type FROM document")}
-    assert types == {"docs", "so"}
+    assert types == {"docs", "so_answer"}
+    assert SO_URL not in fetcher.requests  # the HTML page is never requested
     assert conn.execute("SELECT count(*) FROM chunk_vec").fetchone()[0] == report["new_chunks"]
 
     hits = retrieve(conn, "when does postgres autovacuum run", k=4)

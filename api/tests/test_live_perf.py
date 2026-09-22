@@ -58,7 +58,7 @@ def conn(tmp_path):
 MULTI_HOST_PAGES = {
     "https://docs.python.org/3/vacuum.html": _page("A"),
     "https://www.postgresql.org/docs/16/vacuum.html": _page("B"),
-    "https://stackoverflow.com/questions/1/vacuum": _page("C"),
+    "https://kubernetes.io/docs/vacuum/": _page("C"),
     "https://redis.io/docs/persistence/": _page("D"),
 }
 MULTI_HOST_CANDS = [Candidate(u, rank=i) for i, u in enumerate(MULTI_HOST_PAGES)]
