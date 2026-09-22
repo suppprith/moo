@@ -373,7 +373,13 @@ def format_transcript(result: dict, traps: list[dict], verdict: dict) -> str:
 def trap_engines(conn, *, k: int = 8, max_steps: int = 3, max_seconds: float = 90.0,
                  use_llm: bool = True, include: list[str] | None = None) -> dict:
     """moo fast and deep, plus every competitor whose key is set."""
-    from .competitors import exa_deep_engine, exa_engine, tavily_engine, tavily_research_engine
+    from .competitors import (
+        exa_deep_engine,
+        exa_engine,
+        plain_search_engine,
+        tavily_engine,
+        tavily_research_engine,
+    )
 
     def moo_fast(query: str) -> dict:
         from ..websearch import web_search
@@ -393,6 +399,7 @@ def trap_engines(conn, *, k: int = 8, max_steps: int = 3, max_seconds: float = 9
     candidates = {
         "moo_fast": moo_fast,
         "moo_deep": moo_deep,
+        "plain_search": plain_search_engine(k=k),
         "tavily": tavily_engine(k=k),
         "tavily_research": tavily_research_engine(),
         "exa": exa_engine(k=k),
@@ -423,8 +430,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.eval.stale_traps",
                                      description="USP acceptance gate: stale-answer traps")
     parser.add_argument("--engines", nargs="*", default=None,
-                        help="subset to run: moo_fast moo_deep tavily tavily_research "
-                             "exa exa_deep")
+                        help="subset to run: moo_fast moo_deep plain_search tavily "
+                             "tavily_research exa exa_deep")
     parser.add_argument("--limit", type=int, default=None, help="run only the first N traps")
     parser.add_argument("-k", type=int, default=8)
     parser.add_argument("--max-steps", type=int, default=3)

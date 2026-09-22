@@ -41,6 +41,29 @@ def moo_engine(conn, *, k: int = 8):
     return run
 
 
+def plain_search_engine(*, k: int = 8, provider=None):
+    """The results a plain web-search tool hands an agent: the discovery
+    provider's own titles and snippets, with nothing of moo's on top (no fetch,
+    no ranking, no highlights). Coding agents' built-in search is a search
+    engine's result list, so this is the baseline "does moo beat just
+    searching" is measured against. Unavailable without a search provider."""
+    if provider is None:
+        from ..live.providers import resolve_provider
+
+        provider = resolve_provider()
+    if provider is None:
+        return None
+
+    def run(query: str) -> dict | None:
+        cands = provider.discover(query, count=k)
+        if not cands:
+            return None
+        return {"results": [{"title": c.title, "url": c.url, "snippet": c.snippet}
+                            for c in cands], "answer": None}
+
+    return run
+
+
 def exa_engine(*, k: int = 8, client=None):
     key = os.environ.get("EXA_API_KEY")
     if not key:

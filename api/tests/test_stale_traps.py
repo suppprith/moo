@@ -267,6 +267,9 @@ def test_engine_selection_is_filterable(monkeypatch):
 def test_competitors_are_skipped_without_keys(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    for var in ("MOO_SEARCH_PROVIDER", "MOO_SEARXNG_URL", "MOO_SEARCH_URL",
+                "MOO_BRAVE_API_KEY", "MOO_SEARCH_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
     assert set(stale_traps.trap_engines(None)) == {"moo_fast", "moo_deep"}
 
 
@@ -297,3 +300,18 @@ def test_gate_fails_when_only_the_old_changes_are_caught():
 
 def test_gate_passes_when_recent_changes_clear_the_bar_too():
     assert gate(_cohort_result(0.8, 0.75))["status"] == "pass"
+
+
+def test_plain_search_returns_the_providers_own_rows():
+    from app.eval.competitors import plain_search_engine
+    from app.live.providers import Candidate
+
+    class Provider:
+        def discover(self, query, *, count=12):
+            return [Candidate("https://example.com/a", title="A", snippet="use utcnow()", rank=0)]
+
+    out = plain_search_engine(provider=Provider())("utc now")
+    assert out["results"] == [{"title": "A", "url": "https://example.com/a",
+                               "snippet": "use utcnow()"}]
+    score = score_trap(out, TRAP, CUES)
+    assert score["silent_stale"] is True
