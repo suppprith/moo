@@ -25,6 +25,12 @@ without keys or network. Competitor columns appear when their keys are set.
     uv run python -m app.eval.stale_traps --gate --strict  # ...or if it never ran
     uv run python -m app.eval.stale_traps --transcript docs/stale-answer-demo.md
 
+Traps come in two cohorts. ``classic`` changes are years old: a model usually
+knows them already, so an agent barely needs search for them. ``recent`` ones
+changed after most models' training data was gathered, which is where a search
+tool earns its place, so the gate holds moo to the bar on that cohort by itself
+as well as overall.
+
 The gate has three outcomes, not two: pass, fail, and **not evaluated**. Every
 trap asks what the live web says today, so without a search provider nothing is
 fetched and every engine scores 0% — which says nothing about the USP. Reporting
@@ -108,8 +114,9 @@ def structural_flags(out: dict) -> dict:
 def score_trap(out: dict | None, trap: dict, cues: list[str]) -> dict:
     """Score one engine's answer to one trap. ``out=None`` means the engine
     errored, which scores as a miss rather than being dropped."""
+    cohort = trap.get("cohort", "classic")
     if out is None:
-        return {"id": trap["id"], "error": True, "surfaces_current": False,
+        return {"id": trap["id"], "cohort": cohort, "error": True, "surfaces_current": False,
                 "repeats_stale": False, "flags_stale": False, "passes": False,
                 "silent_stale": False, "two_sided": False, "signals": {}, "quote": None}
 
@@ -125,6 +132,7 @@ def score_trap(out: dict | None, trap: dict, cues: list[str]) -> dict:
 
     return {
         "id": trap["id"],
+        "cohort": cohort,
         "error": False,
         "surfaces_current": current,
         "repeats_stale": stale,
@@ -187,6 +195,11 @@ def run_traps(conn, traps: list[dict], engine_map: dict, *, cues: list[str]) -> 
             rows.append(score_trap(out, trap, cues))
         summary = summarize(rows)
         summary["latency_ms"] = round(_avg(latencies) or 0, 1)
+        cohorts = sorted({r["cohort"] for r in rows})
+        if len(cohorts) > 1:
+            summary["cohorts"] = {
+                c: summarize([r for r in rows if r["cohort"] == c]) for c in cohorts
+            }
         per_engine[name] = {"summary": summary, "rows": rows}
     return {"n_traps": len(traps), "engines": per_engine}
 
@@ -228,6 +241,10 @@ def gate(result: dict, *, pass_bar: float = PASS_BAR,
     competitors = {name: data["summary"]["pass_rate"] for name, data in engines.items()
                    if name not in MOO_ENGINES and data["summary"]["pass_rate"] is not None}
 
+    recent = {name: data["summary"]["cohorts"]["recent"]["pass_rate"] or 0
+              for name, data in engines.items()
+              if name in MOO_ENGINES and "recent" in (data["summary"].get("cohorts") or {})}
+
     checks = []
     if not moo:
         checks.append({"name": "moo pass rate", "passed": False,
@@ -241,6 +258,15 @@ def gate(result: dict, *, pass_bar: float = PASS_BAR,
             "passed": best_moo >= pass_bar,
             "detail": f"best moo engine {best_name} flagged {best_moo:.0%} of traps "
                       f"(bar {pass_bar:.0%})",
+        })
+
+    if recent:
+        best_recent = max(recent, key=lambda n: recent[n])
+        checks.append({
+            "name": "recent-change pass rate",
+            "passed": recent[best_recent] >= pass_bar,
+            "detail": f"best moo engine {best_recent} caught {recent[best_recent]:.0%} of "
+                      f"changes a model can't know from training (bar {pass_bar:.0%})",
         })
 
     if not competitors:
@@ -278,6 +304,15 @@ def format_table(result: dict) -> str:
             f"{_pct(s['flag_rate']):>9}{_pct(s['structural_flag_rate']):>12}"
             f"{_pct(s['silent_stale_rate']):>14}{s['latency_ms']:>12}{s['errors']:>8}"
         )
+    by_cohort = [(name, data["summary"]["cohorts"]) for name, data in result["engines"].items()
+                 if data["summary"].get("cohorts")]
+    if by_cohort:
+        lines += ["", f"{'by cohort':<14}{'cohort':>9}{'n':>5}{'pass':>8}{'current':>9}"
+                      f"{'flagged':>9}"]
+        for name, cohorts in by_cohort:
+            for cohort, c in cohorts.items():
+                lines.append(f"{name:<14}{cohort:>9}{c['n']:>5}{_pct(c['pass_rate']):>8}"
+                             f"{_pct(c['current_rate']):>9}{_pct(c['flag_rate']):>9}")
     return "\n".join(lines)
 
 
@@ -306,7 +341,8 @@ def format_transcript(result: dict, traps: list[dict], verdict: dict) -> str:
            "surfaces the current answer and marks the old one as outdated.", "",
            format_table(result), "```", format_gate(verdict).strip(), "```", ""]
     for trap_id, trap in by_id.items():
-        out += [f"## {trap['query']}", "",
+        tag = " (recent)" if trap.get("cohort") == "recent" else ""
+        out += [f"## {trap['query']}{tag}", "",
                 f"**Changed in {trap['product']} {trap['changed_in']}** "
                 f"({trap['change_type']}). Stale: {trap['stale']['summary']}. "
                 f"Current: {trap['current']['summary']}.", ""]

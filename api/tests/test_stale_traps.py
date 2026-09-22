@@ -207,7 +207,7 @@ class TestTaskSet:
     """The committed traps are the artifact; keep them well-formed."""
 
     def test_size_and_versioning(self, data):
-        assert 10 <= len(data["traps"]) <= 20
+        assert 10 <= len(data["traps"]) <= 40
         assert data["version"] and data["verified_on"]
         assert data["staleness_cues"]
 
@@ -221,6 +221,15 @@ class TestTaskSet:
                 assert trap[side]["markers"], f"{trap['id']} has no {side} markers"
                 assert all(m == m.lower() for m in trap[side]["markers"]), \
                     f"{trap['id']} {side} markers must be lowercase to match"
+
+    def test_recent_traps_are_recent_and_sourced(self, data):
+        """The recent cohort exists to test what a model can't already know, so
+        each one says when it changed and where that is written down."""
+        recent = [t for t in data["traps"] if t.get("cohort") == "recent"]
+        assert len(recent) >= 8
+        for trap in recent:
+            assert trap["announced"] >= "2025-08-01", trap["id"]
+            assert trap["source_url"].startswith("https://"), trap["id"]
 
     def test_ids_are_unique(self, data):
         ids = [t["id"] for t in data["traps"]]
@@ -259,3 +268,32 @@ def test_competitors_are_skipped_without_keys(monkeypatch):
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     assert set(stale_traps.trap_engines(None)) == {"moo_fast", "moo_deep"}
+
+
+RECENT_TRAP = {**TRAP, "id": "recent-one", "cohort": "recent"}
+
+
+def test_cohorts_are_summarized_separately():
+    engines = {"moo_fast": lambda q: rows(
+        "datetime.utcnow() is deprecated, use now(timezone.utc)" if "old" in q else "nothing")}
+    old = {**TRAP, "query": "old"}
+    result = run_traps(None, [old, RECENT_TRAP], engines, cues=CUES)
+    cohorts = result["engines"]["moo_fast"]["summary"]["cohorts"]
+    assert cohorts["classic"]["pass_rate"] == 1.0
+    assert cohorts["recent"]["pass_rate"] == 0.0
+
+
+def _cohort_result(overall, recent):
+    return {"engines": {"moo_fast": {"summary": {
+        "pass_rate": overall, "cohorts": {"recent": {"pass_rate": recent}}}, "rows": []}}}
+
+
+def test_gate_fails_when_only_the_old_changes_are_caught():
+    verdict = gate(_cohort_result(0.8, 0.2))
+    assert verdict["status"] == "fail"
+    check = next(c for c in verdict["checks"] if c["name"] == "recent-change pass rate")
+    assert check["passed"] is False
+
+
+def test_gate_passes_when_recent_changes_clear_the_bar_too():
+    assert gate(_cohort_result(0.8, 0.75))["status"] == "pass"

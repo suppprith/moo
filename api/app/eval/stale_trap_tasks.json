@@ -1,11 +1,25 @@
 {
-  "version": "1.0",
-  "verified_on": "2026-08-02",
-  "about": "Queries whose widely-cited answer is verifiably outdated. Each trap names the old answer (still all over blogs, Stack Overflow and model training data), the answer that is current, and where the change is documented. An engine passes a trap when it surfaces the current answer AND marks the old one as outdated; repeating the old answer with no warning is the failure this task set exists to measure.",
+  "version": "1.1",
+  "verified_on": "2026-09-22",
+  "about": "Queries whose widely-cited answer is verifiably outdated. Each trap names the old answer (still all over blogs, Stack Overflow and model training data), the answer that is current, and where the change is documented. An engine passes a trap when it surfaces the current answer AND marks the old one as outdated; repeating the old answer with no warning is the failure this task set exists to measure. Traps with cohort \"recent\" changed between August 2025 and March 2026, after most models' training data was gathered: a model can't answer them from memory, so they are the ones where retrieval has to do the work.",
   "staleness_cues": [
-    "deprecated", "removed in", "was removed", "no longer", "superseded",
-    "obsolete", "replaced by", "instead of", "legacy", "outdated",
-    "not recommended", "since version", "as of "
+    "deprecated",
+    "removed in",
+    "was removed",
+    "no longer",
+    "superseded",
+    "obsolete",
+    "replaced by",
+    "instead of",
+    "legacy",
+    "outdated",
+    "not recommended",
+    "since version",
+    "as of ",
+    "renamed",
+    "retired",
+    "retirement",
+    "end of life"
   ],
   "traps": [
     {
@@ -16,13 +30,23 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "datetime.utcnow() returns a naive datetime and is deprecated since 3.12",
-        "markers": ["utcnow()"]
+        "markers": [
+          "utcnow()"
+        ]
       },
       "current": {
         "summary": "datetime.now(timezone.utc) (or datetime.UTC) returns an aware datetime",
-        "markers": ["now(timezone.utc)", "now(datetime.utc)", "now(utc)", "now(tz=timezone.utc)"]
+        "markers": [
+          "now(timezone.utc)",
+          "now(datetime.utc)",
+          "now(utc)",
+          "now(tz=timezone.utc)"
+        ]
       },
-      "authoritative_sources": ["docs.python.org"]
+      "authoritative_sources": [
+        "docs.python.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "python-distutils",
@@ -32,13 +56,24 @@
       "change_type": "removed",
       "stale": {
         "summary": "distutils was removed from the standard library in Python 3.12",
-        "markers": ["from distutils", "import distutils"]
+        "markers": [
+          "from distutils",
+          "import distutils"
+        ]
       },
       "current": {
         "summary": "use setuptools with a pyproject.toml build backend",
-        "markers": ["setuptools", "pyproject.toml", "build backend"]
+        "markers": [
+          "setuptools",
+          "pyproject.toml",
+          "build backend"
+        ]
       },
-      "authoritative_sources": ["docs.python.org", "packaging.python.org"]
+      "authoritative_sources": [
+        "docs.python.org",
+        "packaging.python.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "python-get-event-loop",
@@ -48,13 +83,21 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "asyncio.get_event_loop() outside a running loop is deprecated",
-        "markers": ["get_event_loop()"]
+        "markers": [
+          "get_event_loop()"
+        ]
       },
       "current": {
         "summary": "asyncio.run() at the entry point, asyncio.get_running_loop() inside a coroutine",
-        "markers": ["asyncio.run(", "get_running_loop"]
+        "markers": [
+          "asyncio.run(",
+          "get_running_loop"
+        ]
       },
-      "authoritative_sources": ["docs.python.org"]
+      "authoritative_sources": [
+        "docs.python.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "python-setup-py-install",
@@ -64,13 +107,24 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "python setup.py install is deprecated",
-        "markers": ["setup.py install", "setup.py develop"]
+        "markers": [
+          "setup.py install",
+          "setup.py develop"
+        ]
       },
       "current": {
         "summary": "pip install . (or pip install -e . for an editable install)",
-        "markers": ["pip install .", "pip install -e .", "python -m build"]
+        "markers": [
+          "pip install .",
+          "pip install -e .",
+          "python -m build"
+        ]
       },
-      "authoritative_sources": ["packaging.python.org", "setuptools.pypa.io"]
+      "authoritative_sources": [
+        "packaging.python.org",
+        "setuptools.pypa.io"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "react-reactdom-render",
@@ -80,13 +134,20 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "ReactDOM.render was deprecated in React 18",
-        "markers": ["reactdom.render("]
+        "markers": [
+          "reactdom.render("
+        ]
       },
       "current": {
         "summary": "createRoot(container).render(<App />)",
-        "markers": ["createroot"]
+        "markers": [
+          "createroot"
+        ]
       },
-      "authoritative_sources": ["react.dev"]
+      "authoritative_sources": [
+        "react.dev"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "react-component-will-mount",
@@ -96,13 +157,23 @@
       "change_type": "renamed",
       "stale": {
         "summary": "componentWillMount is a legacy lifecycle method",
-        "markers": ["componentwillmount"]
+        "markers": [
+          "componentwillmount"
+        ]
       },
       "current": {
         "summary": "use componentDidMount, or the UNSAFE_ prefixed name if you truly need it",
-        "markers": ["componentdidmount", "unsafe_componentwillmount", "useeffect"]
+        "markers": [
+          "componentdidmount",
+          "unsafe_componentwillmount",
+          "useeffect"
+        ]
       },
-      "authoritative_sources": ["react.dev", "legacy.reactjs.org"]
+      "authoritative_sources": [
+        "react.dev",
+        "legacy.reactjs.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "docker-compose-v1",
@@ -112,13 +183,24 @@
       "change_type": "superseded",
       "stale": {
         "summary": "the standalone docker-compose (V1) binary is end of life",
-        "markers": ["docker-compose up", "docker-compose -f", "pip install docker-compose"]
+        "markers": [
+          "docker-compose up",
+          "docker-compose -f",
+          "pip install docker-compose"
+        ]
       },
       "current": {
         "summary": "docker compose up, the V2 plugin built into the Docker CLI",
-        "markers": ["docker compose up", "compose v2", "compose plugin"]
+        "markers": [
+          "docker compose up",
+          "compose v2",
+          "compose plugin"
+        ]
       },
-      "authoritative_sources": ["docs.docker.com"]
+      "authoritative_sources": [
+        "docs.docker.com"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "compose-file-version-key",
@@ -128,13 +210,26 @@
       "change_type": "obsolete",
       "stale": {
         "summary": "a top-level version: \"3.x\" key",
-        "markers": ["version: '3", "version: \"3", "version: 3"]
+        "markers": [
+          "version: '3",
+          "version: \"3",
+          "version: 3"
+        ]
       },
       "current": {
         "summary": "the version key is obsolete and Compose warns about it",
-        "markers": ["obsolete", "no longer required", "not required", "can be omitted", "compose specification"]
+        "markers": [
+          "obsolete",
+          "no longer required",
+          "not required",
+          "can be omitted",
+          "compose specification"
+        ]
       },
-      "authoritative_sources": ["docs.docker.com"]
+      "authoritative_sources": [
+        "docs.docker.com"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "k8s-podsecuritypolicy",
@@ -144,13 +239,23 @@
       "change_type": "removed",
       "stale": {
         "summary": "PodSecurityPolicy was removed in Kubernetes 1.25",
-        "markers": ["podsecuritypolicy", "kind: podsecuritypolicy"]
+        "markers": [
+          "podsecuritypolicy",
+          "kind: podsecuritypolicy"
+        ]
       },
       "current": {
         "summary": "Pod Security Admission with the Pod Security Standards, or a policy engine",
-        "markers": ["pod security admission", "pod security standards", "podsecurity admission"]
+        "markers": [
+          "pod security admission",
+          "pod security standards",
+          "podsecurity admission"
+        ]
       },
-      "authoritative_sources": ["kubernetes.io"]
+      "authoritative_sources": [
+        "kubernetes.io"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "kubectl-run-generator",
@@ -160,13 +265,20 @@
       "change_type": "removed",
       "stale": {
         "summary": "kubectl run --generator was removed; kubectl run only creates pods now",
-        "markers": ["--generator"]
+        "markers": [
+          "--generator"
+        ]
       },
       "current": {
         "summary": "kubectl create deployment",
-        "markers": ["kubectl create deployment"]
+        "markers": [
+          "kubectl create deployment"
+        ]
       },
-      "authoritative_sources": ["kubernetes.io"]
+      "authoritative_sources": [
+        "kubernetes.io"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "apt-key-add",
@@ -176,13 +288,25 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "apt-key add is deprecated and adds a globally trusted key",
-        "markers": ["apt-key add", "apt-key adv"]
+        "markers": [
+          "apt-key add",
+          "apt-key adv"
+        ]
       },
       "current": {
         "summary": "store the key in /etc/apt/keyrings and reference it with signed-by",
-        "markers": ["/etc/apt/keyrings", "signed-by", "trusted.gpg.d"]
+        "markers": [
+          "/etc/apt/keyrings",
+          "signed-by",
+          "trusted.gpg.d"
+        ]
       },
-      "authoritative_sources": ["wiki.debian.org", "manpages.debian.org", "ubuntu.com"]
+      "authoritative_sources": [
+        "wiki.debian.org",
+        "manpages.debian.org",
+        "ubuntu.com"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "nginx-http2-listen",
@@ -192,13 +316,21 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "the http2 parameter of the listen directive is deprecated",
-        "markers": ["listen 443 ssl http2", "ssl http2;"]
+        "markers": [
+          "listen 443 ssl http2",
+          "ssl http2;"
+        ]
       },
       "current": {
         "summary": "the separate http2 on; directive",
-        "markers": ["http2 on"]
+        "markers": [
+          "http2 on"
+        ]
       },
-      "authoritative_sources": ["nginx.org"]
+      "authoritative_sources": [
+        "nginx.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "mysql-query-cache",
@@ -208,13 +340,24 @@
       "change_type": "removed",
       "stale": {
         "summary": "the query cache was removed in MySQL 8.0",
-        "markers": ["query_cache_size", "query_cache_type"]
+        "markers": [
+          "query_cache_size",
+          "query_cache_type"
+        ]
       },
       "current": {
         "summary": "there is no query cache; size the InnoDB buffer pool instead",
-        "markers": ["innodb_buffer_pool", "no query cache", "removed in mysql 8", "removed in 8.0"]
+        "markers": [
+          "innodb_buffer_pool",
+          "no query cache",
+          "removed in mysql 8",
+          "removed in 8.0"
+        ]
       },
-      "authoritative_sources": ["dev.mysql.com"]
+      "authoritative_sources": [
+        "dev.mysql.com"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "postgres-wal-level-archive",
@@ -224,13 +367,23 @@
       "change_type": "renamed",
       "stale": {
         "summary": "wal_level = archive and hot_standby were merged and removed as names",
-        "markers": ["wal_level = archive", "wal_level=archive", "wal_level = hot_standby"]
+        "markers": [
+          "wal_level = archive",
+          "wal_level=archive",
+          "wal_level = hot_standby"
+        ]
       },
       "current": {
         "summary": "wal_level = replica, which is the default",
-        "markers": ["wal_level = replica", "wal_level=replica"]
+        "markers": [
+          "wal_level = replica",
+          "wal_level=replica"
+        ]
       },
-      "authoritative_sources": ["postgresql.org"]
+      "authoritative_sources": [
+        "postgresql.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "redis-slaveof",
@@ -240,13 +393,20 @@
       "change_type": "renamed",
       "stale": {
         "summary": "SLAVEOF and slave-* config names are deprecated aliases",
-        "markers": ["slaveof"]
+        "markers": [
+          "slaveof"
+        ]
       },
       "current": {
         "summary": "REPLICAOF and the replica-* config names",
-        "markers": ["replicaof"]
+        "markers": [
+          "replicaof"
+        ]
       },
-      "authoritative_sources": ["redis.io"]
+      "authoritative_sources": [
+        "redis.io"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "git-switch-branch",
@@ -256,13 +416,21 @@
       "change_type": "superseded",
       "stale": {
         "summary": "git checkout -b still works but its overloaded behaviour is why it was split",
-        "markers": ["git checkout -b"]
+        "markers": [
+          "git checkout -b"
+        ]
       },
       "current": {
         "summary": "git switch -c, with git restore for files",
-        "markers": ["git switch -c", "git switch"]
+        "markers": [
+          "git switch -c",
+          "git switch"
+        ]
       },
-      "authoritative_sources": ["git-scm.com"]
+      "authoritative_sources": [
+        "git-scm.com"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "node-url-parse",
@@ -272,13 +440,22 @@
       "change_type": "deprecated",
       "stale": {
         "summary": "the legacy url.parse() API is deprecated",
-        "markers": ["url.parse("]
+        "markers": [
+          "url.parse("
+        ]
       },
       "current": {
         "summary": "the WHATWG URL class: new URL(input)",
-        "markers": ["new url(", "whatwg url", "url.canparse"]
+        "markers": [
+          "new url(",
+          "whatwg url",
+          "url.canparse"
+        ]
       },
-      "authoritative_sources": ["nodejs.org"]
+      "authoritative_sources": [
+        "nodejs.org"
+      ],
+      "cohort": "classic"
     },
     {
       "id": "java-simpledateformat",
@@ -288,13 +465,328 @@
       "change_type": "superseded",
       "stale": {
         "summary": "SimpleDateFormat is not thread safe and predates java.time",
-        "markers": ["simpledateformat", "new date()"]
+        "markers": [
+          "simpledateformat",
+          "new date()"
+        ]
       },
       "current": {
         "summary": "java.time with DateTimeFormatter",
-        "markers": ["datetimeformatter", "java.time", "localdatetime"]
+        "markers": [
+          "datetimeformatter",
+          "java.time",
+          "localdatetime"
+        ]
       },
-      "authoritative_sources": ["docs.oracle.com"]
+      "authoritative_sources": [
+        "docs.oracle.com"
+      ],
+      "cohort": "classic"
+    },
+    {
+      "id": "python-mp-forkserver",
+      "cohort": "recent",
+      "query": "what is the default multiprocessing start method on Linux in Python",
+      "product": "python",
+      "changed_in": "3.14",
+      "change_type": "changed default",
+      "announced": "2025-10-07",
+      "stale": {
+        "summary": "fork is the default start method on Linux",
+        "markers": [
+          "fork is the default",
+          "'fork' is the default",
+          "defaults to fork",
+          "default is fork",
+          "default on posix is fork",
+          "fork (default"
+        ]
+      },
+      "current": {
+        "summary": "forkserver is the default on Unix platforms other than macOS; fork must be requested explicitly",
+        "markers": [
+          "forkserver"
+        ]
+      },
+      "authoritative_sources": [
+        "docs.python.org"
+      ],
+      "source_url": "https://docs.python.org/3/whatsnew/3.14.html"
+    },
+    {
+      "id": "postgres-uuidv7",
+      "cohort": "recent",
+      "query": "how do I generate a UUIDv7 in Postgres",
+      "product": "postgresql",
+      "changed_in": "18",
+      "change_type": "superseded",
+      "announced": "2025-09-25",
+      "stale": {
+        "summary": "install the pg_uuidv7 extension or write your own PL/pgSQL function",
+        "markers": [
+          "pg_uuidv7",
+          "uuid_generate_v7"
+        ]
+      },
+      "current": {
+        "summary": "PostgreSQL 18 has a built-in uuidv7() function",
+        "markers": [
+          "uuidv7()",
+          "postgresql 18",
+          "postgres 18"
+        ]
+      },
+      "authoritative_sources": [
+        "postgresql.org"
+      ],
+      "source_url": "https://www.postgresql.org/docs/release/18.0/"
+    },
+    {
+      "id": "postgres-md5-auth",
+      "cohort": "recent",
+      "query": "how do I set up md5 password authentication in pg_hba.conf",
+      "product": "postgresql",
+      "changed_in": "18",
+      "change_type": "deprecated",
+      "announced": "2025-09-25",
+      "stale": {
+        "summary": "md5 password authentication is deprecated and will be removed in a future major version",
+        "markers": [
+          "md5"
+        ]
+      },
+      "current": {
+        "summary": "use scram-sha-256 password authentication",
+        "markers": [
+          "scram-sha-256"
+        ]
+      },
+      "authoritative_sources": [
+        "postgresql.org"
+      ],
+      "source_url": "https://www.postgresql.org/docs/release/18.0/"
+    },
+    {
+      "id": "nextjs-middleware-proxy",
+      "cohort": "recent",
+      "query": "how do I add middleware in Next.js",
+      "product": "nextjs",
+      "changed_in": "16",
+      "change_type": "renamed",
+      "announced": "2025-10-21",
+      "stale": {
+        "summary": "middleware.ts is deprecated for the Node.js runtime",
+        "markers": [
+          "middleware.ts",
+          "middleware.js"
+        ]
+      },
+      "current": {
+        "summary": "rename middleware.ts to proxy.ts and the exported function to proxy",
+        "markers": [
+          "proxy.ts",
+          "proxy.js"
+        ]
+      },
+      "authoritative_sources": [
+        "nextjs.org"
+      ],
+      "source_url": "https://nextjs.org/blog/next-16"
+    },
+    {
+      "id": "nextjs-next-lint",
+      "cohort": "recent",
+      "query": "how do I lint a Next.js app",
+      "product": "nextjs",
+      "changed_in": "16",
+      "change_type": "removed",
+      "announced": "2025-10-21",
+      "stale": {
+        "summary": "the next lint command was removed and next build no longer lints",
+        "markers": [
+          "next lint"
+        ]
+      },
+      "current": {
+        "summary": "run ESLint or Biome directly (codemod: next-lint-to-eslint-cli)",
+        "markers": [
+          "next-lint-to-eslint-cli",
+          "eslint .",
+          "biome"
+        ]
+      },
+      "authoritative_sources": [
+        "nextjs.org"
+      ],
+      "source_url": "https://nextjs.org/blog/next-16"
+    },
+    {
+      "id": "react-use-effect-event",
+      "cohort": "recent",
+      "query": "how do I use useEffectEvent in React",
+      "product": "react",
+      "changed_in": "19.2",
+      "change_type": "stabilized",
+      "announced": "2025-10-01",
+      "stale": {
+        "summary": "useEffectEvent is experimental and imported as experimental_useEffectEvent",
+        "markers": [
+          "experimental_useeffectevent"
+        ]
+      },
+      "current": {
+        "summary": "useEffectEvent ships in React 19.2",
+        "markers": [
+          "react 19.2",
+          "react@19.2",
+          "react v19.2"
+        ]
+      },
+      "authoritative_sources": [
+        "react.dev"
+      ],
+      "source_url": "https://react.dev/blog/2025/10/01/react-19-2"
+    },
+    {
+      "id": "k8s-ingress-nginx-retired",
+      "cohort": "recent",
+      "query": "how do I install the ingress-nginx controller in Kubernetes",
+      "product": "kubernetes",
+      "changed_in": "ingress-nginx retired March 2026",
+      "change_type": "retired",
+      "announced": "2025-11-11",
+      "stale": {
+        "summary": "ingress-nginx is retired; maintenance ended in March 2026",
+        "markers": [
+          "helm install ingress-nginx",
+          "ingress-nginx/ingress-nginx",
+          "ingress-nginx/controller"
+        ]
+      },
+      "current": {
+        "summary": "migrate to Gateway API, or to another Ingress controller",
+        "markers": [
+          "gateway api",
+          "gateway-api",
+          "httproute"
+        ]
+      },
+      "authoritative_sources": [
+        "kubernetes.io"
+      ],
+      "source_url": "https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/"
+    },
+    {
+      "id": "go-container-gomaxprocs",
+      "cohort": "recent",
+      "query": "how do I set GOMAXPROCS for a Golang service running in a container",
+      "product": "go",
+      "changed_in": "1.25",
+      "change_type": "superseded",
+      "announced": "2025-08-12",
+      "stale": {
+        "summary": "import go.uber.org/automaxprocs so GOMAXPROCS respects the container CPU limit",
+        "markers": [
+          "automaxprocs"
+        ]
+      },
+      "current": {
+        "summary": "Go 1.25 reads the cgroup CPU limit and sets GOMAXPROCS itself",
+        "markers": [
+          "go 1.25",
+          "container-aware",
+          "cgroup cpu bandwidth limit"
+        ]
+      },
+      "authoritative_sources": [
+        "go.dev"
+      ],
+      "source_url": "https://go.dev/doc/go1.25"
+    },
+    {
+      "id": "npm-classic-tokens-revoked",
+      "cohort": "recent",
+      "query": "how do I create an npm automation token to publish from GitHub Actions",
+      "product": "npm",
+      "changed_in": "classic tokens revoked 2025-12-09",
+      "change_type": "removed",
+      "announced": "2025-12-09",
+      "stale": {
+        "summary": "classic (automation) tokens were revoked and can no longer be created",
+        "markers": [
+          "automation token",
+          "classic token"
+        ]
+      },
+      "current": {
+        "summary": "trusted publishing (OIDC), or a granular access token",
+        "markers": [
+          "trusted publishing",
+          "granular access token",
+          "oidc"
+        ]
+      },
+      "authoritative_sources": [
+        "github.blog",
+        "docs.npmjs.com"
+      ],
+      "source_url": "https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/"
+    },
+    {
+      "id": "eslint-eslintrc-removed",
+      "cohort": "recent",
+      "query": "how do I configure ESLint with an .eslintrc file",
+      "product": "eslint",
+      "changed_in": "10",
+      "change_type": "removed",
+      "announced": "2026-02-06",
+      "stale": {
+        "summary": ".eslintrc.* and .eslintignore files are no longer honored",
+        "markers": [
+          ".eslintrc"
+        ]
+      },
+      "current": {
+        "summary": "flat config in eslint.config.js",
+        "markers": [
+          "eslint.config.",
+          "flat config"
+        ]
+      },
+      "authoritative_sources": [
+        "eslint.org"
+      ],
+      "source_url": "https://eslint.org/blog/2026/02/eslint-v10.0.0-released/"
+    },
+    {
+      "id": "typescript-moduleresolution-node",
+      "cohort": "recent",
+      "query": "what moduleResolution should I set in tsconfig for a Node.js project",
+      "product": "typescript",
+      "changed_in": "6.0",
+      "change_type": "deprecated",
+      "announced": "2026-03-23",
+      "stale": {
+        "summary": "--moduleResolution node (node10) is deprecated",
+        "markers": [
+          "\"moduleresolution\": \"node\"",
+          "moduleresolution: node",
+          "\"node10\"",
+          "moduleresolution node"
+        ]
+      },
+      "current": {
+        "summary": "nodenext for code Node runs directly, bundler when a bundler resolves imports",
+        "markers": [
+          "nodenext",
+          "\"bundler\""
+        ]
+      },
+      "authoritative_sources": [
+        "typescriptlang.org",
+        "devblogs.microsoft.com"
+      ],
+      "source_url": "https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/"
     }
   ]
 }
