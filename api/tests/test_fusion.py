@@ -74,3 +74,32 @@ def test_signals_surface_on_sources():
     fuse(h)
     row = _sources([h])[0]
     assert row["rank_signals"]["fused"] == round(h.score, 6)
+
+
+def _page(cid, rrf, text, *, url="http://d", title="T", trust=None):
+    h = _hit(cid, rrf, trust=trust)
+    h.text, h.document_url, h.title = text, url, title
+    return h
+
+
+def test_page_about_another_product_ranks_below_one_about_the_query():
+    postgres = _page(1, 0.60, "Tune shared_buffers for caching.", trust=0.95,
+                     url="https://www.postgresql.org/docs/16/runtime-config.html")
+    mysql = _page(2, 0.45, "The query cache was removed in MySQL 8.0.", trust=0.4)
+    fuse(postgres, ["mysql"])
+    fuse(mysql, ["mysql"])
+    assert mysql.score > postgres.score
+    assert postgres.rank_signals["focus"] < 1.0 and mysql.rank_signals["focus"] == 1.0
+
+
+def test_url_and_title_count_as_naming_the_product():
+    h = _page(1, 0.5, "Use datetime.now(timezone.utc).",
+              url="https://docs.python.org/3/library/datetime.html")
+    fuse(h, ["python"])
+    assert h.rank_signals["focus"] == 1.0
+
+
+def test_no_named_product_leaves_scores_alone():
+    h = _page(1, 0.5, "anything")
+    fuse(h, [])
+    assert h.score == 0.5 and h.rank_signals["focus"] == 1.0

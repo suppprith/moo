@@ -144,3 +144,26 @@ def test_agent_format_carries_version_flags(conn, monkeypatch):
                             format="agent", live=False)
     flags = {s["id"]: s.get("version_match") for s in out["sources"]}
     assert True in flags.values()
+
+
+def test_query_products_names_what_the_query_is_about():
+    from app.versions import query_products
+
+    assert query_products("how do I tune the MySQL query cache") == ["mysql"]
+    assert query_products("how do I parse a URL in Node.js") == ["node"]
+    assert query_products("create a deployment with kubectl run") == ["kubernetes"]
+    assert query_products("Postgres vs MySQL for analytics") == ["postgresql", "mysql"]
+
+
+def test_query_products_ignores_common_words():
+    from app.versions import query_products
+
+    assert query_products("how do I go about spring cleaning my repo") == []
+
+
+def test_mentions_product_reads_urls_but_not_substrings():
+    from app.versions import mentions_product
+
+    assert mentions_product("https://docs.python.org/3/library/", ["python"])
+    assert not mentions_product("javascript closures", ["java"])
+    assert not mentions_product("rm -rf node_modules", ["node"])

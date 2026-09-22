@@ -39,6 +39,7 @@ RECENCY_FLOOR = 0.85
 RECENCY_DECAY_PER_YEAR = 0.05
 FUSE_OVERSAMPLE = 10
 SIMHASH_HAMMING = 14  # measured: near-dups land at ~10-12, unrelated pairs at >=19
+OFF_FOCUS_PENALTY = 0.5
 
 
 def _shingles(text: str, n: int = 3):
@@ -164,13 +165,28 @@ def _recency_factor(published_at: str | None) -> float:
     return max(RECENCY_FLOOR, 1.0 - RECENCY_DECAY_PER_YEAR * age_years)
 
 
-def fuse(hit: RetrievedChunk) -> None:
-    """Blend trust, corroboration, recency and usefulness into the hit's score,
-    in place, recording the components on ``rank_signals``.
+def _focus_factor(hit: RetrievedChunk, products: list[str] | None) -> float:
+    """OFF_FOCUS_PENALTY when the query names a product and this chunk, its
+    heading, its title and its URL never mention it; 1.0 otherwise."""
+    if not products:
+        return 1.0
+    from .versions import mentions_product
+
+    where = " ".join(filter(None, (hit.title, hit.heading, hit.document_url, hit.text)))
+    return 1.0 if mentions_product(where, products) else OFF_FOCUS_PENALTY
+
+
+def fuse(hit: RetrievedChunk, focus: list[str] | None = None) -> None:
+    """Blend trust, corroboration, recency, usefulness and product focus into
+    the hit's score, in place, recording the components on ``rank_signals``.
 
     Usefulness is the opt-in signal from :mod:`app.feedback` and is exactly 1.0
     unless this store collected some, so a store that never opted in ranks
-    bit-for-bit as it did before the signal existed."""
+    bit-for-bit as it did before the signal existed.
+
+    Focus is the products the query names. Trust is a property of the source,
+    not of its fit to the question, so without it a well-trusted Postgres page
+    outranked the Stack Overflow thread that answered a MySQL question."""
     from .feedback import usefulness_factor
 
     rrf = hit.score
@@ -179,13 +195,15 @@ def fuse(hit: RetrievedChunk) -> None:
     corroboration_f = 1.0 + W_CORROBORATION * math.log2(1 + len(hit.alternates))
     recency_f = _recency_factor(hit.published_at)
     usefulness_f = usefulness_factor(hit.usefulness)
-    hit.score = rrf * trust_f * corroboration_f * recency_f * usefulness_f
+    focus_f = _focus_factor(hit, focus)
+    hit.score = rrf * trust_f * corroboration_f * recency_f * usefulness_f * focus_f
     hit.rank_signals = {
         "rrf": round(rrf, 6),
         "trust": round(trust_f, 4),
         "corroboration": round(corroboration_f, 4),
         "recency": round(recency_f, 4),
         "usefulness": round(usefulness_f, 4),
+        "focus": focus_f,
         "fused": round(hit.score, 6),
     }
 
@@ -201,6 +219,7 @@ def retrieve(
     source_boost: dict[str, float] | None = None,
     index_weights: tuple[float, float] | None = None,
     fuse_signals: bool = True,
+    focus: list[str] | None = None,
 ) -> list[RetrievedChunk]:
     """Hybrid retrieval over both indexes. ``queries`` adds fan-out variants
 ; ``source_boost`` lets query understanding weight source types
@@ -208,7 +227,12 @@ def retrieve(
     ``index_weights`` = (vector, keyword) RRF vote multipliers from the
     adaptive router. ``fuse_signals=False`` returns plain RRF order, which is
     what the eval harness ablates the trust/corroboration/recency blend
-    against."""
+    against. ``focus`` is the products the query is about; by default they
+    are read from ``query``, and ``focus=[]`` turns the check off."""
+    if focus is None:
+        from .versions import query_products
+
+        focus = query_products(query)
     variants = [query] + [q for q in (queries or []) if q and q != query]
     filters = {"source_types": source_types, "since": since}
     w_vec, w_kw = index_weights or (1.0, 1.0)
@@ -264,7 +288,7 @@ def retrieve(
         priors = usefulness_signal(conn, [h.chunk_id for h in out], doc_of)
         for hit in out:
             hit.usefulness = priors.get(hit.chunk_id, 0.0)
-            fuse(hit)
+            fuse(hit, focus)
         out.sort(key=lambda h: -h.score)
     return out[:k]
 

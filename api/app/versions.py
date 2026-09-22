@@ -105,6 +105,47 @@ def matches(mention: Mention, constraint: Mention) -> bool:
     return mv[: len(cv)] == cv or cv[: len(mv)] == mv
 
 
+FOCUS_ALIASES: dict[str, str] = {
+    **PRODUCT_ALIASES,
+    "nginx": "nginx", "apache": "apache", "httpd": "apache",
+    "kubectl": "kubernetes", "helm": "helm", "apt": "apt", "apt-get": "apt",
+    "next.js": "nextjs", "nextjs": "nextjs", "tailwind": "tailwind",
+    "pandas": "pandas", "numpy": "numpy", "pydantic": "pydantic",
+    "javascript": "javascript", "c#": "csharp", ".net": "dotnet", "dotnet": "dotnet",
+    "kotlin": "kotlin", "swift": "swift", "gradle": "gradle", "maven": "maven",
+    "webpack": "webpack", "vite": "vite", "eslint": "eslint", "yarn": "yarn",
+    "pnpm": "pnpm", "deno": "deno", "bun": "bun", "elasticsearch": "elasticsearch",
+    "kafka": "kafka", "graphql": "graphql", "celery": "celery", "sqlalchemy": "sqlalchemy",
+}
+# Too common as plain words to say what a query is about. They still match
+# when a document is checked for a product the query named some other way.
+_AMBIGUOUS_FOCUS = {"go", "pg", "uv", "spring", "rails", "swift", "bun", "helm", "apache"}
+_FOCUS_RE = re.compile(
+    r"(?<![\w-])(" + "|".join(sorted(map(re.escape, FOCUS_ALIASES), key=len, reverse=True))
+    + r")(?![\w-])", re.I)
+
+
+def query_products(query: str) -> list[str]:
+    """The products a query is about, canonical and in order: "tune the MySQL
+    query cache" -> ["mysql"]. Words that are usually not product names ("go",
+    "spring") are left out so ordinary prose does not narrow the search."""
+    found: list[str] = []
+    for m in _FOCUS_RE.finditer(query):
+        alias = m.group(1).lower()
+        if alias in _AMBIGUOUS_FOCUS:
+            continue
+        canon = FOCUS_ALIASES[alias]
+        if canon not in found:
+            found.append(canon)
+    return found
+
+
+def mentions_product(text: str, products: list[str]) -> bool:
+    """Does ``text`` name any of ``products`` by any of its aliases?"""
+    wanted = set(products)
+    return any(FOCUS_ALIASES[m.group(1).lower()] in wanted for m in _FOCUS_RE.finditer(text))
+
+
 MATCH_BOOST = 1.25
 OUTDATED_PENALTY = 0.75
 
