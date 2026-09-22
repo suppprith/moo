@@ -28,6 +28,7 @@ TIER_PRIORS = {
 }
 
 OFF_DOMAIN_THRESHOLD = 0.5
+MAX_PER_HOST = 2
 
 _HOSTS: dict[str, tuple[str, str]] = {
     "docs.python.org": ("docs", "docs"),
@@ -141,11 +142,21 @@ def rank_candidates(
     cands: list[Candidate], *, max_pages: int = 6
 ) -> list[tuple[Candidate, DomainInfo]]:
     """Order candidates by domain prior (desc), then provider rank; drop
-    blocked hosts; cap at ``max_pages``."""
+    blocked hosts; cap at ``max_pages``.
+
+    No host gets more than ``MAX_PER_HOST`` pages while another host is
+    waiting. Discovery for a coding query is often mostly Stack Overflow, and
+    ranked by prior alone those threads took every page slot, so the one docs
+    page or changelog that said what is current never got fetched. Extra pages
+    from one host still backfill slots nobody else wants."""
     scored = [(c, classify(c.url)) for c in cands]
     scored = [(c, d) for c, d in scored if d.tier != "blocked"]
     scored.sort(key=lambda cd: (-cd[1].prior, cd[0].rank))
-    return scored[:max_pages]
+    first, overflow, per_host = [], [], {}
+    for c, d in scored:
+        per_host[d.host] = per_host.get(d.host, 0) + 1
+        (first if per_host[d.host] <= MAX_PER_HOST else overflow).append((c, d))
+    return (first + overflow)[:max_pages]
 
 
 def domain_confidence(cands: list[Candidate], *, top: int = 8) -> float:

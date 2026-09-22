@@ -61,6 +61,14 @@ def test_rank_caps_at_max_pages():
     assert len(rank_candidates(cands, max_pages=3)) == 3
 
 
+def test_one_host_cannot_take_every_slot():
+    cands = [Candidate(f"https://stackoverflow.com/questions/{i}", rank=i) for i in range(5)]
+    cands.append(Candidate("https://dev.to/someone/utcnow-is-deprecated", rank=5))
+    urls = [c.url for c, _ in rank_candidates(cands, max_pages=4)]
+    assert "https://dev.to/someone/utcnow-is-deprecated" in urls
+    assert sum("stackoverflow.com" in u for u in urls) == 3  # backfills the rest
+
+
 DEV_CANDS = [
     Candidate("https://stackoverflow.com/questions/1", rank=0),
     Candidate("https://docs.python.org/3/library/gc.html", rank=1),
