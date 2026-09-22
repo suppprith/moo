@@ -10,6 +10,11 @@ queries: 0.9 means "directly on topic" for every query, not just this one.
 One batched encode scores every sentence of every hit in a single model call.
 Fenced code blocks are kept whole as candidate spans (the exact code line is
 often the answer); tiny fragments are skipped.
+
+A span that says something changed ("deprecated since 3.12", "was removed in
+8.0", "renamed to proxy.ts") takes the last highlight slot when it is nearly as
+on-topic as the best span. That sentence is usually the one an agent most needs
+and least expects, and similarity alone ranks it below the how-to text around it.
 """
 
 from __future__ import annotations
@@ -26,6 +31,11 @@ MAX_SENTENCES_PER_TEXT = 12
 MIN_SPAN_CHARS = 25
 MAX_SPAN_CHARS = 400
 DEFAULT_TOP = 2
+LIFECYCLE_MARGIN = 0.12
+
+_LIFECYCLE_RE = re.compile(
+    r"(deprecat\w*|removed in|was removed|been removed|no longer|superseded|obsolete|"
+    r"replaced by|renamed|retired|retirement|end[- ]of[- ]life|legacy)", re.I)
 
 
 def _spans(text: str) -> list[str]:
@@ -75,10 +85,27 @@ def highlight_hits(query: str, texts: list[str], *, top: int = DEFAULT_TOP) -> l
     for j, (i, sim) in enumerate(zip(owner, sims, strict=True)):
         by_owner.setdefault(i, []).append((j, float(sim), flat[j]))
     for i, scored in by_owner.items():
-        best = sorted(scored, key=lambda t: -t[1])[:top]
+        ranked = sorted(scored, key=lambda t: -t[1])
+        best = ranked[:top]
+        best = _with_lifecycle_span(best, ranked[top:])
         best.sort(key=lambda t: t[0])
         results[i] = {
             "highlights": [s for _, _, s in best],
-            "relevance": round(max(0.0, max(sim for _, sim, _ in best)), 4),
+            "relevance": round(max(0.0, ranked[0][1]), 4),
         }
     return results
+
+
+def _with_lifecycle_span(best: list, rest: list) -> list:
+    """Swap the weakest highlight for the best span that says something changed,
+    if none of the picks already does and that span is within LIFECYCLE_MARGIN of
+    the top similarity. The top span always stays."""
+    if len(best) < 2 or any(_LIFECYCLE_RE.search(s) for _, _, s in best):
+        return best
+    floor = best[0][1] - LIFECYCLE_MARGIN
+    for cand in rest:
+        if cand[1] < floor:
+            break
+        if _LIFECYCLE_RE.search(cand[2]):
+            return best[:-1] + [cand]
+    return best

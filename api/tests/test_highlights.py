@@ -75,3 +75,22 @@ def test_web_search_rows_carry_highlights(conn):
     top = out["results"][0]
     assert top["highlights"] and 0.0 < top["relevance"] <= 1.0
     assert "autovacuum" in " ".join(top["highlights"]).lower()
+
+
+CHANGED = ("To get the current time in UTC, call datetime.now(timezone.utc) from the datetime module. "
+           "The result is an aware datetime that carries its time zone with it. "
+           "You can format the returned datetime with strftime and an explicit format string. "
+           "Note that datetime.utcnow() is deprecated since Python 3.12 and returns a naive value.")
+
+
+def test_a_span_saying_something_changed_takes_the_last_slot():
+    got = highlight_hits("how do I get the current UTC time in Python", [CHANGED], top=2)
+    spans = got[0]["highlights"]
+    assert any("deprecated" in s for s in spans)
+    assert any("now(timezone.utc)" in s for s in spans)
+
+
+def test_the_lifecycle_swap_leaves_relevance_alone():
+    swapped = highlight_hits("how do I get the current UTC time in Python", [CHANGED], top=2)
+    single = highlight_hits("how do I get the current UTC time in Python", [CHANGED], top=1)
+    assert swapped[0]["relevance"] == single[0]["relevance"]
