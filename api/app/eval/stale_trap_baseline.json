@@ -1,27 +1,50 @@
 {
-  "n_traps": 18,
+  "n_traps": 29,
   "engines": {
     "moo_fast": {
       "summary": {
-        "n": 18,
+        "n": 29,
         "errors": 0,
-        "pass_rate": 0.0,
-        "current_rate": 0.056,
-        "flag_rate": 0.0,
+        "pass_rate": 0.276,
+        "current_rate": 0.724,
+        "flag_rate": 0.31,
         "structural_flag_rate": 0.0,
-        "silent_stale_rate": 0.056,
+        "silent_stale_rate": 0.207,
         "two_sided_rate": 0.0,
-        "latency_ms": 11991.7
+        "latency_ms": 13941.0,
+        "cohorts": {
+          "classic": {
+            "n": 18,
+            "errors": 0,
+            "pass_rate": 0.333,
+            "current_rate": 0.778,
+            "flag_rate": 0.389,
+            "structural_flag_rate": 0.0,
+            "silent_stale_rate": 0.222,
+            "two_sided_rate": 0.0
+          },
+          "recent": {
+            "n": 11,
+            "errors": 0,
+            "pass_rate": 0.182,
+            "current_rate": 0.636,
+            "flag_rate": 0.182,
+            "structural_flag_rate": 0.0,
+            "silent_stale_rate": 0.182,
+            "two_sided_rate": 0.0
+          }
+        }
       },
       "rows": [
         {
           "id": "python-utcnow",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
           "flagged_structurally": false,
-          "passes": false,
+          "passes": true,
           "silent_stale": false,
           "two_sided": false,
           "signals": {
@@ -32,62 +55,20 @@
             "two_sided": 0
           },
           "cues": [
-            "instead of"
+            "no longer",
+            "obsolete"
           ],
-          "quote": null
+          "quote": "h on jan 1, 1970? ## answer (score 377, 2025-03-26) for python 3, use `datetime.now(timezone.utc)` to get a timezone-aware datetime, and use `.timestamp()` to convert it to a timestamp. `\u2026 # how to get utc time in python? how do i get the u"
         },
         {
           "id": "python-distutils",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
           "flagged_structurally": false,
-          "passes": false,
-          "silent_stale": false,
-          "two_sided": false,
-          "signals": {
-            "disputed": 0,
-            "superseded": 0,
-            "version_validity": 0,
-            "version_outdated_sources": 0,
-            "two_sided": 0
-          },
-          "cues": [
-            "instead of"
-          ],
-          "quote": null
-        },
-        {
-          "id": "python-get-event-loop",
-          "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
-          "flagged_structurally": false,
-          "passes": false,
-          "silent_stale": false,
-          "two_sided": false,
-          "signals": {
-            "disputed": 0,
-            "superseded": 0,
-            "version_validity": 0,
-            "version_outdated_sources": 0,
-            "two_sided": 0
-          },
-          "cues": [
-            "instead of"
-          ],
-          "quote": null
-        },
-        {
-          "id": "python-setup-py-install",
-          "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
-          "flagged_structurally": false,
-          "passes": false,
+          "passes": true,
           "silent_stale": false,
           "two_sided": false,
           "signals": {
@@ -100,10 +81,57 @@
           "cues": [
             "outdated"
           ],
-          "quote": null
+          "quote": "tional details on configuring, packaging and distributing python projects with `setuptools` that aren\u2019t covered by the introductory tutorial in packaging py\u2026 # packaging and distributing projects\u00b6 - page status: - outdated - last reviewed"
+        },
+        {
+          "id": "python-get-event-loop",
+          "cohort": "classic",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": true,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "instead of"
+          ],
+          "quote": "ntax. ``` $ python -m asyncio asyncio repl ... use \"await\" directly instead of \"asyncio.run()\". type \"help\", \"copyright\", \"credits\" or \"license\" for more information. >>> import asyncio >>> await asyncio.sleep(10, result='hello') 'hello' ``"
+        },
+        {
+          "id": "python-setup-py-install",
+          "cohort": "classic",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "legacy"
+          ],
+          "quote": "me='foo', version='1.0', py_modules=['foo'], ) ``` ``` python setup.py install ``` installing python modules (legacy version)\u00b6 ### the new standard: distutils\u00b6 if you download a module source distribution, you can tell pre"
         },
         {
           "id": "react-reactdom-render",
+          "cohort": "classic",
           "error": false,
           "surfaces_current": true,
           "repeats_stale": false,
@@ -120,19 +148,20 @@
             "two_sided": 0
           },
           "cues": [
-            "not recommended"
+            "replaced by"
           ],
           "quote": "it initially looks like this: ``` import { strictmode } from \"react\"; import { createroot } from \"react-dom/client\"; import\u2026 ``` import { strictmode } from \"react\"; import { createroot } from \"react-dom/client\"; import \"./index.css\"; impor"
         },
         {
           "id": "react-component-will-mount",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
           "flags_stale": false,
           "flagged_structurally": false,
           "passes": false,
-          "silent_stale": false,
+          "silent_stale": true,
           "two_sided": false,
           "signals": {
             "disputed": 0,
@@ -142,17 +171,18 @@
             "two_sided": 0
           },
           "cues": [],
-          "quote": null
+          "quote": "`props` - `state` - `constructor(props)` - `componentdidcatch(error, info)` - `componentdidmount()` - `componentdidupdate(prevprops, prevstate, snapshot?)` - `componentwillmount()` - `componentwillreceiveprops(nextprops)` - `componentwillu"
         },
         {
           "id": "docker-compose-v1",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
           "flags_stale": false,
           "flagged_structurally": false,
           "passes": false,
-          "silent_stale": false,
+          "silent_stale": true,
           "two_sided": false,
           "signals": {
             "disputed": 0,
@@ -161,15 +191,14 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "as of "
-          ],
-          "quote": null
+          "cues": [],
+          "quote": "volumes in a single yaml configuration file. - start up your application: - `$ docker compose up`- with a single command, you create and start all the services from your configuration file. define services in docker compose compose guarant"
         },
         {
           "id": "compose-file-version-key",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -183,13 +212,40 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [],
-          "quote": null
+          "cues": [
+            "no longer",
+            "instead of"
+          ],
+          "quote": "ersion` top-level element in the `compose.yaml` file and relies entirely on the compose specification to interpret the file. history and development of docker compose ### compose file format versioning the docker compose clis are defined by"
         },
         {
           "id": "k8s-podsecuritypolicy",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": true,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "deprecated"
+          ],
+          "quote": "mission controllers as follows: - whenever you create a new cluster, enable the pod security admission controller. - immediately after creating a new cluster, create pod security policies, along with roles (or clusterroles) and ro\u2026 **cautio"
+        },
+        {
+          "id": "kubectl-run-generator",
+          "cohort": "classic",
+          "error": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -204,39 +260,17 @@
             "two_sided": 0
           },
           "cues": [],
-          "quote": null
-        },
-        {
-          "id": "kubectl-run-generator",
-          "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
-          "flagged_structurally": false,
-          "passes": false,
-          "silent_stale": false,
-          "two_sided": false,
-          "signals": {
-            "disputed": 0,
-            "superseded": 0,
-            "version_validity": 0,
-            "version_outdated_sources": 0,
-            "two_sided": 0
-          },
-          "cues": [
-            "legacy",
-            "outdated"
-          ],
-          "quote": null
+          "quote": "kubectl create deployment create a deployment with the specified name create a deployment with the specified name. ``` kubectl create deployment name --image=image -- [command] [args...] ``` ``` # create a deployment named my-dep that runs"
         },
         {
           "id": "apt-key-add",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
-          "repeats_stale": false,
-          "flags_stale": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
           "flagged_structurally": false,
-          "passes": false,
+          "passes": true,
           "silent_stale": false,
           "two_sided": false,
           "signals": {
@@ -247,12 +281,13 @@
             "two_sided": 0
           },
           "cues": [
-            "instead of"
+            "deprecated"
           ],
-          "quote": null
+          "quote": "fetch the latest repository signing key: - download the key: - `sudo mkdir -p /etc/apt/keyrings sudo curl --fail --silent --show-error \\ --output /etc/apt/keyrings/gitlab-keyring.asc \\ --url \"https://packages.gitlab.com/gpgkey/gpg.key\"` -"
         },
         {
           "id": "nginx-http2-listen",
+          "cohort": "classic",
           "error": false,
           "surfaces_current": false,
           "repeats_stale": false,
@@ -269,12 +304,14 @@
             "two_sided": 0
           },
           "cues": [
-            "as of "
+            "obsolete",
+            "since version"
           ],
           "quote": null
         },
         {
           "id": "mysql-query-cache",
+          "cohort": "classic",
           "error": false,
           "surfaces_current": false,
           "repeats_stale": true,
@@ -291,10 +328,11 @@
             "two_sided": 0
           },
           "cues": [],
-          "quote": "mysql query optimization - geeksforgeeks [mysqld] query_cache_type = 1 query_cache_size = 16m with query caching enabled, frequently executed queries can be served from the ** cache**, leading to faster response times and reduced load on th"
+          "quote": "eful with setting\u2026 ## answer (score 6, 2023-06-19) be careful with setting the query_cache_size and limit too high. mysql only uses a single thread to read from the query cache. mysql query optimization - geeksforgeeks [mysqld] query_cache"
         },
         {
           "id": "postgres-wal-level-archive",
+          "cohort": "classic",
           "error": false,
           "surfaces_current": false,
           "repeats_stale": false,
@@ -310,15 +348,14 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "outdated"
-          ],
+          "cues": [],
           "quote": null
         },
         {
           "id": "redis-slaveof",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -333,12 +370,13 @@
             "two_sided": 0
           },
           "cues": [],
-          "quote": null
+          "quote": "bind` address pointing to a local ip that your other machines ## can reach you. replicaof 10.0.0.1 6379` - restart the redis service for the changes to take effect. redis replication and failover providing your own instance ### example conf"
         },
         {
           "id": "git-switch-branch",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -352,15 +390,58 @@
             "version_outdated_sources": 0,
             "two_sided": 0
           },
-          "cues": [
-            "as of "
-          ],
-          "quote": null
+          "cues": [],
+          "quote": "m any commit. for example, switch to \"`head~3`\" and create branch \"`fixup`\": $ git switch -c fixup head~3 switched to a new branch 'fixup' if you want to start a new branch from a remote branch of the same name: $ git switch new-topic br"
         },
         {
           "id": "node-url-parse",
+          "cohort": "classic",
           "error": false,
-          "surfaces_current": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": true,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "legacy"
+          ],
+          "quote": "pathname = '/a/b/c'; const search = '?d=e'; const hash = '#fgh'; const myurl = new url(`https://example.org${pathname}${search}${hash}`); ``` node.js v26.10.0 documentation parses a string as a url. if `base` is provided, it will be used a"
+        },
+        {
+          "id": "java-simpledateformat",
+          "cohort": "classic",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": true,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "class datetimeformatter #### iso_datepublic static final datetimeformatter iso_date the iso date formatter that formats or parses a date with the offset if available, such as '2011-12-03' or '2011-12-03+01:00'.this returns an immutable form"
+        },
+        {
+          "id": "python-mp-forkserver",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
           "repeats_stale": false,
           "flags_stale": false,
           "flagged_structurally": false,
@@ -375,12 +456,99 @@
             "two_sided": 0
           },
           "cues": [
-            "as of "
+            "no longer"
           ],
-          "quote": null
+          "quote": "ich is the default. the possible start methods are - `'fork'`,- `'spawn'`and- `'forkserver'`. not all platforms support all methods. see contexts and start methods.- added i\u2026 - multiprocessing.get_all_start_methods()\u00b6 - returns a list of th"
         },
         {
-          "id": "java-simpledateformat",
+          "id": "postgres-uuidv7",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "# answer (score 1, accepted, 2025-12-04) ah. i figured it out. you need to add `uuidv7()` under the default section when creating a column like this: how can i do v7 using the gui? you need to add `uuidv7()` under the default section when c"
+        },
+        {
+          "id": "postgres-md5-auth",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": true,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "no longer"
+          ],
+          "quote": "in text in the latter case). to upgrade an existing installation from `md5` to `scram-sha-256`, after having ensured that all client libraries in use are new enough to support scram, set `password_encryption = 'scram-sha-256'` in `postgresq"
+        },
+        {
+          "id": "nextjs-middleware-proxy",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": true,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": true,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "nse; } return await au how to use multiple middlewares in next.js using the middleware.ts file? # how to use multiple middlewares in next.js using the middleware.ts file? i'm working on a next.js project and trying to implement multiple"
+        },
+        {
+          "id": "nextjs-next-lint",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": true,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": true,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "existing middleware: how can i see lint messages in next dev (next.js) now, if `next lint` passes (no errors, only warnings), it runs `next dev`; otherwise, the process stops there until the errors are fixed. ## answer (score 0, 2024-01-25)"
+        },
+        {
+          "id": "react-use-effect-event",
+          "cohort": "recent",
           "error": false,
           "surfaces_current": false,
           "repeats_stale": false,
@@ -397,12 +565,121 @@
             "two_sided": 0
           },
           "cues": [],
+          "quote": null
+        },
+        {
+          "id": "k8s-ingress-nginx-retired",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "ingress controller will stop receiving maintenance in march 2026. - **set up a gateway api controller.**this option replaces the nginx ingress controller and the use of the ingress api with an implementation of the kubernetes gateway api."
+        },
+        {
+          "id": "go-container-gomaxprocs",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "ault we want go to provide efficient and reliable defaults when possible, so in go 1.25, we have made `gomaxprocs` take into account its container environment by default. if a go process is running inside a container with a cpu limit, `goma"
+        },
+        {
+          "id": "npm-classic-tokens-revoked",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [],
+          "quote": "token: ${{ secrets.github_token }} fetch-depth: 0 - name: publ trusted publishing for npm packages | npm docs trusted publishing eliminates these risks by using short-lived, workflow-specific credentials that are automatica"
+        },
+        {
+          "id": "eslint-eslintrc-removed",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": true,
+          "repeats_stale": true,
+          "flags_stale": true,
+          "flagged_structurally": false,
+          "passes": true,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "no longer"
+          ],
+          "quote": "multiple c\u2026 this eslintrc file supports multiple configs with overrides: ``` // eslint.config.js import { defineconfig } from \"eslint/config\"; import js from \"@eslint/js\"; export default defineconfig([ js.configs.recommended, // recommende"
+        },
+        {
+          "id": "typescript-moduleresolution-node",
+          "cohort": "recent",
+          "error": false,
+          "surfaces_current": false,
+          "repeats_stale": false,
+          "flags_stale": false,
+          "flagged_structurally": false,
+          "passes": false,
+          "silent_stale": false,
+          "two_sided": false,
+          "signals": {
+            "disputed": 0,
+            "superseded": 0,
+            "version_validity": 0,
+            "version_outdated_sources": 0,
+            "two_sided": 0
+          },
+          "cues": [
+            "end of life"
+          ],
           "quote": null
         }
       ]
     }
   },
-  "task_set_version": "1.0",
+  "task_set_version": "1.1",
   "config": {
     "engines": [
       "moo_fast"
@@ -419,7 +696,12 @@
       {
         "name": "moo pass rate",
         "passed": false,
-        "detail": "best moo engine moo_fast flagged 0% of traps (bar 70%)"
+        "detail": "best moo engine moo_fast flagged 28% of traps (bar 70%)"
+      },
+      {
+        "name": "recent-change pass rate",
+        "passed": false,
+        "detail": "best moo engine moo_fast caught 18% of changes a model can't know from training (bar 70%)"
       },
       {
         "name": "margin over competitors",

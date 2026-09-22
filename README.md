@@ -416,15 +416,29 @@ warning is the failure being counted, and it is what a plain web search does.
 `--gate` exits non-zero unless moo clears 70% and leads every competitor that ran
 by a wide margin; `--transcript` writes the per-trap record, quotes included.
 
-The gate has three outcomes rather than two, and right now it returns the third:
-**not evaluated**. Every trap asks what the live web says today, so with no
-discovery provider configured nothing is fetched, every engine scores 0%, and
-the run proves nothing either way —
-[`stale_trap_baseline.json`](api/app/eval/stale_trap_baseline.json) records
-`live_provider: null` and says exactly that. Reporting it as a failure would cry
-wolf and reporting it as a pass would be a lie. Configure a provider and the same
-command returns a real verdict; `--gate --strict` is the launch check, where "we
-never ran it" must not read as success.
+Eleven of the 29 traps are a **recent** cohort: changes from August 2025 to
+March 2026 (Next.js 16's `proxy.ts`, Postgres 18's `uuidv7()`, ESLint 10 dropping
+`.eslintrc`, the ingress-nginx retirement) that a model can't know from training.
+Those are where search has to earn its place, so the gate also holds moo to 70%
+on that cohort alone. `plain_search`, the search provider's own result list with
+nothing of moo's on top, runs as the stand-in for an agent's built-in search.
+
+**Current verdict: FAIL.** Fast mode against live SearXNG, no LLM
+([`stale_trap_baseline.json`](api/app/eval/stale_trap_baseline.json), transcript
+in [`docs/stale-answer-demo.md`](docs/stale-answer-demo.md)): 28% pass overall
+and 18% on the recent cohort, with the current answer surfacing on 72% of traps.
+The first live run scored 0%. Most of that gain came from fixing three problems:
+Stack Overflow pages refused to a crawler, software queries dropped as off-topic,
+and pages about the wrong product outranking the right one. What's left is mostly
+traps where moo finds the current answer but never says the old one is outdated.
+That's the evidence layer's job, and it hasn't been measured with an LLM yet.
+
+The gate can also return **not evaluated**: with no discovery provider
+configured nothing is fetched, every engine scores 0%, and the run proves
+nothing either way. `--gate --strict` is the launch check, where "we never ran
+it" must not read as success. Running all 29 traps several times in a row
+against a keyless SearXNG gets its upstream engines rate-limited; a run with
+errors in its table isn't a verdict.
 
 ## Layout
 
