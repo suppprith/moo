@@ -1,5 +1,5 @@
 {
-  "name": "@moo/ai-sdk",
+  "name": "moo-ai-sdk",
   "version": "0.1.0",
   "description": "moo tools for the Vercel AI SDK: live software search with claim-level evidence",
   "license": "MIT",

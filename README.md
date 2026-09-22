@@ -147,7 +147,7 @@ optional field.
 ## Or use an SDK
 
 ```bash
-pip install moo        # Python, sync + async
+pip install moo-search # Python, sync + async
 npm install moo-js     # JavaScript and TypeScript, Node + edge runtimes
 ```
 
@@ -183,7 +183,7 @@ from llama_index_moo import MooRetriever, MooToolSpec    # LlamaIndex
 ```
 
 ```ts
-import { mooTools } from '@moo/ai-sdk';                  // Vercel AI SDK
+import { mooTools } from 'moo-ai-sdk';                  // Vercel AI SDK
 ```
 
 Each package wraps the SDK in that framework's own shapes: a retriever whose

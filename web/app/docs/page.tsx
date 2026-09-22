@@ -13,7 +13,7 @@ const QUICKSTARTS = [
     label: "MCP",
     body: "claude mcp add moo -- uv run --directory /path/to/moo/api python -m app.mcp_server",
   },
-  { label: "Python", body: 'pip install moo\nMoo().web_search("postgres connection pooling")' },
+  { label: "Python", body: 'pip install moo-search\nMoo().web_search("postgres connection pooling")' },
   { label: "JavaScript", body: 'npm install moo-js\nawait new Moo().webSearch("wal mode")' },
   {
     label: "HTTP",

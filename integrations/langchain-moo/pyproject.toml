@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["langchain", "search", "agents", "rag", "retriever"]
-dependencies = ["langchain-core>=0.3", "moo>=0.1"]
+dependencies = ["langchain-core>=0.3", "moo-search>=0.1"]
 
 [project.urls]
 Homepage = "https://github.com/suppprith/moo"

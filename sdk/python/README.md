@@ -3,8 +3,10 @@
 Official Python client for [moo](https://github.com/suppprith/moo), search infrastructure for AI agents: live web search over software sources, an evidence layer that flags where sources disagree, and cited deep research.
 
 ```bash
-pip install moo
+pip install moo-search
 ```
+
+The distribution is `moo-search` because `moo` is taken on PyPI; the import is still `moo`.
 
 ## Replace your agent's web_search
 

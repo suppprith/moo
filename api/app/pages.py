@@ -116,7 +116,7 @@ def key_issued_page(key: str, *, login: str | None, credits: int | None, base_ur
   -H 'content-type: application/json' \\
   -d '{{"query":"why is my postgres connection pool exhausted"}}'</pre>
     <h2>Or point an agent at it</h2>
-    <pre>pip install moo        # python
+    <pre>pip install moo-search # python
 npm install moo-js     # javascript
 
 export MOO_BASE_URL={html.escape(base_url)}

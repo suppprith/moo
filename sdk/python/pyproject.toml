@@ -1,5 +1,5 @@
 [project]
-name = "moo"
+name = "moo-search"
 version = "0.1.0"
 description = "Official Python SDK for moo: search infrastructure for AI agents"
 readme = "README.md"

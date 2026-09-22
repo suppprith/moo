@@ -1,16 +1,16 @@
-# @moo/ai-sdk
+# moo-ai-sdk
 
 [moo](https://github.com/suppprith/moo) tools for the [Vercel AI SDK](https://ai-sdk.dev): live web search scoped to software and computer science, with claim-level evidence, trust scores, and cited deep research.
 
 ```bash
-npm install @moo/ai-sdk moo-js
+npm install moo-ai-sdk moo-js
 ```
 
 ```ts
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { Moo } from 'moo-js';
-import { mooTools } from '@moo/ai-sdk';
+import { mooTools } from 'moo-ai-sdk';
 
 const { text } = await generateText({
   model: anthropic('claude-sonnet-5'),
@@ -51,7 +51,7 @@ mooTools(client, {
 The client is typed structurally, so `moo-js` is an optional peer dependency: anything with `webSearch`, `extract` and `research` works, including a stub in tests.
 
 ```ts
-import type { MooClientLike } from '@moo/ai-sdk';
+import type { MooClientLike } from 'moo-ai-sdk';
 ```
 
 ## A note on untrusted content

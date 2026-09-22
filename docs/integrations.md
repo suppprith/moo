@@ -11,7 +11,7 @@ same wherever you call from.
 | --- | --- | --- |
 | LangChain | [`langchain-moo`](../integrations/langchain-moo) | retriever + three tools |
 | LlamaIndex | [`llama-index-tools-moo`](../integrations/llamaindex-moo) | retriever + reader + tool spec |
-| Vercel AI SDK | [`@moo/ai-sdk`](../integrations/vercel-ai) | three tools |
+| Vercel AI SDK | [`moo-ai-sdk`](../integrations/vercel-ai) | three tools |
 | CrewAI | recipe below | one tool class |
 | OpenAI Agents SDK | recipe below | three function tools |
 | Raw OpenAI tool-use loop | `GET /v1/tools` | the function-tool definitions themselves |

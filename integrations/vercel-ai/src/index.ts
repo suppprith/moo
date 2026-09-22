@@ -2,7 +2,7 @@
  * moo tools for the Vercel AI SDK.
  *
  *     import { Moo } from 'moo-js';
- *     import { mooTools } from '@moo/ai-sdk';
+ *     import { mooTools } from 'moo-ai-sdk';
  *
  *     const result = await generateText({
  *       model: anthropic('claude-sonnet-5'),
